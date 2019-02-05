@@ -1,0 +1,13 @@
+session_name: probe-rs
+start_directory: ./
+windows:
+    - window_name: editor
+      focus: true
+      panes:
+          - vim
+    - window_name: rust shell
+      panes:
+          - shell_command: cargo watch
+    - window_name: misc shell
+      panes:
+          - pane
