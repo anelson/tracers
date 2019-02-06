@@ -1,0 +1,17 @@
+[package]
+name = "libstapsdt-sys"
+version = "0.1.0"
+authors = ["Adam Nelson <anelson@127.io>"]
+edition = "2018"
+license = "MIT"
+links = "stapsdt"
+build = "build.rs"
+
+[dependencies]
+
+[build-dependencies]
+pkg-config = "0.3.14"
+cc = "1.0"
+glob = "0.2.11"
+
+

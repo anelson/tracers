@@ -1,0 +1,13 @@
+[package]
+name = "probe-rs"
+version = "0.1.0"
+authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+libstapsdt-sys = { path = "libstapsdt-sys", version = "0.1.0" }
+
+[target.'cfg(all(target_arch = "x86_64", target_os = "linux"))'.dependencies]
+libstapsdt-sys = { path = "libstapsdt-sys", version = "0.1.0" }
+
