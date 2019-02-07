@@ -18,7 +18,7 @@ mod tests {
             assert!(!provider.is_null());
 
             let probe1 = providerAddProbe(provider, CString::new("probe1").unwrap().as_ptr(), 0);
-            assert!(probe1.is_null());
+            assert!(!probe1.is_null());
 
             let probe2 = providerAddProbe(
                 provider,
@@ -31,13 +31,13 @@ mod tests {
                 ArgType_t_int64,
                 ArgType_t_int32,
             );
-            assert!(probe2.is_null());
+            assert!(!probe2.is_null());
 
             //Probes are not loaded yet, so they definitely should not be enabled
             assert_eq!(0, probeIsEnabled(probe1));
             assert_eq!(0, probeIsEnabled(probe2));
 
-            assert_eq!(SDTError_t_noError, providerLoad(provider));
+            assert_eq!(0, providerLoad(provider));
 
             for _ in 0..100 {
                 probeFire(probe1);
@@ -52,7 +52,7 @@ mod tests {
                 );
             }
 
-            assert_eq!(SDTError_t_noError, providerUnload(provider));
+            assert_eq!(0, providerUnload(provider));
 
             providerDestroy(provider);
         }
