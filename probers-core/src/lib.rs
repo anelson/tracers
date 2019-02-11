@@ -14,6 +14,9 @@ pub trait ProbeArgType<T> {
     }
 }
 
+/// This trait, a companion to ProbeArgType<T>, wraps a supported type and on demand converts it to its equivalent C type.
+/// For scalar types that are directly supported there is no overhead to this wrapping, but many more complicated types, including
+/// Rust string types, need additional logic to produce a NULL-terminated byte array.
 pub trait ProbeArgWrapper<T> {
     type CType;
 
@@ -22,10 +25,17 @@ pub trait ProbeArgWrapper<T> {
     /// Convert the probe argument from it's Rust type to one compatible with the native
     /// tracing library infrastructure.
     fn to_c_type(&mut self) -> Self::CType;
+
+    /// This is ugly but unavoidable.  The underlying C type for an Opt<T> is the same C type as T.
+    /// We will use the default value for T to indicate a value of None.  That will have to be good enough.
+    fn default_c_value() -> Self::CType;
 }
 
+/// Wraps integer values of various types for conversion into the corresponding C types
 pub struct IntWrapper<T>(T);
 
+// Using the macro to avoid duplication, implement ProbeArgType<T> and ProbeArgWrapper<T> for
+// the Rust integer types
 macro_rules! impl_integer_arg_type {
     ( $rust_type:ident, $c_type:ident ) => {
         impl ProbeArgType<$rust_type> for $rust_type {
@@ -42,6 +52,10 @@ macro_rules! impl_integer_arg_type {
             fn to_c_type(&mut self) -> Self::CType {
                 self.0 as $c_type
             }
+
+            fn default_c_value() -> Self::CType {
+                0 as $c_type
+            }
         }
     };
 }
@@ -55,6 +69,8 @@ impl_integer_arg_type!(i16, c_int);
 impl_integer_arg_type!(u8, c_uint); //Ditto about chars
 impl_integer_arg_type!(i8, c_int);
 
+/// A wrapper around the Rust string slice type `&str`, which on demand converts the string slice
+/// into a null-terminated C-style string.
 pub struct StringWrapper<'a> {
     string: &'a str,
     c_string: Option<CString>,
@@ -102,6 +118,51 @@ impl<'a> ProbeArgWrapper<&'a str> for StringWrapper<'a> {
                 cstr.as_ptr()
             }
         }
+    }
+
+    fn default_c_value() -> Self::CType {
+        //In this case the default value is a null pointer.  Like it or not, it's a well-established convention
+        //to use this value to indicate the absence of a real value
+        0 as *const c_char
+    }
+}
+
+pub struct OptionWrapper<T: ProbeArgType<T>> {
+    inner_wrapper: Option<<T as ProbeArgType<T>>::WrapperType>,
+}
+
+impl<T> ProbeArgType<Option<T>> for Option<T>
+where
+    T: ProbeArgType<T>,
+{
+    type WrapperType = OptionWrapper<T>;
+}
+
+impl<T> ProbeArgWrapper<Option<T>> for OptionWrapper<T>
+where
+    T: ProbeArgType<T>,
+{
+    //When wrapping an Option<T>, the C type is the same as it would be for a T.
+    //If there is no value for the Option<T>, we will use the default_c_value() value instead.
+    type CType = <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::CType;
+
+    fn new(arg: Option<T>) -> Self {
+        let wrapped_arg =
+            arg.map(|val| <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::new(val));
+        OptionWrapper {
+            inner_wrapper: wrapped_arg,
+        }
+    }
+
+    fn to_c_type(&mut self) -> Self::CType {
+        match &mut self.inner_wrapper {
+            Some(wrapper) => wrapper.to_c_type(),
+            None => Self::default_c_value(),
+        }
+    }
+
+    fn default_c_value() -> Self::CType {
+        <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::default_c_value()
     }
 }
 
