@@ -1,0 +1,10 @@
+[package]
+name = "probers-core"
+version = "0.1.0"
+authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+c_str_macro = "1.0.2"
+
