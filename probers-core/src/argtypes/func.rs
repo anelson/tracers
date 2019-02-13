@@ -1,24 +1,27 @@
 use super::{ProbeArgType, ProbeArgWrapper};
 use std::fmt::Debug;
 
-impl<'a, T> ProbeArgType<&'a Fn() -> T> for &'a Fn() -> T
+impl<'a, F, T> ProbeArgType<&'a F> for &'a F
 where
+    F: Fn() -> T,
     T: ProbeArgType<T> + Debug,
 {
-    type WrapperType = FuncProbeArgTypeWrapper<'a, T>;
+    type WrapperType = FuncProbeArgTypeWrapper<'a, F, T>;
 }
 
-pub struct FuncProbeArgTypeWrapper<'a, T>(&'a Fn() -> T)
+pub struct FuncProbeArgTypeWrapper<'a, F, T>(&'a F)
 where
+    F: Fn() -> T,
     T: ProbeArgType<T> + Debug;
 
-impl<'a, T> ProbeArgWrapper<&'a Fn() -> T> for FuncProbeArgTypeWrapper<'a, T>
+impl<'a, F, T> ProbeArgWrapper<&'a F> for FuncProbeArgTypeWrapper<'a, F, T>
 where
+    F: Fn() -> T,
     T: ProbeArgType<T> + Debug,
 {
     type CType = <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::CType;
 
-    fn new(arg: &'a Fn() -> T) -> Self {
+    fn new(arg: &'a F) -> Self {
         FuncProbeArgTypeWrapper(arg)
     }
 
@@ -33,8 +36,9 @@ where
     }
 }
 
-impl<'a, T> Debug for FuncProbeArgTypeWrapper<'a, T>
+impl<'a, F, T> Debug for FuncProbeArgTypeWrapper<'a, F, T>
 where
+    F: Fn() -> T,
     T: ProbeArgType<T> + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -1,8 +1,12 @@
-pub mod custom;
-pub mod display;
+pub mod func;
 pub mod int;
 pub mod option;
 pub mod string;
+
+pub use func::*;
+pub use int::*;
+pub use option::*;
+pub use string::*;
 
 /// This trait is defined on any type which is supported as an argument to a probe.
 ///
