@@ -1,42 +1,25 @@
-use super::{ProbeArgType, ProbeArgWrapper};
-use std::fmt::Debug;
+use super::reftype::{RefTypeConverter, RefTypeWrapper};
+use super::{ProbeArgTraits, ProbeArgType};
 
-#[derive(Debug)]
-pub struct OptionWrapper<T: ProbeArgType<T> + Debug> {
-    inner_wrapper: Option<<T as ProbeArgType<T>>::WrapperType>,
+/// Using the generic RefTypeWrapper implementation, we'll implement a wrapper that converts to a
+/// T from Option<T> assuming T itself is supported as a ProbeArgType<T>
+pub struct OptionConverter {}
+
+impl<T> RefTypeConverter<Option<T>, T> for OptionConverter
+where
+    T: ProbeArgTraits<T> + Copy,
+{
+    fn ref_to_primitive(arg: &Option<T>) -> Option<T> {
+        //This trait was designed for cases where the conversion to the primitive tyep was
+        //fallible and thus could result in None.  In the case of the Option type that's
+        //literallyhow it's implemented.
+        *arg
+    }
 }
 
-impl<T> ProbeArgType<Option<T>> for Option<T>
+impl<'a, T> ProbeArgType<&'a Option<T>> for &'a Option<T>
 where
-    T: ProbeArgType<T> + Debug,
+    T: ProbeArgTraits<T> + Copy,
 {
-    type WrapperType = OptionWrapper<T>;
-}
-
-impl<T> ProbeArgWrapper<Option<T>> for OptionWrapper<T>
-where
-    T: ProbeArgType<T> + Debug,
-{
-    //When wrapping an Option<T>, the C type is the same as it would be for a T.
-    //If there is no value for the Option<T>, we will use the default_c_value() value instead.
-    type CType = <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::CType;
-
-    fn new(arg: Option<T>) -> Self {
-        let wrapped_arg =
-            arg.map(|val| <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::new(val));
-        OptionWrapper {
-            inner_wrapper: wrapped_arg,
-        }
-    }
-
-    fn to_c_type(&mut self) -> Self::CType {
-        match &mut self.inner_wrapper {
-            Some(wrapper) => wrapper.to_c_type(),
-            None => Self::default_c_value(),
-        }
-    }
-
-    fn default_c_value() -> Self::CType {
-        <<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper<T>>::default_c_value()
-    }
+    type WrapperType = RefTypeWrapper<'a, Option<T>, T, OptionConverter>;
 }

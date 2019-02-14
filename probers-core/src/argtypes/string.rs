@@ -7,19 +7,11 @@ use std::ffi::CString;
 pub struct StringConverter {}
 
 impl RefTypeConverter<str, CString> for StringConverter {
-    fn ref_to_primitive(arg: &str) -> CString {
-        match CString::new(arg) {
-            Ok(cstr) => {
-                //Unless `self.0` contains a NUL byte somewhere, this will succeed.
-                cstr
-            }
-            Err(_) => {
-                //This error means there was an embedded NUL byte in the string which can't be properly
-                //represented in a C string.  Use our default instead
-                CString::new("<probers-core failed to create CString>")
-                    .expect("Failed to create static CString")
-            }
-        }
+    fn ref_to_primitive(arg: &str) -> Option<CString> {
+        //Try to construct a CString from this Rust string.  If successful, return the new CString
+        //wrapped in an Option.  If not return None which will be passed to the probe
+        //infrastructure as a NULL pointer.
+        CString::new(arg).ok()
     }
 }
 

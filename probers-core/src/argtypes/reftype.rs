@@ -18,7 +18,7 @@ where
     RefT: ?Sized,
     PrimitiveT: ProbeArgTraits<PrimitiveT>,
 {
-    fn ref_to_primitive(arg: &RefT) -> PrimitiveT;
+    fn ref_to_primitive(arg: &RefT) -> Option<PrimitiveT>;
 }
 
 /// Generic wrapper around any type which is stored as a non-static reference, and which can be
@@ -47,7 +47,7 @@ where
     /// Invokes a closure passing a mutable reference to the generated wrapper for the primitive
     /// type constructed from the reference type.  If the wrapper was previously created this
     /// uses the previously created wrapper, if not it creates a new one first.
-    fn with_primitive_wrapper<F, ReturnT>(&mut self, f: F) -> ReturnT
+    fn with_primitive_wrapper<F, ReturnT>(&mut self, f: F) -> Option<ReturnT>
     where
         F: FnOnce(&mut <PrimitiveT as ProbeArgType<PrimitiveT>>::WrapperType) -> ReturnT,
     {
@@ -56,12 +56,13 @@ where
         //freed when the wrapper goes out of scope.  Thus we have to keep it around, hence the
         //Option type.
         let ref_arg = self.0;
-        let wrapper = self.1.get_or_insert_with(|| {
-            let primitive_arg = ConverterT::ref_to_primitive(ref_arg);
-            super::wrap(primitive_arg)
-        });
+        if self.1.is_none() {
+            let primitive_arg: Option<PrimitiveT> = ConverterT::ref_to_primitive(ref_arg);
+            let wrapped_arg = primitive_arg.map(super::wrap);
+            self.1 = wrapped_arg;
+        }
 
-        f(wrapper)
+        self.1.as_mut().map(f)
     }
 }
 
@@ -83,6 +84,7 @@ where
 
     fn to_c_type(&mut self) -> Self::CType {
         self.with_primitive_wrapper(|wrapper| wrapper.to_c_type())
+            .unwrap_or(Self::default_c_value())
     }
 
     fn default_c_value() -> Self::CType {
