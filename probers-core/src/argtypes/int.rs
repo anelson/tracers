@@ -16,7 +16,8 @@ macro_rules! impl_integer_arg_type {
             type CType = $c_type;
 
             fn as_c_type(&self) -> Self::CType {
-                *self as $c_type
+                //*self as $c_type
+                <$c_type>::from(*self)
             }
         }
     };

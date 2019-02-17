@@ -17,6 +17,6 @@ impl<'a> ProbeArgWrapper for Option<CString> {
     fn as_c_type(&self) -> Self::CType {
         self.as_ref()
             .map(|x| x.as_ptr())
-            .unwrap_or(Self::default_c_value())
+            .unwrap_or_else(Self::default_c_value)
     }
 }

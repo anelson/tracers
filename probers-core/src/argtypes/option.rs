@@ -20,7 +20,7 @@ where
     type WrapperType = OptionWrapper<<T as ProbeArgType<T>>::WrapperType>;
 
     fn wrap(arg: &Option<T>) -> Self::WrapperType {
-        OptionWrapper(arg.as_ref().map(|x| super::wrap(x)))
+        OptionWrapper(arg.as_ref().map(super::wrap))
     }
 }
 

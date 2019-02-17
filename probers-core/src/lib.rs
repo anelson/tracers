@@ -1,3 +1,5 @@
+#![deny(warnings)]
+
 pub mod argtypes;
 pub use crate::argtypes::*;
 
