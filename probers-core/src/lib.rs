@@ -19,7 +19,7 @@ mod tests {
         assert_eq!(2 + 2, 4);
     }
 
-    fn probe<A: ProbeArgTraits<A>>(arg: A) -> () {
+    fn probe<A: ProbeArgType<A>>(arg: A) -> () {
         let mut wrapper = wrap(arg);
         probe2(&mut wrapper);
     }

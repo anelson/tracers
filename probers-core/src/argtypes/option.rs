@@ -1,17 +1,17 @@
-//! This module implements `ProbeArgTraits` and `ProbeArgWrapper` for `Option<T>` for any `T`
+//! This module implements `ProbeArgType` and `ProbeArgWrapper` for `Option<T>` for any `T`
 //! whichwould itself be a valid probe argument type.  Well, sort of.  That's not entirely true.
 //!
 //! In fact `T` must be a `Copy` type, because in order to operate on the contents of the `Option` without consuming
 //! it, we do so with references to `T`.  Since probe arguments are usually either string references or scalar types, this
 //! restriction should not be a problem.
-use super::{ProbeArgNativeType, ProbeArgTraits, ProbeArgType, ProbeArgWrapper};
+use super::{ProbeArgNativeType, ProbeArgType, ProbeArgWrapper};
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::marker::Copy;
 
 impl<T> ProbeArgType<&Option<T>> for &Option<T>
 where
-    T: ProbeArgTraits<T> + Copy,
+    T: ProbeArgType<T> + Copy,
 {
     type WrapperType = Option<<T as ProbeArgType<T>>::WrapperType>;
 

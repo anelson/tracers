@@ -79,22 +79,6 @@ pub trait ProbeArgType<T> {
     fn wrap(arg: T) -> Self::WrapperType;
 }
 
-/// This trait helps us keep the code readable in spite of Rust's limitation in which type
-/// restrictions on super traits are not propagated intelligently.  This allows us to write type
-/// constraints like:
-/// ```noexecute
-/// ... where T: ProbeArgTraits<T>
-/// ```
-///
-/// instead of:
-///
-/// ```noexecute
-/// ... where T: ProbeArgDebug<T> + ProbeArgType<T> + (whatever we might add)
-/// ```
-pub trait ProbeArgTraits<T>: ProbeArgType<T> {}
-
-impl<T> ProbeArgTraits<T> for T where T: ProbeArgType<T> {}
-
 /// This trait, a companion to ProbeArgType<T>, wraps a supported type and on demand converts it to its equivalent C type.
 /// For scalar types that are directly supported there is no overhead to this wrapping, but many more complicated types, including
 /// Rust string types, need additional logic to produce a NULL-terminated byte array.
@@ -118,6 +102,6 @@ where
 }
 
 /// Helper function to wrap a probe arg in its correspondong wrapper without contorting one's fingers typing angle brackets
-pub fn wrap<T: ProbeArgTraits<T>>(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
+pub fn wrap<T: ProbeArgType<T>>(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
     <T as ProbeArgType<T>>::wrap(arg)
 }
