@@ -27,6 +27,13 @@ macro_rules! impl_native_type_trait {
     };
 }
 
+#[cfg(target_pointer_width = "16")]
+impl_native_type_trait!(usize, CType::UShort);
+#[cfg(target_pointer_width = "32")]
+impl_native_type_trait!(usize, CType::UInt);
+#[cfg(target_pointer_width = "64")]
+impl_native_type_trait!(usize, CType::ULongLong);
+
 impl_native_type_trait!(u64, CType::ULongLong);
 impl_native_type_trait!(i64, CType::LongLong);
 impl_native_type_trait!(u32, CType::UInt);

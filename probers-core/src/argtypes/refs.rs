@@ -14,3 +14,30 @@ where
         super::wrap(*arg)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::wrap;
+
+    #[test]
+    fn ref_str() {
+        let string: &str = "foo bar baz";
+        let ref_to_string: &&str = &string;
+
+        let wrapper = wrap(string);
+        let ref_wrapper = wrap(ref_to_string);
+
+        assert_eq!(wrapper, ref_wrapper);
+    }
+
+    #[test]
+    fn ref_int() {
+        let value = 5usize;
+        let ref_to_value = &value;
+
+        let wrapper = wrap(value);
+        let ref_wrapper = wrap(ref_to_value);
+
+        assert_eq!(wrapper, ref_wrapper);
+    }
+}

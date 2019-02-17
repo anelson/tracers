@@ -6,5 +6,8 @@ edition = "2018"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-c_str_macro = "1.0.2"
+
+[dev-dependencies]
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
 

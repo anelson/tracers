@@ -1,19 +1,40 @@
-use std::fmt::{Debug, Result};
+//! This module and its submodules implement a type-safe wrapper around Rust types such that any
+//! suitable type can be passed as a parameter to the C probing libraries with a minimum of
+//! overhead.
+//!
+//! In order to be able to use a type as a probe argument, that type `T` must implement
+//! `ProbeArgType<T>`, and there must be an implementation of `ProbeArgWrapper` suitable for that
+//! type.
+//!
+//! This library provides implementations for all of the following:
+//!
+//! * All integer types from `u8/i8` to `u64/i64`
+//! * `bool` (passed as an `i32` `1` means `true` and `0` means `false`)
+//! * String references `&str`
+//! * C-style string references `&CStr`
+//! * `Option<T>` for any `T` which is itself a supported probe argument type and implements `Copy`
+//! * Any pointer type, which is passed as either a 32- or 64-bit unsigned int depending upon
+//! architecture
+//!
+//!
+use std::fmt::Debug;
 
+pub mod bool;
 pub mod cstring;
 pub mod int;
 pub mod native;
 pub mod option;
+pub mod pointer;
 pub mod refs;
-//pub mod reftype;
 pub mod string;
 
+pub use self::bool::*;
 pub use cstring::*;
 pub use int::*;
 pub use native::*;
 pub use option::*;
+pub use pointer::*;
 pub use refs::*;
-//pub use reftype::*;
 pub use string::*;
 
 pub enum CType {
@@ -45,18 +66,6 @@ pub trait ProbeArgNativeTypeInfo {
 /// `get_default_value`.
 pub trait ProbeArgNativeType<T>: ProbeArgNativeTypeInfo {
     fn get_default_value() -> T;
-}
-
-/// This trait is defined on any type for which ProbeArgType<T> is defined.  It's a workaround
-/// Rust's limitations on implementing foreign traits.  We need to be assured we can get a string
-/// representation of any type for the implementation of tracing that uses Rust logging, and
-/// `Debug` is very convenient to implement while `Display` is not, so we use Debug as the basis.
-///
-/// There is a default implementation of this trait for all types that implement `Debug`.  Users
-/// of this library should not find themselves having to implement this trait; instead ensure
-/// your times implement `Debug` and this implementation will exist automatically.
-pub trait ProbeArgDebug<T> {
-    fn debug_format(&self, f: &mut std::fmt::Formatter) -> Result;
 }
 
 /// This trait is defined on any type which is supported as an argument to a probe.
