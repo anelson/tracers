@@ -1,20 +1,23 @@
-use super::reftype::{RefTypeConverter, RefTypeWrapper};
-use super::ProbeArgType;
+use super::{ProbeArgType, ProbeArgWrapper};
 use std::ffi::CString;
+use std::fmt::Debug;
+use std::os::raw::c_char;
 
-/// Using the generic RefTypeWrapper implementation, we'll implement a wrapper that converts to a
-/// CString.
-pub struct StringConverter {}
-
-impl RefTypeConverter<str, CString> for StringConverter {
-    fn ref_to_primitive(arg: &str) -> Option<CString> {
-        //Try to construct a CString from this Rust string.  If successful, return the new CString
-        //wrapped in an Option.  If not return None which will be passed to the probe
-        //infrastructure as a NULL pointer.
+impl<'a> ProbeArgType<&'a str> for &'a str {
+    type WrapperType = Option<CString>;
+    fn wrap(arg: &'a str) -> Self::WrapperType {
+        //Create a CString with the C representation of this string, which in theory can fail
+        //if the Rust string has embedded NUL characters which the C string cannot represent
         CString::new(arg).ok()
     }
 }
 
-impl<'a> ProbeArgType<&'a str> for &'a str {
-    type WrapperType = RefTypeWrapper<'a, str, CString, StringConverter>;
+impl<'a> ProbeArgWrapper for Option<CString> {
+    type CType = *const c_char;
+
+    fn as_c_type(&self) -> Self::CType {
+        self.as_ref()
+            .map(|x| x.as_ptr())
+            .unwrap_or(Self::default_c_value())
+    }
 }

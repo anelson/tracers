@@ -1,73 +1,22 @@
 //! This module provides an implementation of the arg type plumbing which passes a rust `CString` to a native C function by simply passing
 //! the pointer to the underlying memory.  This is inherently unsafe subject to the safety properties of the `CString` implementation.
-//!
-//! Note that we have two separate implementations, one consumes a CString and the other borrows
-//! it.  There are two separate use cases for these two variants.  The implementation in the
-//! `string` module produces a `CString` which should then be consumed and translated into a
-//! `*constcons c_char`.  By contrast, a user of the probe library passing in a CString will
-//! surelywant to do so by reference, thus two implementations are required.
 use super::{ProbeArgType, ProbeArgWrapper};
-use std::ffi::CString;
-use std::fmt::Debug;
-use std::os::raw::*;
+use std::ffi::CStr;
+use std::os::raw::c_char;
 
-pub struct CStringWrapper(CString);
-pub struct CStringRefWrapper<'a>(&'a CString);
-
-impl ProbeArgType<CString> for CString {
-    type WrapperType = CStringWrapper;
+impl<'a> ProbeArgType<&'a CStr> for &'a CStr {
+    type WrapperType = &'a CStr;
+    fn wrap(arg: &'a CStr) -> Self::WrapperType {
+        //Create a CString with the C representation of this string, which in theory can fail
+        //if the Rust string has embedded NUL characters which the C string cannot represent
+        arg
+    }
 }
 
-impl<'a> ProbeArgType<&'a CString> for &'a CString {
-    type WrapperType = CStringRefWrapper<'a>;
-}
-
-impl ProbeArgWrapper<CString> for CStringWrapper {
+impl<'a> ProbeArgWrapper for &'a CStr {
     type CType = *const c_char;
 
-    fn new(arg: CString) -> Self {
-        CStringWrapper(arg)
-    }
-
-    fn to_c_type(&mut self) -> Self::CType {
-        self.0.as_ptr()
-    }
-
-    fn default_c_value() -> Self::CType {
-        //In this case the default value is a null pointer.  Like it or not, it's a well-established convention
-        //to use this value to indicate the absence of a real value
-        0 as *const c_char
-    }
-}
-
-impl<'a> ProbeArgWrapper<&'a CString> for CStringRefWrapper<'a> {
-    type CType = *const c_char;
-
-    fn new(arg: &'a CString) -> Self {
-        CStringRefWrapper(arg)
-    }
-
-    fn to_c_type(&mut self) -> Self::CType {
-        self.0.as_ptr()
-    }
-
-    fn default_c_value() -> Self::CType {
-        //In this case the default value is a null pointer.  Like it or not, it's a well-established convention
-        //to use this value to indicate the absence of a real value
-        0 as *const c_char
-    }
-}
-
-impl Debug for CStringWrapper {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        //Just use the Debug impl on the value returned by the function
-        self.0.fmt(f)
-    }
-}
-
-impl<'a> Debug for CStringRefWrapper<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        //Just use the Debug impl on the value returned by the function
-        self.0.fmt(f)
+    fn as_c_type(&self) -> Self::CType {
+        self.as_ptr()
     }
 }
