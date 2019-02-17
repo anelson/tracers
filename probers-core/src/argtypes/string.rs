@@ -1,6 +1,5 @@
 use super::{ProbeArgType, ProbeArgWrapper};
 use std::ffi::CString;
-use std::fmt::Debug;
 use std::os::raw::c_char;
 
 impl<'a> ProbeArgType<&'a str> for &'a str {

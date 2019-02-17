@@ -7,8 +7,6 @@ use std::os::raw::c_char;
 impl<'a> ProbeArgType<&'a CStr> for &'a CStr {
     type WrapperType = &'a CStr;
     fn wrap(arg: &'a CStr) -> Self::WrapperType {
-        //Create a CString with the C representation of this string, which in theory can fail
-        //if the Rust string has embedded NUL characters which the C string cannot represent
         arg
     }
 }

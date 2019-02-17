@@ -1,8 +1,7 @@
 //! This module ensures that if `ProbeArgTraits` and `ProbeArgWrapper` are implemented for some `T`, then they are also implemented for `&T`.
 //! This is necessary for convenience and also to support our generialized implementation for `Option<T>`
 
-use super::{ProbeArgNativeType, ProbeArgTraits, ProbeArgType, ProbeArgWrapper};
-use std::fmt::Debug;
+use super::{ProbeArgTraits, ProbeArgType};
 use std::marker::Copy;
 
 impl<'a, T> ProbeArgType<&'a T> for &'a T
