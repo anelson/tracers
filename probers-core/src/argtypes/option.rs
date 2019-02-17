@@ -51,7 +51,6 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{wrap, ProbeArgWrapper};
-    use std::ffi::{CStr, CString};
     use std::ptr;
 
     #[quickcheck]
@@ -68,29 +67,26 @@ mod tests {
     fn option_strings(x: String) -> bool {
         let some = Some(x.clone());
         let none: Option<String> = None;
+        let naked_wrapper = wrap(&x);
+        let opt_wrapper = wrap(&some);
 
-        let wrapper = wrap(&some);
-        let pointer = wrapper.as_c_type();
-        if pointer.is_null() {
-            //This may happen if the string x has embedded NUL bytes.  In that case the string
-            //cannot be represented as a C-style null terminated string.  Quicktest definitely
-            //generates such strings so for testing purposes just confirm that is indeed what
-            //happened
-            assert!(CString::new(x.as_str()).ok().is_none());
-        } else {
-            //Behold this is very dangerous.  `pointer` is the address of the C string
-            //which the wrapper created.  We'll use a `CStr` to attach to that pointer and then
-            //convconert it into a Rust string type so we can perform the comparison of their
-            //contents.  If `pointer` is not a valid pointer to a C-style string this can crash
-            let cstr = unsafe { CStr::from_ptr(pointer) };
-            let as_string = cstr
-                .to_str()
-                .expect("The string should always be valid unicode");
-
-            assert_eq!(x, as_string)
-        }
-
+        assert_eq!(naked_wrapper, opt_wrapper);
         assert_eq!(ptr::null(), wrap(&none).as_c_type());
+
+        // the same results should be produced for string references, except
+        // because those are handled by the generalized Option implementation and not the one
+        // specifically for Option<String>, there is an unfortunate double layer of Option, because
+        // the internal wrapper type for a &str is itself an Option<CString>, so an Option<&str>
+        // has a wrapper type of Option<Option<CString>>.  Ugly but without support for partial
+        // specialization in Rust I don't see a way around it.
+        let some = Some(x.as_str());
+        let none = None;
+        let naked_wrapper = wrap(x.as_str());
+        let opt_wrapper = wrap(&some);
+
+        assert_eq!(Some(naked_wrapper), opt_wrapper);
+        assert_eq!(ptr::null(), wrap::<&Option<&str>>(&none).as_c_type());
+
         true
     }
 }
