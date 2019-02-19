@@ -11,8 +11,8 @@ failure = "0.1.5"
 [build-dependencies]
 failure = "0.1.5"
 
-
 [dev-dependencies]
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
+libc = "0.2.48"
 
