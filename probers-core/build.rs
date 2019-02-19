@@ -1,5 +1,9 @@
 //! Custom build script to programmatically generate support for tuples of up to 12 probe arguments.
 //!
+//! This may be some the gnarliest code I've written.  It's as messy and unsatisfying as most code
+//! generators I've had to write.  Thankfully most of the ugliness is in the code that generates
+//! the tests, so there's at least some automated eyes looking over my shoulder.
+//!
 //! See the code in the `probes` module for more details.
 use failure::Fallible;
 use std::env;
@@ -223,6 +227,7 @@ fn generate_test_unsafe_probe_impl() -> String {
 }
 
 fn generate_probe_tests() -> String {
+    const STRING_ARG_INDEX: usize = 4;
     const ARG_TYPES: &[(&str, &str)] = &[
         ("u64", "%u"),
         ("u32", "%u"),
@@ -258,18 +263,50 @@ fn generate_probe_tests() -> String {
 
     let mut decl = "".to_string();
 
-    for arity in 1..=MAX_QUICKCHECK_ARITY {
+    for arity in 1..=MAX_ARITY {
         //For every possible arity level, write some quickcheck tests that take a tuple and exercise
-        //the probe firing behavior
+        //the probe firing behavior.
+        //
+        //Note this test is made more complex by the fact that the max arity we support is currently 12, but
+        //quickcheck doesn't support more than 8 parameters to a function under test.  So you'll see this code get
+        //a bit creative; after 8 parameters, we introduce hard-coded strings as test values, so we can still exercise
+        //all of the probing code up to the maximum arity
         let type_params = get_type_param_names(arity);
+        let quickcheck_arg_count = if arity > MAX_QUICKCHECK_ARITY {
+            MAX_QUICKCHECK_ARITY
+        } else {
+            arity
+        };
+        let additional_arg_count = arity - quickcheck_arg_count;
 
+        //Quickcheck eligible args are generated the normal way, but after that we'll use strings
+        //Note that we reverse this, to ensure that the last elements of a tuple are always the quickcheck
+        //generated ones.  That ensures all 12 element positions get the full quickcheck exercise.
         let args = (1..=arity)
-            .map(choose_arg_for_n)
+            .rev()
+            .map(|n| {
+                if n <= MAX_QUICKCHECK_ARITY {
+                    choose_arg_for_n(n)
+                } else {
+                    let mut arg = choose_arg_for_n(STRING_ARG_INDEX);
+                    arg.0 = format!("arg{}", n);
+                    arg
+                }
+            })
             .collect::<Vec<(String, String, String, bool)>>();
 
+        //The parameters to this function are only the ones we expect quickcheck to produce
         let args_declaration: Vec<String> = args
             .iter()
+            .skip(additional_arg_count)
             .map(|(name, typ, _, _)| format!("{}: {}", name, typ))
+            .collect();
+
+        //To make up the difference, we'll declare some string locals ourselves
+        let additional_args_declaration: Vec<String> = args
+            .iter()
+            .take(additional_arg_count)
+            .map(|(name, _, _, _)| format!("let {name} = \"{name}\".to_string()", name = name))
             .collect();
 
         let expected_arg_values: Vec<String> = args
@@ -314,6 +351,7 @@ fn generate_probe_tests() -> String {
             #[quickcheck]
             fn test_fire{arg_count}({args_declaration}) -> bool {{
                 let mut probe_impl = make_test_probe("{c_format_string}".to_string());
+                {additional_args_declaration};
                 let probe_args={args_tuple};
                 probe_impl.fire(probe_args);
 
@@ -324,6 +362,7 @@ fn generate_probe_tests() -> String {
             "##,
             arg_count = type_params.len(),
             args_declaration = args_declaration.join(", "),
+            additional_args_declaration = additional_args_declaration.join(";\n"),
             c_format_string = c_format_string,
             args_tuple = args_tuple,
             rust_format_string = rust_format_string,
