@@ -27,6 +27,7 @@ fn main() -> Fallible<()> {
     }
 
     f.write_all(generate_unsafe_provider_probe_impl_trait().as_bytes())?;
+    f.write_all(generate_unsafe_provider_probe_native_impl_trait().as_bytes())?;
     f_tests.write_all(generate_tests().as_bytes())?;
 
     Ok(())
@@ -61,20 +62,7 @@ fn xform_types_i<F: FnMut(usize, &String) -> String>(
 }
 
 fn generate_probe_args_impl(type_params: &Vec<String>) -> String {
-    let probe_args;
-    let wrapper_decls;
-
-    if type_params.is_empty() {
-        wrapper_decls = "".to_string();
-        probe_args = "".to_string();
-    } else {
-        wrapper_decls = xform_types_i(&type_params, |i, _| {
-            format!("let wrapper{0} = wrap(self.{0})", i)
-        })
-        .join(";\n");
-        probe_args =
-            xform_types_i(&type_params, |i, _| format!("wrapper{}.as_c_type()", i)).join(",");;
-    };
+    let probe_args = xform_types_i(&type_params, |i, _| format!("self.{}", i));
 
     format!(
         r#"
@@ -87,7 +75,6 @@ fn generate_probe_args_impl(type_params: &Vec<String>) -> String {
                 vec![{ctypes}]
             }}
             fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &mut ImplT) -> () {{
-                {wrapper_decls};
                unsafe {{ probe.fire{arg_count}({probe_args}) }}
             }}
         }}
@@ -97,35 +84,29 @@ fn generate_probe_args_impl(type_params: &Vec<String>) -> String {
         args_where_clause = xform_types(&type_params, |x| format!("{t}: ProbeArgType<{t}>", t=x)).join(","),
         arg_count = type_params.len(),
         ctypes = xform_types(&type_params, |x| format!("get_ctype::<{}>()", x)).join(","),
-        wrapper_decls = wrapper_decls,
-        probe_args = probe_args
+        probe_args = probe_args.join(",")
     )
 }
 
-/// Apologies for the confusing name.  We have a trait, UnsafeProviderProbeImpl,
-/// which is implemented by the provider to fire the probe with a given set of args,
-/// such that the provider does not verify the arg count or type.  Thus, it is unsafe.
-/// The other layers in the API use the type system to ensure by the time a call gets
-/// to this point, it has the correct number and type of arguments.
-///
-/// The implementor of this API for a specific tracing library need only implement all 13
-/// possible `fire` methods, one for each number of args from 0 to 12.
+/// This generates the declaration of the `UnsafeProviderProbeImpl` trait.  This trait implements tracing
+/// for implementations that will operate on Rust types, not native C types.  The intention of this library
+/// is to support C native tracing libraries, so the only direct implementation of this trait is likely to be
+/// an implementation which simply logs the probe arguments to Rust's `logging` crate, for debugging purposes
+/// or use on platforms without a supported tracing library.
 fn generate_unsafe_provider_probe_impl_trait() -> String {
     let mut decl= r#"
-        /// Apologies for the confusing name.  We have a trait, UnsafeProviderProbeImpl,
-        /// which is implemented by the provider to fire the probe with a given set of args,
-        /// such that the provider does not verify the arg count or type.  Thus, it is unsafe.
-        /// The other layers in the API use the type system to ensure by the time a call gets
-        /// to this point, it has the correct number and type of arguments.
+        /// This trait is implemented by tracing providers that operate on probe arguments in their Rust represention, not
+        /// their C native representation.  Most implementations will not implement this trait directly but rather its subtrait
+        /// `UnsafeProviderProbeNativeImpl`, which provides an implementation of this trait which wraps all parameters in their
+        /// wrapper types and calls its own trait methods with native C representations of each argument.
+        ///
+        /// This trait and its subtrait `UnsafeProviderProbeNativeImpl` are both unsafe because the provider cannot necessarily
+        /// verify that the types and argument counts for the probe match those when the probe was first created.  This is partially for
+        /// performance reasons and also a practical limitation of the `var-arg` based implementations most commonly used in C tracing
+        /// libraries.
         ///
         /// The implementor of this API for a specific tracing library need only implement all 13
         /// possible `fire` methods, one for each number of args from 0 to 12.
-        ///
-        /// *IMPORTANT NOTE TO IMPLEMENTORS*: Each of the `fireN` methods take arguments which may be either
-        /// integers or possibly pointers to strings or other memory.  The caller guarantees that these are valid
-        /// addresses *only* for the duration of the call.  Immediatley after the `fireN` method returns this memory may
-        /// be freed.  Thus it's imperative that the probing implementation process probes synchronously.  Otherwise
-        /// invalid memory accesses are inevitable.
         pub trait UnsafeProviderProbeImpl
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
@@ -137,12 +118,63 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
 
     for arity in 1..=MAX_ARITY {
         //For every possible arity level, declare a `probeN` method that takes a tuple of N
-        //native (meaning C native) types to pass to the probe.
+        //`ProbeArgType<T>` types.  That is, types that are not wrapped yet but are passed as-is as Rust types.
         let type_params = get_type_param_names(arity);
 
         decl += &format!(
             r##"
             unsafe fn fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+                where {where_clause};
+            "##,
+            arg_count = type_params.len(),
+            type_list = type_params.join(","),
+            args = xform_types_i(&type_params, |i, x| format!("arg{}: {}", i, x)).join(","),
+            where_clause =
+                xform_types(&type_params, |x| format!("{t}: ProbeArgType<{t}>", t = x)).join(",")
+        );
+    }
+
+    decl.push_str("}");
+
+    decl
+}
+
+/// This generates the declaration of the `UnsafeProviderProbeNativeImpl` trait.  This trait provides an
+/// implementation of `UnsafeProviderProbeImpl`, which invokes the wrapper code to convert all of the arguments
+/// to their C native equivalent, and then passes that on to the specific implementator of `UnsafeProviderProbeNativeImpl`.
+fn generate_unsafe_provider_probe_native_impl_trait() -> String {
+    let mut decl= r#"
+        /// See `UnsafeProviderProbeImpl` for additional details.  This subtrait provides an implementation of
+        /// `UnsafeProviderProbeImpl` which wraps each of the Rust types into a `ProbeArgWrapper` and presents to the
+        /// implementor of this trait the C representation of each probe argument.  It is presumbed that implmeentations of
+        /// `UnsafeProviderProbeNativeImpl` are passing these parameters directly into C APIs.
+        ///
+        /// The implementor of this API for a specific tracing library need only implement all 13
+        /// possible `fire` methods, one for each number of args from 0 to 12.
+        ///
+        /// *IMPORTANT NOTE TO IMPLEMENTORS*: Each of the `fireN` methods take arguments which may be either
+        /// integers or possibly pointers to strings or other memory.  The caller guarantees that these are valid
+        /// addresses *only* for the duration of the call.  Immediatley after the `fireN` method returns this memory may
+        /// be freed.  Thus it's imperative that the probing implementation process probes synchronously.  Otherwise
+        /// invalid memory accesses are inevitable.
+        pub trait UnsafeProviderProbeNativeImpl
+        {
+            /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
+            /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
+            fn is_enabled(&self) -> bool;
+
+            /// This is actually identical to `fire0` but is provided for consistency with the other arities
+            unsafe fn c_fire0(&mut self) -> ();
+
+    "#.to_string();
+
+    for arity in 1..=MAX_ARITY {
+        //For every possible arity level `N`, declare the probe method `c_fireN` which takes C native argument types
+        let type_params = get_type_param_names(arity);
+
+        decl += &format!(
+            r##"
+            unsafe fn c_fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
                 where {where_clause};
             "##,
             arg_count = type_params.len(),
@@ -156,7 +188,52 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
         );
     }
 
-    decl.push_str("}");
+    decl += "}\n";
+
+    //Above was the declaration of UnsafeProviderProbeNativeImpl.  Now provide a blanket implementation of
+    //UnsafeProviderProbeImpl for all implementations of UnsafeProviderProbeNativeImpl which performs the conversion
+    //from Rust to C types using `ProbeArgWrapper`.
+    decl += r#"
+        impl<T: UnsafeProviderProbeNativeImpl> UnsafeProviderProbeImpl for T
+        {
+            fn is_enabled(&self) -> bool {
+                T::is_enabled(self)
+            }
+            unsafe fn fire0(&mut self) -> () { self.c_fire0() }
+
+    "#;
+
+    for arity in 1..=MAX_ARITY {
+        //For every possible arity level `N`, implement the `fireN` method declared in the parent trait,
+        //by wrapping each arg in its `ProbeArgWrapper` wrapper and passing a native C representation of that
+        //arg to the `c_fireN` method.
+        let type_params = get_type_param_names(arity);
+        let wrapper_decls = xform_types_i(&type_params, |i, _| {
+            format!("let wrapper{0} = wrap(arg{0})", i)
+        })
+        .join(";\n");
+        let probe_args =
+            xform_types_i(&type_params, |i, _| format!("wrapper{}.as_c_type()", i)).join(",");;
+
+        decl += &format!(
+            r##"
+            unsafe fn fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+                where {where_clause} {{
+                {wrapper_decls};
+                self.c_fire{arg_count}({probe_args});
+            }}
+            "##,
+            type_list = type_params.join(","),
+            arg_count = type_params.len(),
+            args = xform_types_i(&type_params, |i, x| format!("arg{}: {}", i, x)).join(","),
+            where_clause =
+                xform_types(&type_params, |x| format!("{t}: ProbeArgType<{t}>", t = x)).join(","),
+            wrapper_decls = wrapper_decls,
+            probe_args = probe_args,
+        );
+    }
+
+    decl += "}\n";
 
     decl
 }
@@ -177,12 +254,12 @@ fn generate_test_unsafe_probe_impl() -> String {
     let mut decl = r#"
 
     #[cfg(test)]
-    impl UnsafeProviderProbeImpl for TestingProviderProbeImpl {
+    impl UnsafeProviderProbeNativeImpl for TestingProviderProbeImpl {
         fn is_enabled(&self) -> bool {
             self.is_enabled
         }
 
-        unsafe fn fire0(&mut self) -> () {
+        unsafe fn c_fire0(&mut self) -> () {
             libc::snprintf(self.buffer.as_ptr() as *mut c_char, BUFFER_SIZE, self.format_string.as_ptr());
             self.log_call();
         }
@@ -196,7 +273,7 @@ fn generate_test_unsafe_probe_impl() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+            unsafe fn c_fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
                 where {where_clause} {{
                 libc::snprintf(self.buffer.as_ptr() as *mut c_char,
                     BUFFER_SIZE,

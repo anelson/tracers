@@ -40,6 +40,8 @@ pub trait Provider<TracerT: Tracer> {
     ) -> Fallible<<TracerT as Tracer>::ProbeType>;
 }
 
+/// Holds a reference to the internal tracing implementation's probe structure,
+/// and exposes a high-level type-safe API to fire the probe at will.
 pub struct ProviderProbe<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> {
     unsafe_probe_impl: ImplT,
     _args: PhantomData<ArgsT>,
@@ -53,6 +55,9 @@ impl<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> ProviderProbe<Impl
         }
     }
 
+    /// Indicates if this probe is currently enabled; that is, if there are one or more processes
+    /// monitoring this probe.  This call should be very fast, in many cases only a memory access,
+    /// and thus can be used even in production and performance-sensitive code.
     pub fn is_enabled(&self) -> bool {
         self.unsafe_probe_impl.is_enabled()
     }
@@ -69,7 +74,7 @@ impl<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> ProviderProbe<Impl
 /// to obtain runtime information about the argument types, and also to wrap the elements and pass them
 /// to the underlying C probing implementation in a typesafe manner.
 pub trait ProbeArgs<T> {
-    /// The tuple type corresponding to T where each element's type is the corresponding `ProbeArgWrapper`
+    /// The arity of this tuple
     const ARG_COUNT: usize;
 
     /// A vector consisting of the CType enum corresponding to the C type which represents each element
@@ -105,6 +110,31 @@ impl ProbeDefinition {
 fn get_ctype<T: ProbeArgType<T>>() -> CType {
     <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_c_type()
 }
+
+/// This macro helps implementors of this API implement the UnsafeProviderProbeImpl trait without having to
+/// manually construct 13 different methods.  It should be used within an implementation of UnsafeProviderProbeImpl
+/// which otherwise has no implementations for any of the `fireN` methods.
+///
+/// Example:
+///
+/// ```noexec
+/// pub struct MyUnsafeProviderProbe{}
+///
+/// impl UnsafeProviderProbeImpl for MyUnsafeProviderProbe {
+///     fn is_enabled(&self) -> bool { true }
+///
+///     impl_unsafe_provider_probe!(args, {
+///         let parameters = vec![args];
+///
+///         let as_string = parameters.iter().map()
+///
+///         println!()
+///     })
+/// }
+/// ```
+//macro_rules! impl_unsafe_provider_probe {
+//
+//}
 
 // The implementation of `ProbeArgs<T>` is provided for all tuples from
 // 1to 12 elements.  That's highly repetitive, so there's code in `build.rs` that generates it.
@@ -183,5 +213,4 @@ mod test {
             vec!["hey the probe fired"]
         );
     }
-
 }
