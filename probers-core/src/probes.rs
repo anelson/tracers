@@ -62,7 +62,7 @@ impl<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> ProviderProbe<Impl
         self.unsafe_probe_impl.is_enabled()
     }
 
-    /// Fires the probe.  Note that it's assumed higher level code has tested `is_enable()` already.
+    /// Fires the probe.  Note that it's assumed higher level code has tested `is_enabled()` already.
     /// If the probe isnt' enabled, it's not an error to attempt to fire it, just a waste of cycles.
     pub fn fire(&mut self, args: ArgsT) -> () {
         args.fire_probe(&mut self.unsafe_probe_impl)
