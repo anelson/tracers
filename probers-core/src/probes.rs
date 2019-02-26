@@ -15,39 +15,42 @@ pub trait Tracer: Sized {
 
     fn define_provider(
         name: &str,
-        f: impl FnOnce(Self::ProviderBuilderType) -> Self::ProviderBuilderType,
+        f: impl FnOnce(Self::ProviderBuilderType) -> Fallible<Self::ProviderBuilderType>,
     ) -> Fallible<Self::ProviderType>;
 }
 
 pub trait ProviderBuilder<TracerT: Tracer> {
-    fn add_probe(&mut self, definition: &ProbeDefinition) -> Fallible<()>;
+    fn add_probe<ArgsT: ProbeArgs<ArgsT>>(&mut self, name: &'static str) -> Fallible<()>;
     fn build(self, name: &str) -> Fallible<<TracerT as Tracer>::ProviderType>;
 }
 
-pub trait Provider<TracerT: Tracer> : Sync + Drop {
+pub trait Provider<TracerT: Tracer>: Sync + Drop {
     fn get_probe<ArgsT: ProbeArgs<ArgsT>>(
         &self,
-        definition: &ProbeDefinition,
+        name: &'static str,
     ) -> Fallible<ProviderProbe<<TracerT as Tracer>::ProbeType, ArgsT>> {
-        let unsafe_impl = self.get_probe_unsafe(definition)?;
+        let definition = ProbeDefinition::new::<ArgsT>(name);
+        let unsafe_impl = self.get_probe_unsafe(&definition)?;
         Ok(ProviderProbe::new(unsafe_impl))
     }
 
     fn get_probe_unsafe(
         &self,
         definition: &ProbeDefinition,
-    ) -> Fallible<<TracerT as Tracer>::ProbeType>;
+    ) -> Fallible<&<TracerT as Tracer>::ProbeType>;
 }
 
 /// Holds a reference to the internal tracing implementation's probe structure,
 /// and exposes a high-level type-safe API to fire the probe at will.
-pub struct ProviderProbe<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> {
-    unsafe_probe_impl: ImplT,
+pub struct ProviderProbe<'probe, ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> {
+    unsafe_probe_impl: &'probe ImplT,
     _args: PhantomData<ArgsT>,
 }
 
-impl<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> ProviderProbe<ImplT, ArgsT> {
-    fn new(probe: ImplT) -> Self {
+impl<'probe, ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>>
+    ProviderProbe<'probe, ImplT, ArgsT>
+{
+    fn new(probe: &'probe ImplT) -> Self {
         ProviderProbe {
             unsafe_probe_impl: probe,
             _args: PhantomData,
@@ -64,7 +67,7 @@ impl<ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> ProviderProbe<Impl
     /// Fires the probe.  Note that it's assumed higher level code has tested `is_enabled()` already.
     /// If the probe isnt' enabled, it's not an error to attempt to fire it, just a waste of cycles.
     pub fn fire(&mut self, args: ArgsT) -> () {
-        args.fire_probe(&mut self.unsafe_probe_impl)
+        args.fire_probe(self.unsafe_probe_impl)
     }
 }
 
@@ -82,7 +85,7 @@ pub trait ProbeArgs<T> {
 
     /// Converts all of the probe args in this tuple to their C representations and passes them to the
     /// underlying UnsafeProviderProbeImpl implementation.
-    fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &mut ImplT) -> ();
+    fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &ImplT) -> ();
 }
 
 /// This structure is a runtime representation of a probe's definition.
@@ -91,12 +94,12 @@ pub trait ProbeArgs<T> {
 /// probes to be co-erced into specific types.
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct ProbeDefinition {
-    pub name: String,
+    pub name: &'static str,
     pub arg_types: Vec<CType>,
 }
 
 impl ProbeDefinition {
-    pub fn new<ArgsT: ProbeArgs<ArgsT>>(name: String) -> ProbeDefinition {
+    pub fn new<ArgsT: ProbeArgs<ArgsT>>(name: &'static str) -> ProbeDefinition {
         ProbeDefinition {
             name: name,
             arg_types: <ArgsT as ProbeArgs<ArgsT>>::arg_types(),

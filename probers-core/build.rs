@@ -74,7 +74,8 @@ fn generate_probe_args_impl(type_params: &Vec<String>) -> String {
             fn arg_types() -> Vec<CType> {{
                 vec![{ctypes}]
             }}
-            fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &mut ImplT) -> () {{
+
+            fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &ImplT) -> () {{
                unsafe {{ probe.fire{arg_count}({probe_args}) }}
             }}
         }}
@@ -113,7 +114,7 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
             /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
             fn is_enabled(&self) -> bool;
 
-            unsafe fn fire0(&mut self) -> ();
+            unsafe fn fire0(&self) -> ();
     "#.to_string();
 
     for arity in 1..=MAX_ARITY {
@@ -123,7 +124,7 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+            unsafe fn fire{arg_count}<{type_list}>(&self, {args}) -> ()
                 where {where_clause};
             "##,
             arg_count = type_params.len(),
@@ -164,7 +165,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
             fn is_enabled(&self) -> bool;
 
             /// This is actually identical to `fire0` but is provided for consistency with the other arities
-            unsafe fn c_fire0(&mut self) -> ();
+            unsafe fn c_fire0(&self) -> ();
 
     "#.to_string();
 
@@ -174,7 +175,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn c_fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args}) -> ()
                 where {where_clause};
             "##,
             arg_count = type_params.len(),
@@ -199,7 +200,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
             fn is_enabled(&self) -> bool {
                 T::is_enabled(self)
             }
-            unsafe fn fire0(&mut self) -> () { self.c_fire0() }
+            unsafe fn fire0(&self) -> () { self.c_fire0() }
 
     "#;
 
@@ -217,7 +218,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+            unsafe fn fire{arg_count}<{type_list}>(&self, {args}) -> ()
                 where {where_clause} {{
                 {wrapper_decls};
                 self.c_fire{arg_count}({probe_args});
