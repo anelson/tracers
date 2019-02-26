@@ -6,9 +6,8 @@ edition = "2018"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-libstapsdt-sys = { path = "libstapsdt-sys", version = "0.1.0" }
 probers-core = { path = "probers-core", version = "0.1.0" }
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "linux"))'.dependencies]
-libstapsdt-sys = { path = "libstapsdt-sys", version = "0.1.0" }
+probers-stap = { path = "probers-stap", version = "0.1.0" }
 
