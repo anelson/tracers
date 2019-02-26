@@ -61,6 +61,8 @@ impl ProviderBuilder<StapTracer> for StapProviderBuilder {
             provider.add_probe(probe)?;
         }
 
+        provider.load()?;
+
         Ok(provider)
     }
 }
@@ -69,6 +71,12 @@ pub struct StapProvider {
     provider: *mut SDTProvider_t,
     probes: HashMap<ProbeDefinition, StapProbe>,
 }
+
+/// Implementing this marker trait tells Rust that `StapProvider` can be safely shared among
+/// threads.  Once the `StapProvider` has been created by `StapProviderBuilder`, it is entirely
+/// read-only, and libstapsdt guarantees that calls relating to firing probes are thread safe once
+/// the probes themselves have been created.
+unsafe impl Sync for StapProvider {}
 
 impl StapProvider {
     /// Initializes a new stap provider including calling `providerInit`.  This is internal to
@@ -175,6 +183,20 @@ impl StapProvider {
         Ok(())
     }
 
+    /// Loads the provider into the process, making the probes available for firing
+    fn load(&mut self) -> Fallible<()> {
+        unsafe {
+            if providerLoad(self.provider) != 0 {
+                Err(StapError::NativeCallFailed {
+                    func: "providerLoad",
+                }
+                .into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
     /// Translates from the `probers-core` `CType` enum to the constants used by libstapsdt
     fn get_arg_type(typ: CType) -> ArgType_t {
         match typ {
@@ -214,6 +236,7 @@ impl Provider<StapTracer> for StapProvider {
 impl Drop for StapProvider {
     fn drop(&mut self) {
         if !self.provider.is_null() {
+            unsafe { providerUnload(self.provider) };
             unsafe { providerDestroy(self.provider) };
             self.provider = ptr::null_mut();
         }
