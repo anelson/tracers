@@ -2,6 +2,7 @@
 use failure::{Fail, Fallible};
 use libstapsdt_sys::*;
 use probers_core::argtypes::CType;
+use probers_core::ProbeArgs;
 use probers_core::ProbeDefinition;
 use probers_core::{Provider, ProviderBuilder};
 use std::collections::HashMap;
@@ -16,7 +17,7 @@ pub enum StapError {
     ProbeNameRequired,
 
     #[fail(display = "duplicate probe name '{}'", name)]
-    DuplicateProbeName { name: String },
+    DuplicateProbeName { name: &'static str },
 
     #[fail(display = "libstapsdt call failed: {}", func)]
     NativeCallFailed { func: &'static str },
@@ -36,20 +37,17 @@ impl StapProviderBuilder {
 }
 
 impl ProviderBuilder<StapTracer> for StapProviderBuilder {
-    fn add_probe(&mut self, definition: &ProbeDefinition) -> Fallible<()> {
-        if definition.name.is_empty() {
+    fn add_probe<ArgsT: ProbeArgs<ArgsT>>(&mut self, name: &'static str) -> Fallible<()> {
+        if name.is_empty() {
             return Err(StapError::ProbeNameRequired.into());
         }
 
         // Make sure a probe by this name hasn't already been added
-        if self.probes.iter().any(|p| p.name == definition.name) {
-            return Err(StapError::DuplicateProbeName {
-                name: definition.name.to_string(),
-            }
-            .into());
+        if self.probes.iter().any(|p| p.name == name) {
+            return Err(StapError::DuplicateProbeName { name: name }.into());
         }
 
-        self.probes.push(definition.clone());
+        self.probes.push(ProbeDefinition::new::<ArgsT>(name));
 
         Ok(())
     }
@@ -218,8 +216,8 @@ impl StapProvider {
 
 impl Provider<StapTracer> for StapProvider {
     /// Look up the probe by its definition (that is, name and arg types)
-    fn get_probe_unsafe(&self, definition: &ProbeDefinition) -> Fallible<StapProbe> {
-        let probe: Option<StapProbe> = self.probes.get(definition).map(|x| x.clone());
+    fn get_probe_unsafe(&self, definition: &ProbeDefinition) -> Fallible<&StapProbe> {
+        let probe: Option<&StapProbe> = self.probes.get(definition);
 
         probe.ok_or_else(|| {
             StapError::ProbeDefinitionNotFound {

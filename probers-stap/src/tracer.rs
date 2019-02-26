@@ -15,10 +15,10 @@ impl Tracer for StapTracer {
 
     fn define_provider(
         name: &str,
-        f: impl FnOnce(Self::ProviderBuilderType) -> Self::ProviderBuilderType,
+        f: impl FnOnce(Self::ProviderBuilderType) -> Fallible<Self::ProviderBuilderType>,
     ) -> Fallible<Self::ProviderType> {
         let builder = StapProviderBuilder::new();
-        let builder = f(builder);
+        let builder = f(builder)?;
         let provider = builder.build(name)?;
 
         Ok(provider)

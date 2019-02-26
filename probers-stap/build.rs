@@ -54,7 +54,7 @@ fn generate_stap_native_impl() -> String {
         {
             fn is_enabled(&self) -> bool { StapProbe::is_enabled(self) }
 
-            unsafe fn c_fire0(&mut self) -> () {
+            unsafe fn c_fire0(&self) -> () {
                 probeFire(self.probe);
             }
 
@@ -83,7 +83,7 @@ fn generate_stap_native_impl() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn c_fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args}) -> ()
                 where {where_clause} {{
                   probeFire(self.probe, {stap_arg_names});
                 }}
