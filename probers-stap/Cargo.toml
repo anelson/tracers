@@ -1,0 +1,20 @@
+[package]
+name = "probers-stap"
+version = "0.1.0"
+authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT/Apache-2.0"
+
+[dependencies]
+probers-core = { path = "../probers-core", version = "0.1.0" }
+libstapsdt-sys = { path = "../libstapsdt-sys", version = "0.1.0" }
+failure = "0.1.5"
+
+[build-dependencies]
+failure = "0.1.5"
+
+[dev-dependencies]
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
+libc = "0.2.48"
+
