@@ -24,7 +24,7 @@ pub trait ProviderBuilder<TracerT: Tracer> {
     fn build(self, name: &str) -> Fallible<<TracerT as Tracer>::ProviderType>;
 }
 
-pub trait Provider<TracerT: Tracer> : Sync {
+pub trait Provider<TracerT: Tracer> : Sync + Drop {
     fn get_probe<ArgsT: ProbeArgs<ArgsT>>(
         &self,
         definition: &ProbeDefinition,
