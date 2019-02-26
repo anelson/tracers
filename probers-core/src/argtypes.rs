@@ -37,7 +37,7 @@ pub use pointer::*;
 pub use refs::*;
 pub use string::*;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq)]
 pub enum CType {
     NoArg,
     VoidPtr,

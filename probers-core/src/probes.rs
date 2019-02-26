@@ -8,24 +8,23 @@ use std::marker::PhantomData;
 
 /// Each implementation of the tracing API provides a `Tracer` implementation, which provides
 /// tracing functionality for an entire process.
-pub trait Tracer: Drop + Sized {
+pub trait Tracer: Sized {
     type ProviderBuilderType: ProviderBuilder<Self>;
     type ProviderType: Provider<Self>;
     type ProbeType: UnsafeProviderProbeImpl;
 
-    fn new() -> Fallible<Self>;
     fn define_provider(
-        &mut self,
+        name: &str,
         f: impl FnOnce(Self::ProviderBuilderType) -> Self::ProviderBuilderType,
-    ) -> Fallible<&Self::ProviderType>;
+    ) -> Fallible<Self::ProviderType>;
 }
 
 pub trait ProviderBuilder<TracerT: Tracer> {
-    fn add_probe(&self, definition: &ProbeDefinition) -> Fallible<()>;
-    fn build(self) -> Fallible<<TracerT as Tracer>::ProviderType>;
+    fn add_probe(&mut self, definition: &ProbeDefinition) -> Fallible<()>;
+    fn build(self, name: &str) -> Fallible<<TracerT as Tracer>::ProviderType>;
 }
 
-pub trait Provider<TracerT: Tracer> {
+pub trait Provider<TracerT: Tracer> : Sync {
     fn get_probe<ArgsT: ProbeArgs<ArgsT>>(
         &self,
         definition: &ProbeDefinition,
@@ -90,7 +89,7 @@ pub trait ProbeArgs<T> {
 /// A probe is defined by its name and the number and type of its arguments.  This is the
 /// type used at runtime to identify probes and provide run-time type safety before allowing
 /// probes to be co-erced into specific types.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub struct ProbeDefinition {
     pub name: String,
     pub arg_types: Vec<CType>,

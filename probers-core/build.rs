@@ -107,7 +107,7 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
         ///
         /// The implementor of this API for a specific tracing library need only implement all 13
         /// possible `fire` methods, one for each number of args from 0 to 12.
-        pub trait UnsafeProviderProbeImpl
+        pub trait UnsafeProviderProbeImpl : Sync
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
             /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
@@ -157,7 +157,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
         /// addresses *only* for the duration of the call.  Immediatley after the `fireN` method returns this memory may
         /// be freed.  Thus it's imperative that the probing implementation process probes synchronously.  Otherwise
         /// invalid memory accesses are inevitable.
-        pub trait UnsafeProviderProbeNativeImpl
+        pub trait UnsafeProviderProbeNativeImpl : Sync
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
             /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
