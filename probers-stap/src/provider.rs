@@ -76,6 +76,12 @@ pub struct StapProvider {
 /// the probes themselves have been created.
 unsafe impl Sync for StapProvider {}
 
+/// The need for `Send` may not be so obvious.  It's explained a bit in the source code for
+/// `sync::OnceCell`.  The scenario is thread A initializes the provider variable, and thread B
+/// destroys it.  In this case the destructor is running in thread B with a value from thread A,
+/// thus that is a `Send`.  The same logic applies to the `StapProbe` type.
+unsafe impl Send for StapProvider {}
+
 impl StapProvider {
     /// Initializes a new stap provider including calling `providerInit`.  This is internal to
     /// this module; the caller should also call `add_probe` for each probe defined on the
