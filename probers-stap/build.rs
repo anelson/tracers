@@ -41,11 +41,6 @@ fn xform_types_i<F: FnMut(usize, &String) -> String>(
 
 fn generate_stap_native_impl() -> String {
     let mut decl= r#"
-        /// Implementing this marker trait tells Rust that `StapProbe` can be shared between threads safely.
-        /// The libstapsdt API guarantees this, although only for firing probes.  That's why defining providers
-        /// and probes is done separately on traits that are not marked as `Sync`
-        unsafe impl Sync for StapProbe {}
-
         /// Implementation of `UnsafeProviderProbeNativeImpl` for SystemTap.
         ///
         /// NB: While the `probe-rs` API supports probes with from 0 to 12 arguments, the libstapsdt library (or maybe SystemTap itself)
