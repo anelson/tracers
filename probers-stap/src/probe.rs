@@ -29,6 +29,11 @@ impl StapProbe {
     }
 }
 
+// See the `Send` and `Sync` implementations for `StapProvider` for more explication
+
+unsafe impl Sync for StapProbe {}
+unsafe impl Send for StapProbe {}
+
 // The implementation of UnsafeProviderProbeNativeImpl involves repetitive code for 13 different
 // arities.  Thus, it's generated in `build.rs` not written manually
 include!(concat!(env!("OUT_DIR"), "/probe_unsafe_impl.rs"));
