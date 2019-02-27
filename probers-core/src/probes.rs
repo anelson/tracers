@@ -9,9 +9,16 @@ use std::marker::PhantomData;
 /// Each implementation of the tracing API provides a `Tracer` implementation, which provides
 /// tracing functionality for an entire process.
 pub trait Tracer: Sized {
+    /// The type used to construct tracing providers
     type ProviderBuilderType: ProviderBuilder<Self>;
-    type ProviderType: Provider<Self>;
-    type ProbeType: UnsafeProviderProbeImpl;
+
+    /// The type which represents a tracing provider.  This type must always be `Send` and `Sync`
+    /// because there is no restriction placed on use of and sharing between multiple threads.
+    type ProviderType: Provider<Self> + Sync + Send;
+
+    /// The type which represents a tracing probe.  This type must always be `Send` and `Sync`
+    /// because there is no restriction placed on use of and sharing between multiple threads.
+    type ProbeType: UnsafeProviderProbeImpl + Sync + Send;
 
     fn define_provider(
         name: &str,
@@ -24,7 +31,7 @@ pub trait ProviderBuilder<TracerT: Tracer> {
     fn build(self, name: &str) -> Fallible<<TracerT as Tracer>::ProviderType>;
 }
 
-pub trait Provider<TracerT: Tracer>: Sync + Drop {
+pub trait Provider<TracerT: Tracer>: Drop {
     fn get_probe<ArgsT: ProbeArgs<ArgsT>>(
         &self,
         name: &'static str,
@@ -66,9 +73,20 @@ impl<'probe, ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>>
 
     /// Fires the probe.  Note that it's assumed higher level code has tested `is_enabled()` already.
     /// If the probe isnt' enabled, it's not an error to attempt to fire it, just a waste of cycles.
-    pub fn fire(&mut self, args: ArgsT) -> () {
+    pub fn fire(&self, args: ArgsT) -> () {
         args.fire_probe(self.unsafe_probe_impl)
     }
+}
+
+// If the underlying impl is Sync/Send, then so is this wrapper around it
+
+unsafe impl<'probe, ImplT: UnsafeProviderProbeImpl + Sync, ArgsT: ProbeArgs<ArgsT>> Sync
+    for ProviderProbe<'probe, ImplT, ArgsT>
+{
+}
+unsafe impl<'probe, ImplT: UnsafeProviderProbeImpl + Send, ArgsT: ProbeArgs<ArgsT>> Send
+    for ProviderProbe<'probe, ImplT, ArgsT>
+{
 }
 
 /// All tuple types which consist entirely of elements which have a `ProbeArgType<T>` implementation
@@ -149,6 +167,7 @@ mod test {
     use crate::argtypes::ProbeArgNativeType;
     use std::ffi::{CStr, CString};
     use std::os::raw::c_char;
+    use std::sync::Mutex;
 
     const BUFFER_SIZE: usize = 8192;
 
@@ -160,8 +179,8 @@ mod test {
     struct TestingProviderProbeImpl {
         pub is_enabled: bool,
         pub format_string: CString,
-        pub buffer: Vec<c_char>,
-        pub calls: Vec<String>,
+        pub buffer: Mutex<Vec<c_char>>,
+        pub calls: Mutex<Vec<String>>,
     }
 
     impl TestingProviderProbeImpl {
@@ -171,26 +190,25 @@ mod test {
             TestingProviderProbeImpl {
                 is_enabled: false,
                 format_string: c_format_string,
-                buffer: Vec::with_capacity(BUFFER_SIZE),
-                calls: Vec::new(),
+                buffer: Mutex::new(Vec::with_capacity(BUFFER_SIZE)),
+                calls: Mutex::new(Vec::new()),
             }
         }
 
         /// Called internally when the `buffer` member has been filled with a new string with `snprintf`.
         /// Convert that into a Rust string and add it to the `calls` vector.
-        fn log_call(&mut self) {
-            let cstring = unsafe { CStr::from_ptr(self.buffer.as_ptr()) };
+        fn log_call(&self) {
+            let buffer = self.buffer.lock().unwrap();
+            let mut calls = self.calls.lock().unwrap();
+            let cstring = unsafe { CStr::from_ptr(buffer.as_ptr()) };
             let as_str = cstring.to_str().expect("snprintf string isn't valid UTF-8");
 
-            self.calls.push(as_str.to_string());
+            calls.push(as_str.to_string());
         }
-    }
 
-    fn make_test_probe<ArgsT: ProbeArgs<ArgsT>>(
-        fmt_string: String,
-    ) -> ProviderProbe<TestingProviderProbeImpl, ArgsT> {
-        let unsafe_impl = TestingProviderProbeImpl::new(fmt_string);
-        ProviderProbe::new(unsafe_impl)
+        fn get_calls(&self) -> Vec<String> {
+            self.calls.lock().unwrap().clone()
+        }
     }
 
     /// Convert a Rust string to a CString and then back again.  Some of the Quickcheck strings
@@ -207,11 +225,12 @@ mod test {
 
     #[test]
     fn test_fire0() {
-        let mut probe_impl = make_test_probe("hey the probe fired".to_string());
+        let unsafe_impl = TestingProviderProbeImpl::new("hey the probe fired".to_string());
+        let mut probe_impl = ProviderProbe::new(&unsafe_impl);
         probe_impl.fire(());
 
         assert_eq!(
-            probe_impl.unsafe_probe_impl.calls,
+            probe_impl.unsafe_probe_impl.get_calls(),
             vec!["hey the probe fired"]
         );
     }

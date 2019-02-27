@@ -108,7 +108,7 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
         ///
         /// The implementor of this API for a specific tracing library need only implement all 13
         /// possible `fire` methods, one for each number of args from 0 to 12.
-        pub trait UnsafeProviderProbeImpl : Sync
+        pub trait UnsafeProviderProbeImpl
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
             /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
@@ -158,7 +158,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
         /// addresses *only* for the duration of the call.  Immediatley after the `fireN` method returns this memory may
         /// be freed.  Thus it's imperative that the probing implementation process probes synchronously.  Otherwise
         /// invalid memory accesses are inevitable.
-        pub trait UnsafeProviderProbeNativeImpl : Sync
+        pub trait UnsafeProviderProbeNativeImpl
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
             /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
@@ -260,8 +260,12 @@ fn generate_test_unsafe_probe_impl() -> String {
             self.is_enabled
         }
 
-        unsafe fn c_fire0(&mut self) -> () {
-            libc::snprintf(self.buffer.as_ptr() as *mut c_char, BUFFER_SIZE, self.format_string.as_ptr());
+        unsafe fn c_fire0(&self) -> () {
+            {
+                let buffer = self.buffer.lock().unwrap();
+                libc::snprintf(buffer.as_ptr() as *mut c_char, BUFFER_SIZE, self.format_string.as_ptr());
+            }
+
             self.log_call();
         }
     "#
@@ -274,12 +278,15 @@ fn generate_test_unsafe_probe_impl() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn c_fire{arg_count}<{type_list}>(&mut self, {args}) -> ()
+            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args}) -> ()
                 where {where_clause} {{
-                libc::snprintf(self.buffer.as_ptr() as *mut c_char,
-                    BUFFER_SIZE,
-                    self.format_string.as_ptr(),
-                    {probe_args});
+                {{
+                    let buffer = self.buffer.lock().unwrap();
+                    libc::snprintf(buffer.as_ptr() as *mut c_char,
+                        BUFFER_SIZE,
+                        self.format_string.as_ptr(),
+                        {probe_args});
+                }}
                 self.log_call();
             }}
             "##,
@@ -428,12 +435,13 @@ fn generate_probe_tests() -> String {
             r##"
             #[quickcheck]
             fn test_fire{arg_count}({args_declaration}) -> bool {{
-                let mut probe_impl = make_test_probe("{c_format_string}".to_string());
+                let unsafe_impl = TestingProviderProbeImpl::new("{c_format_string}".to_string());
+                let mut probe_impl = ProviderProbe::new(&unsafe_impl);
                 {additional_args_declaration};
                 let probe_args={args_tuple};
                 probe_impl.fire(probe_args);
 
-                assert_eq!(probe_impl.unsafe_probe_impl.calls,
+                assert_eq!(probe_impl.unsafe_probe_impl.get_calls(),
                     vec![format!("{rust_format_string}", {expected_arg_values})]);
                 true
             }}
