@@ -9,6 +9,7 @@ license = "MIT/Apache-2.0"
 probers-core = { path = "../probers-core", version = "0.1.0" }
 libstapsdt-sys = { path = "../libstapsdt-sys", version = "0.1.0" }
 failure = "0.1.5"
+once_cell = "0.1.8"
 
 [build-dependencies]
 failure = "0.1.5"
