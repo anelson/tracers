@@ -226,7 +226,7 @@ mod test {
     #[test]
     fn test_fire0() {
         let unsafe_impl = TestingProviderProbeImpl::new("hey the probe fired".to_string());
-        let mut probe_impl = ProviderProbe::new(&unsafe_impl);
+        let probe_impl = ProviderProbe::new(&unsafe_impl);
         probe_impl.fire(());
 
         assert_eq!(

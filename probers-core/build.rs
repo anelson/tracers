@@ -436,7 +436,7 @@ fn generate_probe_tests() -> String {
             #[quickcheck]
             fn test_fire{arg_count}({args_declaration}) -> bool {{
                 let unsafe_impl = TestingProviderProbeImpl::new("{c_format_string}".to_string());
-                let mut probe_impl = ProviderProbe::new(&unsafe_impl);
+                let probe_impl = ProviderProbe::new(&unsafe_impl);
                 {additional_args_declaration};
                 let probe_args={args_tuple};
                 probe_impl.fire(probe_args);
