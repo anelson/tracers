@@ -37,6 +37,7 @@ type ProberResult<T> = std::result::Result<T, ProberError>;
 struct ProbeSpecification {
     name: String,
     method_name: Ident,
+    original_method: TraitItemMethod,
     span: Span,
     args: Vec<FnArg>,
 }
@@ -51,14 +52,31 @@ fn prober_impl(item: ItemTrait) -> TokenStream {
 }
 
 fn generate_prober_trait(item: ItemTrait) -> ProberResult<TokenStream> {
+    if item.generics.type_params().next() != None || item.generics.lifetimes().next() != None {
+        return Err(ProberError::new(
+            "Probe traits must not take any lifetime or type parameters",
+            item.span(),
+        ));
+    }
+
+    // Look at the methods on the trait and translate each one into a probe specification
     let probes = get_probes(&item)?;
+
+    // From the probe specifications, generate the corresponding methods that will be on the probe
+    // trait.
+    let mut probe_methods: Vec<TokenStream> = Vec::new();
+    for probe in probes.iter() {
+        probe_methods.push(generate_probe_trait_methods(probe)?);
+    }
+
+    // Re-generate the trait method that we took as input, with the modifications to support
+    // probing
     let ident = item.ident;
     let vis = item.vis;
-    let (impl_generics, ty_generics, where_clause) = item.generics.split_for_impl();
-    let items = item.items;
+
     let result = quote! {
-        #vis trait #ident #ty_generics #where_clause {
-            #(#items)*
+        #vis trait #ident  {
+            #(#probe_methods)*
         }
     };
 
@@ -131,13 +149,54 @@ fn get_probe(method: &TraitItemMethod) -> ProberResult<ProbeSpecification> {
             "Probe methods must not have an explicit return type (they return `()` implicitly)",
             method.span(),
         ));
+    };
+
+    let first_arg = method.sig.decl.inputs.iter().next();
+    match first_arg {
+        None => {
+            return Err(ProberError::new(
+                "Probe methods must take at least one argument, `&self`",
+                method.span(),
+            ));
+        }
+        Some(FnArg::SelfRef(selfarg)) => {
+            if selfarg.mutability != None {
+                return Err(ProberError::new(
+                    "Probe methods must take `&self`, not `&mut self`",
+                    method.span(),
+                ));
+            }
+        }
+        Some(_) => {
+            return Err(ProberError::new(
+                "The first argument of all probe methods must be `&self`",
+                method.span(),
+            ));
+        }
     }
 
     Ok(ProbeSpecification {
         name: method.sig.ident.to_string(),
         method_name: method.sig.ident.clone(),
+        original_method: method.clone(),
         span: method.span(),
         args: method.sig.decl.inputs.iter().map(|x| x.clone()).collect(),
+    })
+}
+
+/// Each probe needs to have two methods generated on the probe trait: the original method written
+/// by the user which describes the probe, and another one with an `_enabled` suffix which returns
+/// a bool indicating if the probe is currently enabled or not.
+fn generate_probe_trait_methods(probe: &ProbeSpecification) -> ProberResult<TokenStream> {
+    let original_method = &probe.original_method;
+    let mut enabled_method = original_method.clone();
+    enabled_method.sig.ident = Ident::new(
+        &format!("{}_enabled", probe.method_name),
+        original_method.sig.ident.span(),
+    );
+    Ok(quote! {
+        #original_method
+        #enabled_method
     })
 }
 
@@ -167,6 +226,16 @@ mod test {
         pub(crate) fn simple_valid() -> ItemTrait {
             parse_quote! {
                 trait TestTrait {
+                    fn probe0(&self, arg0: i32);
+                    fn probe1(&self, arg0: &str);
+                    fn probe2(&self, arg0: &str, arg1: usize);
+                }
+            }
+        }
+
+        pub(crate) fn has_trait_type_param() -> ItemTrait {
+            parse_quote! {
+                trait TestTrait<T: Debug> {
                     fn probe0(&self, arg0: i32);
                     fn probe1(&self, arg0: &str);
                     fn probe2(&self, arg0: &str, arg1: usize);
@@ -249,11 +318,53 @@ mod test {
                 }
             }
         }
+        pub(crate) fn has_default_impl() -> ItemTrait {
+            parse_quote! {
+                trait TestTrait {
+                    fn probe0(&self, arg0: i32) { prinln!("{}", arg0); }
+                }
+            }
+        }
+
+        pub(crate) fn has_static_method() -> ItemTrait {
+            parse_quote! {
+                trait TestTrait {
+                    fn probe0(arg0: i32);
+                }
+            }
+        }
+
+        pub(crate) fn has_mut_self_method() -> ItemTrait {
+            parse_quote! {
+                trait TestTrait {
+                    fn probe0(&mut self, arg0: i32);
+                }
+            }
+        }
+
+        pub(crate) fn has_self_by_val_method() -> ItemTrait {
+            parse_quote! {
+                trait TestTrait {
+                    fn probe0(self, arg0: i32);
+                }
+            }
+        }
+
     }
 
     #[test]
     fn works_with_valid_cases() {
         assert_eq!(true, generate_prober_trait(data::simple_valid()).is_ok());
+    }
+
+    #[test]
+    fn trait_type_params_not_allowed() {
+        // We need to be able to programmatically generate an impl of the probe trait which means
+        // it cannot take any type parameters which we would not know how to provide
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_trait_type_param()).is_err()
+        );
     }
 
     #[test]
@@ -275,11 +386,13 @@ mod test {
         assert_eq!(true, generate_prober_trait(data::has_extern_fn()).is_err());
     }
 
-
     #[test]
     fn generic_methods_not_allowed() {
         // Probe methods must not be generic
-        assert_eq!(true, generate_prober_trait(data::has_fn_type_param()).is_err());
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_fn_type_param()).is_err()
+        );
     }
 
     #[test]
@@ -287,8 +400,41 @@ mod test {
         // Probe methods never return a value.  I would like to be able to support methods that
         // explicitly return `()`, but it wasn't immediately obvious how to do that with `syn` and
         // it's more convenient to declare probe methods without any return type anyway
-        assert_eq!(true, generate_prober_trait(data::has_explicit_unit_retval()).is_err());
-        assert_eq!(true, generate_prober_trait(data::has_non_unit_retval()).is_err());
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_explicit_unit_retval()).is_err()
+        );
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_non_unit_retval()).is_err()
+        );
+    }
+
+    #[test]
+    fn methods_must_take_self_ref_non_mutable() {
+        // Probe methods must all take `&self` and be non-mut
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_static_method()).is_err()
+        );
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_mut_self_method()).is_err()
+        );
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_self_by_val_method()).is_err()
+        );
+    }
+
+    #[test]
+    fn methods_must_not_have_default_impl() {
+        // The whole point of this macro is to generate implementations of the probe methods so ti
+        // doesn't make sense for the caller to provide their own
+        assert_eq!(
+            true,
+            generate_prober_trait(data::has_default_impl()).is_err()
+        );
     }
 
 }
