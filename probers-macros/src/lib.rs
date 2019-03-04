@@ -442,20 +442,59 @@ fn generate_provider_struct(item: &ItemTrait, probes: &Vec<ProbeSpecification>) 
             unsafe impl<#struct_type_params> Send for #struct_type_name<#struct_type_params> {}
             unsafe impl<#struct_type_params> Sync for #struct_type_name <#struct_type_params>{}
 
-            static #struct_var_name: OnceCell<Fallible<#struct_type_name>> = OnceCell::INIT;
             static #instance_var_name: OnceCell<Fallible<SystemProvider>> = OnceCell::INIT;
+            static #struct_var_name: OnceCell<Fallible<#struct_type_name>> = OnceCell::INIT;
+            static impl_opt: OnceCell<Option<&'static #struct_type_name>> = OnceCell::INIT;
 
             impl<#struct_type_params> #struct_type_name<#struct_type_params> {
-               fn get() -> &'static Fallible<#struct_type_name<#struct_type_params>> {
-                   #struct_var_name.get_or_init(|| {
-                       let provider = #instance_var_name.get_or_init(|| {
-                            #define_provider_call
-                       })?;
+               fn get() -> Option<&'static #struct_type_name<#struct_type_params>> {
+                   let imp: &'static Option<&'static #struct_type_name> = impl_opt.get_or_init(|| {
+                       // The reason for this seemingly-excessive nesting is that it's possible for
+                       // both the creation of `SystemProvider` or the subsequent initialization of
+                       // #struct_type_name to fail with different and also relevant errors.  By
+                       // separting them this way we're able to preserve the details about any init
+                       // failures that happen, while at runtime when firing probes it's a simple
+                       // call of a method on an `Option<T>`.  I don't have any data to back this
+                       // up but I suspect that allows for better optimizations, since we know an
+                       // `Option<&T>` is implemented as a simple pointer where `None` is `NULL`.
+                       let imp = #struct_var_name.get_or_init(|| {
+                           // Initialzie the `SystemProvider`, capturing any initialization errors
+                           let #provider_var_name: &Fallible<SystemProvider> = #instance_var_name.get_or_init(|| {
+                                #define_provider_call
+                           });
 
-                       Ok(#struct_type_name{
-                           #(#struct_initializers,)*
-                       })
-                   })
+                           // Transform this #provider_var_name into an owned `Fallible` containing
+                           // references to `T` or `E`, since there's not much useful you can do
+                           // with just a `&Result`.
+                           let #provider_var_name = #provider_var_name.as_ref();
+
+                           match #provider_var_name {
+                               Err(e) => bail!("Provider initialization failed: {}", e),
+                               Ok(#provider_var_name) => {
+                                   // Proceed to create the struct containing each of the probes'
+                                   // `ProviderProbe` instances
+                                   Ok(
+                                       #struct_type_name{
+                                           #(#struct_initializers,)*
+                                       }
+                                   )
+                               }
+                           }
+                       });
+
+                       //Convert this &Fallible<..> into an Option<&T>
+                       imp.as_ref().ok()
+                   });
+
+                   //Copy this `&Option<&T>` to a new `Option<&T>`.  Since that should be
+                   //implemented as just a pointer, this should be effectively free
+                   *imp
+               }
+
+               fn get_init_error() -> Option<&'static failure::Error> {
+                    //Don't do a whole re-init cycle again, but if the initialization has happened,
+                    //check for failure
+                    #struct_var_name.get().and_then(|fallible|  fallible.as_ref().err() )
                }
             }
         }
