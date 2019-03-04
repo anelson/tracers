@@ -2,8 +2,7 @@ use probers_macros::prober;
 
 #[prober]
 trait Foo {
-    //type Bar;
-
-    fn probe0(&self);
-    fn probe1(&self, arg0: &str);
+    fn probe0();
+    fn probe1(arg0: &str);
+    fn probe2(arg0: &str, arg1: &str, arg2: usize, arg3: &Option<String>);
 }
