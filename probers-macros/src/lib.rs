@@ -172,7 +172,7 @@ fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> Toke
         mod #mod_name {
             use ::failure::{bail, Fallible};
             use ::probers::{SystemTracer,SystemProvider,SystemProbe,ProviderProbe,Provider};
-            use ::probers_core::{ProviderBuilder,Tracer,ProbeArgs};
+            use ::probers_core::{ProviderBuilder,Tracer};
             use ::once_cell::sync::OnceCell;
 
             #[allow(dead_code)]

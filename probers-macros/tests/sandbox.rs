@@ -9,4 +9,6 @@ trait Foo {
 
 fn main() {
     Foo::probe0_impl();
+    Foo::probe1_impl("foo!");
+    Foo::probe2_impl("foo!", "bar!", 5, &Some("baz!".to_string()));
 }

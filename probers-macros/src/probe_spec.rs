@@ -208,24 +208,31 @@ impl ProbeSpecification {
             trait_name,
             probe_name);
 
+        // Note that we don't put an #[allow(dead_code)] attribute on the original method, because
+        // the user declared that method.  If it's not being used, let the compiler warn them about
+        // it just like it would any other unused method.  The methods we generate, however, won't
+        // be directly visible to the user and thus should not cause a warning if left un-called
         Ok(quote_spanned! { original_method.span() =>
             #[deprecated(note = #deprecation_message)]
             #original_method {
                 Self::#impl_method_name( #probe_args_list )
             }
 
-            #enabled_method {
-                #struct_type_path::get().map(|probes| {
+            #[allow(dead_code)]
+            #enabled_method -> bool {
+                if let Some(probes) = #struct_type_path::get() {
                     probes.#probe_ident.is_enabled()
-                }).unwrap_or(false);
+                } else {
+                    false
+                }
             }
 
-            #impl_method{
-                #struct_type_path::get().map(|probes| {
+            #[allow(dead_code)]
+            #impl_method {
+                if let Some(probes) = #struct_type_path::get() {
                     probes.#probe_ident.fire(#probe_args_tuple)
-                });
+                };
             }
-
         })
     }
 
@@ -386,23 +393,6 @@ impl ProbeSpecification {
     /// Build a tuple type expression whose elements correspond to the arguments of this probe.
     /// This includes only the type of each argument, and has no explicit lifetimes specified.  For
     /// that there is `get_args_as_tuple_type_with_lifetimes`
-    pub(super) fn get_args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
-        // The type of each arg is already decorated with lifetime params by default, so just
-        // return
-        let types = self.args.iter().map(|(_, typ)| typ);
-
-        if self.args.is_empty() {
-            quote! { () }
-        } else {
-            quote_spanned! { self.original_method.sig.decl.inputs.span() =>
-                ( #(#types),* ,)
-            }
-        }
-    }
-
-    /// Like the method above constructs a tuple type corresponding to the types of the arguments of this probe.
-    ///  Unlike the above method, this tuple type is also annotated with explicit lifetime
-    ///  parameters for all reference types in the tuple.
     pub(super) fn get_args_as_tuple_type_without_lifetimes(&self) -> TokenStream {
         //When the probe spec is constructed lifetime parameters are added, so to construct a tuple
         //type without them they need to be stripped
@@ -419,6 +409,23 @@ impl ProbeSpecification {
             //Now make a tuple type with the types
             quote_spanned! { self.span =>
                 ( #(#args),* ,)
+            }
+        }
+    }
+
+    /// Like the method above constructs a tuple type corresponding to the types of the arguments of this probe.
+    ///  Unlike the above method, this tuple type is also annotated with explicit lifetime
+    ///  parameters for all reference types in the tuple.
+    pub(super) fn get_args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
+        // The type of each arg is already decorated with lifetime params by default, so just
+        // return
+        let types = self.args.iter().map(|(_, typ)| typ);
+
+        if self.args.is_empty() {
+            quote! { () }
+        } else {
+            quote_spanned! { self.original_method.sig.decl.inputs.span() =>
+                ( #(#types),* ,)
             }
         }
     }
