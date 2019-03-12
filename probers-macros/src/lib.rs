@@ -7,24 +7,17 @@ mod syn_helpers;
 
 //We have to use the `proc_macro` types for the actual macro impl, but everywhere else we'll use
 //`proc_macro2` for better testability
-use heck::{CamelCase, MixedCase, ShoutySnakeCase, SnakeCase};
+use heck::{ShoutySnakeCase, SnakeCase};
 use probe_spec::ProbeSpecification;
 use proc_macro::TokenStream as CompilerTokenStream;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
-use std::collections::HashMap;
-use std::iter::FromIterator;
-use syn::parse::{Parse, ParseStream};
+use quote::{quote, quote_spanned};
 use syn::parse_quote;
-use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{
-    braced, parse_macro_input, token, Field, FnArg, Ident, ItemTrait, ReturnType, Token, TraitItem,
-    TraitItemMethod,
-};
+use syn::{parse_macro_input, Ident, ItemTrait, TraitItem};
 
 #[proc_macro_attribute]
-pub fn prober(attr: CompilerTokenStream, item: CompilerTokenStream) -> CompilerTokenStream {
+pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> CompilerTokenStream {
     // In our case this attribute can only be applied to a trait.  If it's not a trait, this line
     // will cause what looks to the user like a compile error complaining that it expected a trait.
     let input = parse_macro_input!(item as ItemTrait);
@@ -107,6 +100,7 @@ fn generate_prober_trait(
         #vis trait #ident  {
             #(#probe_methods)*
 
+            #[allow(dead_code)]
             fn get_init_error() -> Option<&'static ::failure::Error> {
                 #mod_name::#struct_type_name::get_init_error()
             }
@@ -151,7 +145,6 @@ fn generate_provider_struct(item: &ItemTrait, probes: &Vec<ProbeSpecification>) 
     let struct_type_params = get_provider_struct_type_params(probes);
     let instance_var_name = get_provider_instance_var_name(&item.ident);
     let define_provider_call = generate_define_provider_call(&item, probes);
-    let vis = &item.vis;
     let provider_var_name = syn::Ident::new("p", item.span());
     let struct_members: Vec<_> = probes
         .iter()
@@ -170,6 +163,7 @@ fn generate_provider_struct(item: &ItemTrait, probes: &Vec<ProbeSpecification>) 
             use ::probers_core::{ProviderBuilder,Tracer,ProbeArgs};
             use ::once_cell::sync::OnceCell;
 
+            #[allow(dead_code)]
             pub(super) struct #struct_type_name<#struct_type_params> {
                 #(pub #struct_members),*
             }
@@ -179,11 +173,12 @@ fn generate_provider_struct(item: &ItemTrait, probes: &Vec<ProbeSpecification>) 
 
             static #instance_var_name: OnceCell<Fallible<SystemProvider>> = OnceCell::INIT;
             static #struct_var_name: OnceCell<Fallible<#struct_type_name>> = OnceCell::INIT;
-            static impl_opt: OnceCell<Option<&'static #struct_type_name>> = OnceCell::INIT;
+            static IMPL_OPT: OnceCell<Option<&'static #struct_type_name>> = OnceCell::INIT;
 
             impl<#struct_type_params> #struct_type_name<#struct_type_params> {
+               #[allow(dead_code)]
                pub(super) fn get() -> Option<&'static #struct_type_name<#struct_type_params>> {
-                   let imp: &'static Option<&'static #struct_type_name> = impl_opt.get_or_init(|| {
+                   let imp: &'static Option<&'static #struct_type_name> = IMPL_OPT.get_or_init(|| {
                        // The reason for this seemingly-excessive nesting is that it's possible for
                        // both the creation of `SystemProvider` or the subsequent initialization of
                        // #struct_type_name to fail with different and also relevant errors.  By
@@ -242,7 +237,6 @@ fn generate_define_provider_call(
     item: &ItemTrait,
     probes: &Vec<ProbeSpecification>,
 ) -> TokenStream {
-    let provider_name = item.ident.to_string();
     let builder = Ident::new("builder", item.ident.span());
     let add_probe_calls: Vec<TokenStream> = probes
         .iter()
@@ -483,6 +477,7 @@ mod test {
     #[test]
     fn works_with_valid_cases() {
         assert_eq!(true, prober_impl(data::simple_valid()).is_ok());
+        assert_eq!(true, prober_impl(data::valid_with_many_refs()).is_ok());
     }
 
     #[test]
@@ -536,107 +531,5 @@ mod test {
         // The whole point of this macro is to generate implementations of the probe methods so ti
         // doesn't make sense for the caller to provide their own
         assert_eq!(true, prober_impl(data::has_default_impl()).is_err());
-    }
-
-    #[test]
-    fn probe_lifetime_params_unique() {
-        let probe_trait = data::valid_with_many_refs();
-        let probes = get_probes(&probe_trait).expect("This is a known valid trait");
-
-        //This particular trait has four probes, see the valid_with_many_refs method for details
-        let all_lifetimes: Vec<_> = probes
-            .iter()
-            .map(|p| p.get_args_with_separate_lifetimes())
-            .flatten()
-            .map(|(_, _, lifetimes)| lifetimes)
-            .flatten()
-            .map(|lifetime| lifetime.to_string())
-            .collect();
-
-        assert_eq!(
-            all_lifetimes,
-            vec![
-                "'probe1_arg0",
-                "'probe2_arg0",
-                "'probe3_arg0",
-                "'probe3_arg1",
-                "'probe3_arg2"
-            ]
-        );
-    }
-
-    #[test]
-    fn probe_generate_args_as_tuple_with_lifetimes() {
-        let probe_trait = data::valid_with_many_refs();
-        let probes = get_probes(&probe_trait).expect("This is a known valid trait");
-
-        //This particular trait has four probes, see the valid_with_many_refs method for details
-        let all_ref_args: Vec<_> = probes
-            .iter()
-            .map(|p| p.get_args_as_tuple_type_with_lifetimes())
-            .map(|tokenstream| tokenstream.to_string())
-            .collect();
-
-        assert_eq!(
-            all_ref_args,
-            vec![
-                "( i32 , )",
-                "( & 'probe1_arg0 str , )",
-                "( & 'probe2_arg0 str , usize , )",
-                "( & 'probe3_arg0 str , & 'probe3_arg1 usize , & 'probe3_arg2 Option < i32 > , )",
-            ]
-        );
-    }
-
-    #[test]
-    fn probe_generate_lifetime_for_nested_ref() {
-        // It's not enoguh to just look at the arg types to each probe and generate a lifetime for
-        // each reference.  If the type of an arg is not a reference, but some type (most often
-        // `Option<T>` but this applies to any type) which has a reference type as a type
-        // parameter, we still require a lifetime for that type param.  It gets messy real fast.
-        // Take this rather improbable example:
-        //
-        // ```
-        // fn whack_probe(arg: &Option<&Result<&Option<str>, &impl std::error::Error>>);
-        // ```
-        //
-        // Count the ref types.  We need a lifetime for each occurrence of `&`.
-        let inputs: Vec<TraitItem> = vec![
-            parse_quote! {
-                fn probe(arg: Option<&str>);
-            },
-            parse_quote! {
-                fn probe(arg: Result<&str, &str>);
-            },
-        ];
-
-        let expected_lifetimes = vec![
-            vec!["'probe_arg_option_1"],
-            vec!["'probe_arg_result_1", "'probe_arg_result_2"],
-        ];
-
-        let tests: Vec<_> = inputs.iter().zip(expected_lifetimes).collect();
-
-        for (input, output) in tests {
-            let itemTrait: ItemTrait = parse_quote! {
-                trait TestTrait {
-                    #input
-                }
-            };
-
-            let probes =
-                get_probes(&itemTrait).expect(&format!("Error processing {:?}", itemTrait));
-
-            let all_lifetimes: Vec<_> = probes
-                .iter()
-                .map(|p| p.get_args_with_separate_lifetimes())
-                .flatten()
-                .map(|(_, _, lifetimes)| lifetimes)
-                .flatten()
-                .map(|lifetime| lifetime.to_string())
-                .collect();
-
-            assert_eq!(output, all_lifetimes);
-        }
     }
 }

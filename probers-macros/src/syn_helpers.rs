@@ -5,7 +5,9 @@ use super::*;
 /// In the `probers` macro implementation there are some cases where, given a `Type` instance, I
 /// want to recursively visit all nested types.  For example, consider this type expression:
 ///
-///     Option<Result<Box<&str>>>
+/// ```noexecute
+/// Option<Result<Box<&str>>>
+/// ```
 ///
 /// `syn` will parse this into a single `syn::Type` struct, covering the whole type expression.
 /// But if we dig into it, there will be an `Option`, a `Result`, a `Box`, and a `&str`.  This is
@@ -47,7 +49,7 @@ fn recurse_tree<F: FnMut(&syn::Type) -> ProberResult<syn::Type>>(
         }
         syn::Type::BareFn(ref mut func) => {
             //Each of the types in this bare function need to be examined
-            if let syn::ReturnType::Type(arrow, ref mut typ) = func.output {
+            if let syn::ReturnType::Type(_, ref mut typ) = func.output {
                 *typ = Box::new(recurse_tree(f, &typ)?)
             }
 

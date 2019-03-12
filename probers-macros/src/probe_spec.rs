@@ -6,12 +6,9 @@
 //! the definition of a probe.
 
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{
-    braced, parse_macro_input, token, Field, FnArg, Ident, ItemTrait, ReturnType, Token, TraitItem,
-    TraitItemMethod,
-};
+use syn::{FnArg, Ident, ReturnType, TraitItemMethod};
 
 use super::syn_helpers;
 use super::{ProberError, ProberResult};
