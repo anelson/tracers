@@ -59,29 +59,33 @@ fn prober_impl(item: ItemTrait) -> ProberResult<TokenStream> {
     // Look at the methods on the trait and translate each one into a probe specification
     let probes = get_probes(&item)?;
 
-    // Re-generate this trait with our probing implementation in it
-    let probe_trait = generate_prober_trait(&item, &probes)?;
+    // Re-generate this trait as a struct with our probing implementation in it
+    let probe_struct = generate_prober_struct(&item, &probes)?;
 
     // Generate code for a struct and some `OnceCell` statics to hold the instance of the provider
     // and individual probe wrappers
-    let provider_struct = generate_provider_struct(&item, &probes);
+    let impl_mod = generate_impl_mod(&item, &probes);
 
     Ok(quote_spanned! { item.span() =>
-        #probe_trait
+        #probe_struct
 
-        #provider_struct
+        #impl_mod
     })
 }
 
-fn generate_prober_trait(
+/// A provider is described by the user as a `trait`, with methods corresponding to probes.
+/// However it's actually implemented as a `struct` with no member fields, with static methods
+/// implementing the probes.  Thus, given as input the `trait`, we produce a `struct` of the same
+/// name whose implementation actually performs the firing of the probes.
+fn generate_prober_struct(
     item: &ItemTrait,
     probes: &Vec<ProbeSpecification>,
 ) -> ProberResult<TokenStream> {
     // From the probe specifications, generate the corresponding methods that will be on the probe
-    // trait.
+    // struct.
     let mut probe_methods: Vec<TokenStream> = Vec::new();
     let mod_name = get_provider_impl_mod_name(&item.ident);
-    let struct_type_name = get_provider_struct_type_name(&item.ident);
+    let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
     let struct_type_path: syn::Path = parse_quote! { #mod_name::#struct_type_name };
     for probe in probes.iter() {
         probe_methods.push(probe.generate_trait_methods(&item.ident, &struct_type_path)?);
@@ -94,10 +98,12 @@ fn generate_prober_trait(
     let vis = &item.vis;
 
     let mod_name = get_provider_impl_mod_name(&item.ident);
-    let struct_type_name = get_provider_struct_type_name(&item.ident);
+    let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
 
     let result = quote_spanned! { span =>
-        #vis trait #ident  {
+        #vis struct #ident;
+
+        impl #ident {
             #(#probe_methods)*
 
             #[allow(dead_code)]
@@ -134,14 +140,20 @@ fn get_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
     Ok(specs)
 }
 
-/// Our implementation requires that we declare a `struct` type, named `xProvider_` where `x` is
-/// the name of the probe trait .  This struct will be stored in a static `OnceCell` so it will be
-/// initialized lazily on first use. This method also generates the code that performs this lazy
-/// initialization
-fn generate_provider_struct(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> TokenStream {
+/// The implementation of the probing logic is complex enough that it involves the declaration of a
+/// few variables and one new struct type.  All of this is contained within a module, to avoid the
+/// possibility of collissions with other code.  This method generates that module and all its
+/// contents.
+///
+/// The contents are, briefly:
+/// * The module itself, named after the trait
+/// * A declaration of a `struct` which will hold references to all of the probes
+/// * Multiple static `OnceCell` variables which hold the underlying provider instance as well as
+/// the instance of the `struct` which holds references to all of the probes
+fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> TokenStream {
     let mod_name = get_provider_impl_mod_name(&item.ident);
-    let struct_type_name = get_provider_struct_type_name(&item.ident);
-    let struct_var_name = get_provider_struct_var_name(&item.ident);
+    let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
+    let struct_var_name = get_provider_impl_struct_var_name(&item.ident);
     let struct_type_params = get_provider_struct_type_params(probes);
     let instance_var_name = get_provider_instance_var_name(&item.ident);
     let define_provider_call = generate_define_provider_call(&item, probes);
@@ -288,14 +300,16 @@ fn get_provider_impl_mod_name(trait_name: &Ident) -> Ident {
     )
 }
 
-/// The name of the struct type which represents the provider, eg `MyProbesProviderImpl`
-fn get_provider_struct_type_name(trait_name: &Ident) -> Ident {
+/// The name of the struct type within the impl module which represents the provider, eg `MyProbesProviderImpl`.
+/// Note that this is not the same as the struct which we generate which has the same name as the
+/// trait and implements its methods.
+fn get_provider_impl_struct_type_name(trait_name: &Ident) -> Ident {
     syn_helpers::add_suffix_to_ident(trait_name, "ProviderImpl")
 }
 
 /// The name of the static variable which contains the singleton instance of the provider struct,
 /// eg MYPROBESPROVIDERIMPL
-fn get_provider_struct_var_name(trait_name: &Ident) -> Ident {
+fn get_provider_impl_struct_var_name(trait_name: &Ident) -> Ident {
     Ident::new(
         &format!("{}ProviderImpl", trait_name).to_shouty_snake_case(),
         trait_name.span(),
