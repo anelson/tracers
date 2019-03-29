@@ -31,7 +31,7 @@ pub trait ProviderBuilder<TracerT: Tracer> {
     fn build(self, name: &str) -> Fallible<<TracerT as Tracer>::ProviderType>;
 }
 
-pub trait Provider<TracerT: Tracer>: Drop {
+pub trait Provider<TracerT: Tracer> {
     fn get_probe<ArgsT: ProbeArgs<ArgsT>>(
         &self,
         name: &'static str,
@@ -49,6 +49,7 @@ pub trait Provider<TracerT: Tracer>: Drop {
 
 /// Holds a reference to the internal tracing implementation's probe structure,
 /// and exposes a high-level type-safe API to fire the probe at will.
+#[derive(Copy, Clone)]
 pub struct ProviderProbe<'probe, ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>> {
     unsafe_probe_impl: &'probe ImplT,
     _args: PhantomData<ArgsT>,
