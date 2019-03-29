@@ -236,8 +236,6 @@ impl ProbeSpecification {
 
         //Generate the body of the original method, simply passing its arguments directly to the
         //impl method
-        let impl_method_name = &impl_method.ident;
-        let probe_args_list = self.get_args_as_arg_list();
         let probe_args_tuple = self.get_args_as_tuple_value();
 
         //Keep the original probe method, but mark it deprecated with a helpful message so that if the
@@ -257,7 +255,11 @@ impl ProbeSpecification {
             #[deprecated(note = #deprecation_message)]
            #[allow(dead_code)]
             #original_method {
-                Self::#impl_method_name( #probe_args_list )
+                if let Some(probes) = #struct_type_path::get() {
+                    if probes.#probe_ident.is_enabled() {
+                        probes.#probe_ident.fire(#probe_args_tuple)
+                    }
+                };
             }
 
             #[allow(dead_code)]
@@ -271,12 +273,6 @@ impl ProbeSpecification {
 
             #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
                 #struct_type_path::get().map(|probes| &probes.#probe_ident)
-            }
-
-            #impl_method {
-                if let Some(probes) = #struct_type_path::get() {
-                    probes.#probe_ident.fire(#probe_args_tuple)
-                };
             }
         })
     }
@@ -438,16 +434,6 @@ impl ProbeSpecification {
             quote_spanned! { self.original_method.sig.decl.inputs.span() =>
                 ( #(#names),* ,)
             }
-        }
-    }
-
-    /// Builds an expression consisting of the names of all probe args in a argument list, as they
-    /// would appear being passed to a function.  They are separated by commas.
-    pub(super) fn get_args_as_arg_list(&self) -> TokenStream {
-        let probe_args: Vec<_> = self.args.iter().map(|(nam, _)| nam).collect();
-
-        quote_spanned! { self.span =>
-            #(#probe_args,)*
         }
     }
 
