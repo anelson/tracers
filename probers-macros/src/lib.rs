@@ -11,7 +11,9 @@ use heck::{ShoutySnakeCase, SnakeCase};
 use probe_spec::ProbeSpecification;
 use proc_macro::TokenStream as CompilerTokenStream;
 use proc_macro2::{Span, TokenStream};
+use proc_macro_hack::proc_macro_hack;
 use quote::{quote, quote_spanned};
+use std::borrow::BorrowMut;
 use syn::parse_quote;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, Ident, ItemTrait, TraitItem};
@@ -23,6 +25,17 @@ pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> Compiler
     let input = parse_macro_input!(item as ItemTrait);
 
     match prober_impl(input) {
+        Ok(stream) => stream,
+        Err(err) => report_error(&err.message, err.span),
+    }
+    .into()
+}
+
+#[proc_macro_hack]
+pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
+    let input = parse_macro_input!(input as syn::Expr);
+
+    match probe_impl(input) {
         Ok(stream) => stream,
         Err(err) => report_error(&err.message, err.span),
     }
@@ -45,6 +58,38 @@ impl ProberError {
 }
 
 type ProberResult<T> = std::result::Result<T, ProberError>;
+
+fn probe_impl(call: syn::Expr) -> ProberResult<TokenStream> {
+    match call {
+        syn::Expr::Call(mut call) => {
+            //`call` is a `syn::ExprCall` struct.  It contains a `Box<Path>` where which specifies
+            //the name of the function being called in the form of a (possibly fully or partially)
+            //qualified path.  We will take this almost entirely as-is, but with the slight
+            //adjustment that we want the name of the function being called (which is the probe to
+            //fire) should have the "_impl" appended.
+            if let syn::Expr::Path(ref mut func) = call.func.borrow_mut() {
+                if let Some(ref mut pair) = func.path.segments.last_mut() {
+                    let mut probe_segment = pair.value_mut();
+                    probe_segment.ident =
+                        syn_helpers::add_suffix_to_ident(&probe_segment.ident, "_impl");
+                }
+            } else {
+                return Err(ProberError::new(
+                    format!("Unexpected expression for function call: {:?}", call.func),
+                    call.span(),
+                ));
+            }
+
+            Ok(quote! { #call })
+        }
+        _ => {
+            return Err(ProberError::new(
+                    "The probe! macro requires the name of a provider trait and its probe method, e.g. MyProvider::myprobe(...)",
+                    call.span(),
+                    ));
+        }
+    }
+}
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
 /// more testable

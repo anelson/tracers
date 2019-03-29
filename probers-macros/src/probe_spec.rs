@@ -168,10 +168,23 @@ impl ProbeSpecification {
         &self.method_name
     }
 
-    /// Each probe needs to have multiple methods generated on the probe trait: the original method written
-    /// by the user which describes the probe, and another one with an `_enabled` suffix which returns
-    /// a bool indicating if the probe is currently enabled or not.  This method generates the trait
-    /// methods for this probe
+    /// For each probe the user defines on the trait, we will generate multiple implementation
+    /// methods:
+    ///
+    /// * `(probe_name)` - This is the same name as the method the user declared.  It takes the same
+    /// arguments the user specified, and when called it checks to see if the probe is enabled and
+    /// if so fires the probe.  This is implemented as a normal Rust function call, so the
+    /// arguments to the probe function are evaluated unconditionally, whether the probe is enabled
+    /// or not.
+    /// * `(probe_name)_is_enabled` - This takes no args and returns a `bool` indicating if the
+    /// probe is enabled or not.  Most situations won't require this method, but in some rare cases
+    /// where some specific operation is conditional upon the enabling of a specific probe, this is
+    /// available.
+    /// * `if_(probe_name)_enabled` - This is a more complex version of `(probe_name)_is_enabled`
+    /// which takes as an argument a `FnOnce` closure, which itself is passed a `FnOnce` closure
+    /// which when called will fire the probe.  If the probe is not enabled, this closure never
+    /// gets called.  Thus, in this way callers can implement potentially expensive logic to
+    /// prepare information for a probe, and only run this code when the probe is activated.
     pub(super) fn generate_trait_methods(
         &self,
         trait_name: &syn::Ident,
@@ -214,6 +227,7 @@ impl ProbeSpecification {
         // be directly visible to the user and thus should not cause a warning if left un-called
         Ok(quote_spanned! { original_method.span() =>
             #[deprecated(note = #deprecation_message)]
+           #[allow(dead_code)]
             #original_method {
                 Self::#impl_method_name( #probe_args_list )
             }
@@ -227,7 +241,6 @@ impl ProbeSpecification {
                 }
             }
 
-            #[allow(dead_code)]
             #impl_method {
                 if let Some(probes) = #struct_type_path::get() {
                     probes.#probe_ident.fire(#probe_args_tuple)
@@ -241,9 +254,7 @@ impl ProbeSpecification {
     /// usage the lifetime parameters are not needed.
     pub(super) fn generate_add_probe_call(&self, builder: &Ident) -> TokenStream {
         //The `add_probe` method takes one type parameter, which should be the tuple form of the
-        //arguments for this probe.  It shouldn't be hard to create, just transform the arguments
-        //of the probe method as we have them by removing the argument names, leaving just a
-        //comma-separated list of types, then wrap in parentheses
+        //arguments for this probe.
         let args_type = self.get_args_as_tuple_type_with_lifetimes();
         let probe_name = &self.name;
 

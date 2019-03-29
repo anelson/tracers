@@ -11,6 +11,7 @@ failure = "0.1.5"
 once_cell = "0.1.8"
 proc-macro2 = "0.4"
 heck = "0.3"
+proc-macro-hack = "0.5"
 probers-core = { path = "../probers-core", version = "0.1.0" }
 
 [dependencies.syn]
