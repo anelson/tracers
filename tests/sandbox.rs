@@ -3,7 +3,7 @@ extern crate probers;
 
 use probers_macros::prober;
 #[prober]
-pub(crate) trait TestProbes {
+trait TestProbes {
     fn probe0();
     fn probe1(foo: &str);
 }

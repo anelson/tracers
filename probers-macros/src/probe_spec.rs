@@ -201,6 +201,34 @@ impl ProbeSpecification {
         let mut enabled_method = original_method.clone();
         enabled_method.ident = syn_helpers::add_suffix_to_ident(&enabled_method.ident, "_enabled");
         enabled_method.decl.inputs = syn::punctuated::Punctuated::new();
+        enabled_method.decl.output = syn::ReturnType::Default;
+
+        //Generate an get_(probe)_probe method which returns the raw Option<ProviderProbe>
+        let mut get_probe_method = original_method.clone();
+        get_probe_method.ident = Ident::new(
+            &format!("get_{}_probe", get_probe_method.ident),
+            get_probe_method.ident.span(),
+        );
+        get_probe_method.decl.inputs = syn::punctuated::Punctuated::new();
+        get_probe_method.decl.output = syn::ReturnType::Default;
+        let get_probe_method_ret_type = self.generate_provider_probe_type();
+        let a_lifetime = syn::Lifetime::new("'a", self.span);
+        get_probe_method
+            .decl
+            .generics
+            .params
+            .push(syn::GenericParam::Lifetime(syn::LifetimeDef::new(
+                a_lifetime,
+            )));
+        for param in self.get_args_lifetime_parameters().iter() {
+            get_probe_method
+                .decl
+                .generics
+                .params
+                .push(syn::GenericParam::Lifetime(syn::LifetimeDef::new(
+                    param.clone(),
+                )))
+        }
 
         //Generate an _impl method that actually fires the probe when called
         let mut impl_method = original_method.clone();
@@ -239,6 +267,10 @@ impl ProbeSpecification {
                 } else {
                     false
                 }
+            }
+
+            #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
+                #struct_type_path::get().map(|probes| &probes.#probe_ident)
             }
 
             #impl_method {
@@ -280,7 +312,7 @@ impl ProbeSpecification {
         let a_lifetime = syn::Lifetime::new("'a", self.span);
 
         quote_spanned! { self.span =>
-            ProviderProbe<#a_lifetime, SystemProbe, #arg_tuple>
+            ::probers::ProviderProbe<#a_lifetime, ::probers::SystemProbe, #arg_tuple>
         }
     }
 
@@ -371,6 +403,24 @@ impl ProbeSpecification {
                 (nam.clone(), new_typ, lifetimes)
             })
             .collect()
+    }
+
+    /// Gets all of the lifetime parameters for all of the reference args for this probe, in a
+    /// `Vec` for convenient post-processing.
+    ///
+    /// For example:
+    ///
+    /// ```noexecute
+    /// fn probe(arg0: &str, arg1: usize, arg2: Option<Result<(), &String>>;
+    ///
+    /// // results in vec!['probe_arg0_1, 'probe_arg2, _1]
+    /// ```
+    pub(super) fn get_args_lifetime_parameters(&self) -> Vec<syn::Lifetime> {
+        self.get_args_with_separate_lifetimes()
+            .into_iter()
+            .map(|(_, _, lifetimes)| lifetimes)
+            .flatten()
+            .collect::<Vec<syn::Lifetime>>()
     }
 
     /// Build a tuple value expression, consisting of the names of the probe arguments in a tuple.
