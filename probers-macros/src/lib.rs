@@ -76,7 +76,7 @@ type ProberResult<T> = std::result::Result<T, ProberError>;
 /// {
 ///     if let Some(probe) = MyProvider::get_myprobe_probe() {
 ///         if probe.is_enabled() {
-///             probe.fire(1, 5, "this is a string", compute_something()));
+///             probe.fire((1, 5, "this is a string", compute_something(),)));
 ///         }
 ///     }
 /// }
