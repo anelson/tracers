@@ -112,9 +112,9 @@ fn probe_impl(call: syn::Expr) -> ProberResult<TokenStream> {
 
                 Ok(quote_spanned! { call.span() =>
                     {
-                        if let Some(_probers_probe) = #get_probe_call {
-                            if _probers_probe.is_enabled() {
-                                _probers_probe.fire(#fire_args);
+                        if let Some(__probers_probe) = #get_probe_call {
+                            if __probers_probe.is_enabled() {
+                                __probers_probe.fire(#fire_args);
                             }
                         }
                     }
@@ -377,8 +377,10 @@ fn get_provider_struct_type_params(probes: &Vec<ProbeSpecification>) -> TokenStr
 /// Returns the name of the module in which most of the implementation code for this trait will be
 /// located.
 fn get_provider_impl_mod_name(trait_name: &Ident) -> Ident {
+    let snake_case_name = format!("{}Provider", trait_name).to_snake_case();
+
     Ident::new(
-        &format!("{}Provider", trait_name).to_snake_case(),
+        &format!("__{}", snake_case_name),
         trait_name.span(),
     )
 }
