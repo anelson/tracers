@@ -9,6 +9,7 @@
 //! `Option`.  If the string can't be represented as a `CString`, it will be passed to the C
 //! probeAPI as a NULL.
 use super::{ProbeArgType, ProbeArgWrapper};
+#[cfg(unix)]
 use std::ffi::{CString, OsStr, OsString};
 use std::os::raw::c_char;
 #[cfg(unix)]
