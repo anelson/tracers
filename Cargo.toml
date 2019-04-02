@@ -13,6 +13,10 @@ maintenance = { status = "experimental" }
 [dependencies]
 probers-core = { path = "probers-core", version = "0.1.0" }
 probers-macros = { path = "probers-macros", version = "0.1.0" }
+
+# This is only a fallback; not always used
+probers-noop = { path = "probers-noop", version = "0.1.0" }
+
 proc-macro-hack = "0.5"
 
 [dev-dependencies]
