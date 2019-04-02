@@ -11,7 +11,7 @@ jobs:
       vmImage: 'ubuntu-16.04'
     container: 'rust:latest'
     steps:
-      - script: apt-get update && apt-get install libelf-dev
+      - script: sudo apt-get update && sudo apt-get install libelf-dev
         displayName: install Debian dependencies
       - script: rustup component add clippy
         displayName: Install clippy
