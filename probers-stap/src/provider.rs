@@ -44,7 +44,7 @@ impl ProviderBuilder<StapTracer> for StapProviderBuilder {
 
         // Make sure a probe by this name hasn't already been added
         if self.probes.iter().any(|p| p.name == name) {
-            return Err(StapError::DuplicateProbeName { name: name }.into());
+            return Err(StapError::DuplicateProbeName { name }.into());
         }
 
         self.probes.push(ProbeDefinition::new::<ArgsT>(name));
@@ -108,7 +108,7 @@ impl StapProvider {
     /// keeps a record of the `ProbeDefinition` which will be used at runtime to ensure the
     /// probe'sarg count and types are the same as when the probe was defined.
     fn add_probe(&mut self, definition: ProbeDefinition) -> Fallible<()> {
-        let c_name = CString::new(definition.name.clone())?;
+        let c_name = CString::new(definition.name)?;
 
         // Unfortunately, the `providerAddProbe` C function is variadic, taking the types of the probe arguments
         // as variadic arguments.  This isn't a very ergonomic API design for either C or Rust wrappers.

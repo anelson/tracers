@@ -74,7 +74,7 @@ impl<'probe, ImplT: UnsafeProviderProbeImpl, ArgsT: ProbeArgs<ArgsT>>
 
     /// Fires the probe.  Note that it's assumed higher level code has tested `is_enabled()` already.
     /// If the probe isnt' enabled, it's not an error to attempt to fire it, just a waste of cycles.
-    pub fn fire(&self, args: ArgsT) -> () {
+    pub fn fire(&self, args: ArgsT) {
         args.fire_probe(self.unsafe_probe_impl)
     }
 }
@@ -104,7 +104,7 @@ pub trait ProbeArgs<T> {
 
     /// Converts all of the probe args in this tuple to their C representations and passes them to the
     /// underlying UnsafeProviderProbeImpl implementation.
-    fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &ImplT) -> ();
+    fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &ImplT);
 }
 
 /// This structure is a runtime representation of a probe's definition.
@@ -120,7 +120,7 @@ pub struct ProbeDefinition {
 impl ProbeDefinition {
     pub fn new<ArgsT: ProbeArgs<ArgsT>>(name: &'static str) -> ProbeDefinition {
         ProbeDefinition {
-            name: name,
+            name,
             arg_types: <ArgsT as ProbeArgs<ArgsT>>::arg_types(),
         }
     }

@@ -75,7 +75,7 @@ fn generate_probe_args_impl(type_params: &Vec<String>) -> String {
                 vec![{ctypes}]
             }}
 
-            fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &ImplT) -> () {{
+            fn fire_probe<ImplT: UnsafeProviderProbeImpl>(self, probe: &ImplT) {{
                unsafe {{ probe.fire{arg_count}({probe_args}) }}
             }}
         }}
@@ -108,13 +108,14 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
         ///
         /// The implementor of this API for a specific tracing library need only implement all 13
         /// possible `fire` methods, one for each number of args from 0 to 12.
+        #[allow(clippy::too_many_arguments)]
         pub trait UnsafeProviderProbeImpl
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
             /// access.  The Rust compiler should be able to inline this implementation for maxmimum performance.
             fn is_enabled(&self) -> bool;
 
-            unsafe fn fire0(&self) -> ();
+            unsafe fn fire0(&self);
     "#.to_string();
 
     for arity in 1..=MAX_ARITY {
@@ -124,7 +125,7 @@ fn generate_unsafe_provider_probe_impl_trait() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn fire{arg_count}<{type_list}>(&self, {args}) -> ()
+            unsafe fn fire{arg_count}<{type_list}>(&self, {args})
                 where {where_clause};
             "##,
             arg_count = type_params.len(),
@@ -158,6 +159,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
         /// addresses *only* for the duration of the call.  Immediatley after the `fireN` method returns this memory may
         /// be freed.  Thus it's imperative that the probing implementation process probes synchronously.  Otherwise
         /// invalid memory accesses are inevitable.
+        #[allow(clippy::too_many_arguments)]
         pub trait UnsafeProviderProbeNativeImpl
         {
             /// Tests if this probe is enabled or not.  This should be a very fast test, ideally just a memory
@@ -165,7 +167,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
             fn is_enabled(&self) -> bool;
 
             /// This is actually identical to `fire0` but is provided for consistency with the other arities
-            unsafe fn c_fire0(&self) -> ();
+            unsafe fn c_fire0(&self);
 
     "#.to_string();
 
@@ -175,7 +177,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args}) -> ()
+            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args})
                 where {where_clause};
             "##,
             arg_count = type_params.len(),
@@ -200,7 +202,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
             fn is_enabled(&self) -> bool {
                 T::is_enabled(self)
             }
-            unsafe fn fire0(&self) -> () { self.c_fire0() }
+            unsafe fn fire0(&self) { self.c_fire0() }
 
     "#;
 
@@ -218,7 +220,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn fire{arg_count}<{type_list}>(&self, {args}) -> ()
+            unsafe fn fire{arg_count}<{type_list}>(&self, {args})
                 where {where_clause} {{
                 {wrapper_decls};
                 self.c_fire{arg_count}({probe_args});
@@ -255,12 +257,13 @@ fn generate_test_unsafe_probe_impl() -> String {
     let mut decl = r#"
 
     #[cfg(test)]
+    #[allow(clippy::too_many_arguments)]
     impl UnsafeProviderProbeNativeImpl for TestingProviderProbeImpl {
         fn is_enabled(&self) -> bool {
             self.is_enabled
         }
 
-        unsafe fn c_fire0(&self) -> () {
+        unsafe fn c_fire0(&self) {
             {
                 let buffer = self.buffer.lock().unwrap();
                 libc::snprintf(buffer.as_ptr() as *mut c_char, BUFFER_SIZE, self.format_string.as_ptr());
@@ -278,7 +281,7 @@ fn generate_test_unsafe_probe_impl() -> String {
 
         decl += &format!(
             r##"
-            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args}) -> ()
+            unsafe fn c_fire{arg_count}<{type_list}>(&self, {args})
                 where {where_clause} {{
                 {{
                     let buffer = self.buffer.lock().unwrap();

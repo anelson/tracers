@@ -1,4 +1,5 @@
 //! Implements the `UnsafeProviderProbeImpl` trait for SystemTap
+
 use libstapsdt_sys::{probeFire, SDTProbe_t};
 use probers_core::{ProbeArgNativeType, UnsafeProviderProbeNativeImpl};
 
@@ -24,7 +25,7 @@ impl StapProbe {
                 return false;
             }
 
-            return true;
+            true
         }
     }
 }
