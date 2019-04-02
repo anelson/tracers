@@ -5,6 +5,9 @@ authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
 
+[badges]
+maintenance = { status = "experimental" }
+
 [workspace]
 
 [dependencies]
