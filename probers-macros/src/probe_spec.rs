@@ -243,7 +243,7 @@ impl ProbeSpecification {
         //macro instead.
         let probe_name = &self.name;
         let probe_ident = &self.method_name;
-        let deprecation_message = format!( "Probe methods should not be called directly.  Use the `probe!` macro, e.g. `probe! {}::{}(...)`",
+        let deprecation_message = format!( "Probe methods should not be called directly.  Use the `probe!` macro, e.g. `probe!({}::{}(...))`",
             trait_name,
             probe_name);
 
