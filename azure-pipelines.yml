@@ -64,8 +64,8 @@ jobs:
     - script: sudo apt-get install libelf-dev
         displayName: install Ubuntu dependencies
         condition: eq( variables['Agent.OS'], 'Linux')
-      - script: cargo build --all --release
+      - script: cargo build --all --release -vv
         displayName: Cargo build
-      - script: cargo test --all
+      - script: cargo test --all -vv
         displayName: Cargo test
 
