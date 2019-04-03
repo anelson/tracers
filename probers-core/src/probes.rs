@@ -163,6 +163,7 @@ fn get_ctype<T: ProbeArgType<T>>() -> CType {
 include!(concat!(env!("OUT_DIR"), "/probe_args.rs"));
 
 #[cfg(test)]
+#[cfg(unix)] //Windows doesn't have the same libc functions like snprintf...
 mod test {
     use super::*;
     use crate::argtypes::ProbeArgNativeType;
