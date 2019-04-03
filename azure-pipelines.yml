@@ -62,6 +62,6 @@ jobs:
       #
       # Once it's fixed, put back `--all-targets` because otherwise clippy isn't running against tests
       - script: rustup component add clippy && cargo clippy --all-features -- -D warnings
-        displayName: Run Clippy linter on Rust code (only on Linux with Rust stable)
-        condition: and( eq( variables['Agent.OS'], 'Linux' ), eq( variables['rustup_toolchain'], 'stable' ) )
+        displayName: Run Clippy linter on Rust code (only on Rust stable)
+        condition:  eq( variables['rustup_toolchain'], 'stable' )
 
