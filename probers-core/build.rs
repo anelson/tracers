@@ -257,6 +257,7 @@ fn generate_test_unsafe_probe_impl() -> String {
     let mut decl = r#"
 
     #[cfg(test)]
+    #[cfg(unix)]
     #[allow(clippy::too_many_arguments)]
     impl UnsafeProviderProbeNativeImpl for TestingProviderProbeImpl {
         fn is_enabled(&self) -> bool {

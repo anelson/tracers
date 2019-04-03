@@ -65,6 +65,7 @@ impl<'a> ProbeArgWrapper for Option<CString> {
 mod tests {
     use crate::{wrap, ProbeArgType, ProbeArgWrapper};
     use std::ffi::{CStr, CString};
+    #[cfg(unix)]
     use std::ffi::{OsStr, OsString};
     use std::fmt::Debug;
     #[cfg(unix)]
