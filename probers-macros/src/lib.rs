@@ -379,10 +379,7 @@ fn get_provider_struct_type_params(probes: &Vec<ProbeSpecification>) -> TokenStr
 fn get_provider_impl_mod_name(trait_name: &Ident) -> Ident {
     let snake_case_name = format!("{}Provider", trait_name).to_snake_case();
 
-    Ident::new(
-        &format!("__{}", snake_case_name),
-        trait_name.span(),
-    )
+    Ident::new(&format!("__{}", snake_case_name), trait_name.span())
 }
 
 /// The name of the struct type within the impl module which represents the provider, eg `MyProbesProviderImpl`.
@@ -427,7 +424,6 @@ fn report_error(msg: &str, span: Span) -> TokenStream {
 #[cfg(test)]
 mod test {
     use super::*;
-    use quote::quote;
     use syn::{parse_quote, ItemTrait};
 
     mod data {
