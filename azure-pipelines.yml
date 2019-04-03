@@ -58,5 +58,5 @@ jobs:
         displayName: Cargo test
       - script: cargo clippy --all
         displayName: Run Clippy linter on Rust code (only on Linux with Rust stable)
-        condition: and( eq( variables['Agent.OS'], 'Linux' ), eq( variables['rustup_toolchain'], 'Stable' ) )
+        condition: and( eq( variables['Agent.OS'], 'Linux' ), eq( variables['rustup_toolchain'], 'stable' ) )
 
