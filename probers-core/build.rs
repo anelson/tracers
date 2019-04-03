@@ -438,6 +438,7 @@ fn generate_probe_tests() -> String {
         decl += &format!(
             r##"
             #[quickcheck]
+            #[cfg(unix)]
             fn test_fire{arg_count}({args_declaration}) -> bool {{
                 let unsafe_impl = TestingProviderProbeImpl::new("{c_format_string}".to_string());
                 let probe_impl = ProviderProbe::new(&unsafe_impl);
