@@ -132,31 +132,6 @@ fn get_ctype<T: ProbeArgType<T>>() -> CType {
     <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_c_type()
 }
 
-/// This macro helps implementors of this API implement the UnsafeProviderProbeImpl trait without having to
-/// manually construct 13 different methods.  It should be used within an implementation of UnsafeProviderProbeImpl
-/// which otherwise has no implementations for any of the `fireN` methods.
-///
-/// Example:
-///
-/// ```noexec
-/// pub struct MyUnsafeProviderProbe{}
-///
-/// impl UnsafeProviderProbeImpl for MyUnsafeProviderProbe {
-///     fn is_enabled(&self) -> bool { true }
-///
-///     impl_unsafe_provider_probe!(args, {
-///         let parameters = vec![args];
-///
-///         let as_string = parameters.iter().map()
-///
-///         println!()
-///     })
-/// }
-/// ```
-//macro_rules! impl_unsafe_provider_probe {
-//
-//}
-
 // The implementation of `ProbeArgs<T>` is provided for all tuples from
 // 1to 12 elements.  That's highly repetitive, so there's code in `build.rs` that generates it.
 // Here we need only include it:
