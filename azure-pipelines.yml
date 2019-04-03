@@ -56,7 +56,12 @@ jobs:
         displayName: Cargo build
       - script: cargo test --all -vv
         displayName: Cargo test
-      - script: rustup component add clippy && cargo clippy --all-targets --all-features -- -D warnings
+
+      # NB: Currently running with `--all-targets` causes a ICE due to this issue:
+      # https://github.com/rust-lang/rust-clippy/issues/3741
+      #
+      # Once it's fixed, put back `--all-targets` because otherwise clippy isn't running against tests
+      - script: rustup component add clippy && cargo clippy --all-features -- -D warnings
         displayName: Run Clippy linter on Rust code (only on Linux with Rust stable)
         condition: and( eq( variables['Agent.OS'], 'Linux' ), eq( variables['rustup_toolchain'], 'stable' ) )
 
