@@ -2,3 +2,6 @@
 	path = libstapsdt-sys/vendor/libstapsdt
 	url = https://github.com/sthima/libstapsdt.git
 
+[submodule "libelf-sys/vendor/libelf"]
+	path = libelf-sys/vendor/libelf
+	url = git://sourceware.org/git/elfutils.git
