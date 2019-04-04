@@ -72,7 +72,7 @@ fn main() {
     println!("cargo:root={}", root.display());
     println!("cargo:include={}", include.display());
     println!("cargo:rustc-link-lib=static={}", "elf");
-    println!("cargo:rustc-link=native={}", lib.display());
+    println!("cargo:rustc-link-search=native={}", lib.display());
 }
 
 fn run(cmd: &mut Command, program: &str) {
