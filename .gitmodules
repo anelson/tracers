@@ -1,9 +1,4 @@
-[submodule "vendor"]
-	path = vendor
-	url = https://github.com/sthima/libstapsdt.git
 [submodule "libstapsdt-sys/vendor/libstapsdt"]
 	path = libstapsdt-sys/vendor/libstapsdt
 	url = https://github.com/sthima/libstapsdt.git
-[submodule "libelf-sys/vendor"]
-	path = libelf-sys/vendor
-	url = git://sourceware.org/git/elfutils.git
+
