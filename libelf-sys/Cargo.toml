@@ -3,5 +3,14 @@ name = "libelf-sys"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
+license = "LGPL-3.0-or-later"
+links = "elf"
 
 [dependencies]
+libz-sys = ">= 0.1.2"
+libc = "0.2"
+
+[build-dependencies]
+pkg-config = "0.3.2"
+cc = "1.0"
+
