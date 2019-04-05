@@ -9,6 +9,8 @@ use super::{StapProbe, StapProvider, StapProviderBuilder};
 pub struct StapTracer {}
 
 impl Tracer for StapTracer {
+    const TRACING_IMPLEMENTATION: &'static str = "stap";
+
     type ProviderBuilderType = StapProviderBuilder;
     type ProviderType = StapProvider;
     type ProbeType = StapProbe;

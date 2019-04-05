@@ -11,6 +11,8 @@ use super::{NoOpProbe, NoOpProvider, NoOpProviderBuilder};
 pub struct NoOpTracer {}
 
 impl Tracer for NoOpTracer {
+    const TRACING_IMPLEMENTATION: &'static str = "no-op";
+
     type ProviderBuilderType = NoOpProviderBuilder;
     type ProviderType = NoOpProvider;
     type ProbeType = NoOpProbe;

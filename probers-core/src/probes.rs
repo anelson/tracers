@@ -9,6 +9,8 @@ use std::marker::PhantomData;
 /// Each implementation of the tracing API provides a `Tracer` implementation, which provides
 /// tracing functionality for an entire process.
 pub trait Tracer: Sized {
+    const TRACING_IMPLEMENTATION: &'static str;
+
     /// The type used to construct tracing providers
     type ProviderBuilderType: ProviderBuilder<Self>;
 

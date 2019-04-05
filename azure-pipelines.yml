@@ -54,8 +54,12 @@ jobs:
         condition: eq( variables['Agent.OS'], 'Linux' )
       - script: cargo build --all --release -vv
         displayName: Cargo build
-      - script: cargo test --all -vv
-        displayName: Cargo test
+      - script: PROBERS_EXPECTED_IMPL=stap cargo test --all -vv
+        displayName: Cargo test SystemTap implementation
+        condition: eq( variables['Agent.OS'], 'Linux' )
+      - script: PROBERS_EXPECTED_IMPL=noop cargo test --all -vv
+        displayName: Cargo test NoOp implementation
+        condition: ne( variables['Agent.OS'], 'Linux' )
 
       # NB: Currently running with `--all-targets` causes a ICE due to this issue:
       # https://github.com/rust-lang/rust-clippy/issues/3741
