@@ -57,9 +57,14 @@ jobs:
       - script: PROBERS_EXPECTED_IMPL=stap cargo test --all -vv
         displayName: Cargo test SystemTap implementation
         condition: eq( variables['Agent.OS'], 'Linux' )
-      - script: PROBERS_EXPECTED_IMPL=noop cargo test --all -vv
-        displayName: Cargo test NoOp implementation
-        condition: ne( variables['Agent.OS'], 'Linux' )
+      - script: PROBERS_EXPECTED_IMPL=no-op cargo test --all -vv
+        displayName: Cargo test NoOp implementation (non-Windows)
+        condition: and(ne( variables['Agent.OS'], 'Windows_NT' ), ne( variables['Agent.OS'], 'Linux' ))
+      - script: |
+          echo "##vso[task.setvariable variable=PROBERS_EXPECTED_IMPL;]no-op"
+          cargo test --all -vv
+        displayName: Cargo test NoOp implementation (Windows)
+        condition: ne( variables['Agent.OS'], 'Windows_NT' )
 
       # NB: Currently running with `--all-targets` causes a ICE due to this issue:
       # https://github.com/rust-lang/rust-clippy/issues/3741
