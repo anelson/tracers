@@ -16,21 +16,6 @@ fn main() {
         panic!("libstapsdt is only supported on Linux");
     }
 
-    //The makefile for libstapsdt is mercifully simple, and since it's wrapping a Linux-only
-    //subsystem SytemTap there's no cross-platform nonsense either.
-    let dst = fs::canonicalize(PathBuf::from(env::var_os("OUT_DIR").unwrap())).unwrap();
-    let root = dst.join("libstapsdt");
-    let build = root.join("build");
-    let include = root.join("include");
-    let lib = root.join("lib");
-
-    //the libstapstd Makefile is not idempotent, it will actually fail if `make install` is run a
-    //second time.  So, ensure we always build with a clean slate
-    let _ = fs::remove_dir_all(&root);
-    fs::create_dir_all(&build).unwrap();
-    fs::create_dir_all(&include).unwrap();
-    fs::create_dir_all(&lib).unwrap();
-
     // Init the submodule if not already where the source code is located
     let src_path = fs::canonicalize(Path::new("vendor/libstapsdt")).unwrap();
     if !src_path.join("/.git").exists() {
@@ -38,6 +23,20 @@ fn main() {
             .args(&["submodule", "update", "--init"])
             .status();
     }
+
+    //The makefile for libstapsdt is mercifully simple, and since it's wrapping a Linux-only
+    //subsystem SytemTap there's no cross-platform nonsense either.
+    let dst = fs::canonicalize(PathBuf::from(env::var_os("OUT_DIR").unwrap())).unwrap();
+    let root = dst.join("libstapsdt");
+    let build = root.join("build");
+    let lib = root.join("lib");
+    let include = src_path.clone(); //libstapsdt doesn't segregate include from src files
+
+    //the libstapstd Makefile is not idempotent, it will actually fail if `make install` is run a
+    //second time.  So, ensure we always build with a clean slate
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&build).unwrap();
+    fs::create_dir_all(&lib).unwrap();
 
     //We won't use cc to build the library, it has a makefile
     //But the cc crate will help us build up the right CFLAGS
@@ -58,8 +57,13 @@ fn main() {
         cflags.push(" ");
     }
 
+    //NB: I am deliberately overriding the CC and CFLAGS variabes hard-coded in the `Makefile` with
+    //values computed using the `cc` crate.  As of this writing, that works.  It's possible a
+    //future change to `libstapsdt-sys` might add more flags that will then not be reflected here
+    //and break the build.  If so that's the first place to look.
     let mut make = Command::new("make");
     make.arg("--environment-overrides")
+        .arg("out/libstapsdt.a")
         .env("CC", compiler.path())
         .env("CFLAGS", cflags)
         .env("PREFIX", root.clone())
@@ -67,11 +71,8 @@ fn main() {
         .current_dir(&src_path);
 
     run(&mut make, "make");
-    make.arg("install");
-    run(&mut make, "make install");
 
-    // `make install` will copy the libs and headers to the `PREFIX` directory, but it doesn't copy
-    // the static library
+    //The makefile doesn't copy the static lib anywhere so do that ourselves
     let libstapsdt_static_path = src_path.join("out/libstapsdt.a");
     let libstapsdt_output_path = lib.join("libstapsdt.a");
     fs::copy(libstapsdt_static_path.clone(), libstapsdt_output_path).expect(&format!(
