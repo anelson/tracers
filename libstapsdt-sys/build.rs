@@ -18,7 +18,7 @@ fn main() {
 
     //The makefile for libstapsdt is mercifully simple, and since it's wrapping a Linux-only
     //subsystem SytemTap there's no cross-platform nonsense either.
-    let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
+    let dst = fs::canonicalize(PathBuf::from(env::var_os("OUT_DIR").unwrap())).unwrap();
     let root = dst.join("libstapsdt");
     let build = root.join("build");
     let include = root.join("include");
@@ -32,7 +32,7 @@ fn main() {
     fs::create_dir_all(&lib).unwrap();
 
     // Init the submodule if not already where the source code is located
-    let src_path = Path::new("vendor/libstapsdt");
+    let src_path = fs::canonicalize(Path::new("vendor/libstapsdt")).unwrap();
     if !src_path.join("/.git").exists() {
         let _ = Command::new("git")
             .args(&["submodule", "update", "--init"])
@@ -44,7 +44,6 @@ fn main() {
     let mut cfg = cc::Build::new();
     cfg.warnings(true)
         .warnings_into_errors(false) //it pains me to do this but the lib doesn't compile clean
-        .static_flag(true)
         .flag("-z")
         .flag("noexecstack")
         .pic(true)
