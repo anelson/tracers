@@ -8,7 +8,8 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{FnArg, Ident, ReturnType, TraitItemMethod};
+use syn::Visibility;
+use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
 
 use super::syn_helpers;
 use super::{ProberError, ProberResult};
@@ -17,6 +18,7 @@ pub(super) struct ProbeSpecification {
     name: String,
     method_name: Ident,
     original_method: TraitItemMethod,
+    vis: Visibility,
     span: Span,
     args: Vec<(syn::PatIdent, syn::Type)>,
 }
@@ -34,7 +36,10 @@ impl ProbeSpecification {
     /// * Not `unsafe`, `const`, `async`, or `extern "C"`
     /// * No type parameters; generics are not supported in probe types
     /// * Not variadic
-    pub(super) fn from_method(method: &TraitItemMethod) -> ProberResult<ProbeSpecification> {
+    pub(super) fn from_method(
+        item: &ItemTrait,
+        method: &TraitItemMethod,
+    ) -> ProberResult<ProbeSpecification> {
         if method.default != None {
             return Err(ProberError::new(
                 "Probe methods must NOT have a default implementation",
@@ -97,6 +102,7 @@ impl ProbeSpecification {
             name: method.sig.ident.to_string(),
             method_name: method.sig.ident.clone(),
             original_method: method.clone(),
+            vis: item.vis.clone(),
             span: method.span(),
             args: args,
         };
@@ -190,6 +196,7 @@ impl ProbeSpecification {
         trait_name: &syn::Ident,
         struct_type_path: &syn::Path,
     ) -> ProberResult<TokenStream> {
+        let vis = &self.vis;
         //The original method will be implemented as a call to the impl method.  It's only purpose
         //is to ensure the user can call the original method and get our warning reminding them ot
         //use the `probe!` macro instead.  Otherwise it would be confusing to not be able to call a
@@ -254,7 +261,7 @@ impl ProbeSpecification {
         Ok(quote_spanned! { original_method.span() =>
             #[deprecated(note = #deprecation_message)]
            #[allow(dead_code)]
-            #original_method {
+            #vis #original_method {
                 if let Some(probes) = #struct_type_path::get() {
                     if probes.#probe_ident.is_enabled() {
                         probes.#probe_ident.fire(#probe_args_tuple)
@@ -263,7 +270,7 @@ impl ProbeSpecification {
             }
 
             #[allow(dead_code)]
-            #enabled_method -> bool {
+            #vis #enabled_method -> bool {
                 if let Some(probes) = #struct_type_path::get() {
                     probes.#probe_ident.is_enabled()
                 } else {
@@ -271,7 +278,7 @@ impl ProbeSpecification {
                 }
             }
 
-            #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
+            #vis #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
                 #struct_type_path::get().map(|probes| &probes.#probe_ident)
             }
         })
@@ -487,6 +494,10 @@ mod test {
     mod data {
         use super::*;
 
+        pub(crate) fn get_trait_item() -> ItemTrait {
+            parse_quote! { trait SomeTrait {} }
+        }
+
         /// Produces an assortment of valid probe methods, all of which should be accepted by the
         /// `from_method` constructor
         pub(crate) fn get_valid_test_cases() -> Vec<TraitItemMethod> {
@@ -522,7 +533,7 @@ mod test {
         for input in data::get_valid_test_cases().iter() {
             let input_string = quote! { #input }.to_string();
 
-            ProbeSpecification::from_method(input).expect(&format!(
+            ProbeSpecification::from_method(&data::get_trait_item(), input).expect(&format!(
                 "This should be treated as a valid method: {}",
                 input_string
             ));
@@ -534,7 +545,7 @@ mod test {
         for input in data::get_invalid_test_cases().iter() {
             let input_string = quote! { #input }.to_string();
 
-            ProbeSpecification::from_method(input)
+            ProbeSpecification::from_method(&data::get_trait_item(), input)
                 .err()
                 .expect(&format!(
                     "This should be treated as an invalid method: {}",
@@ -572,7 +583,7 @@ mod test {
         ];
 
         for (method, expected) in test_cases.iter() {
-            let probe = ProbeSpecification::from_method(method)
+            let probe = ProbeSpecification::from_method(&data::get_trait_item(), method)
                 .expect(&format!("This method should be valid: {}", quote! {method}));
 
             //Re-construct the probe method using the args as they've been computed in the

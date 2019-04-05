@@ -215,7 +215,7 @@ fn get_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
     for f in item.items.iter() {
         match f {
             TraitItem::Method(ref m) => {
-                specs.push(ProbeSpecification::from_method(m)?);
+                specs.push(ProbeSpecification::from_method(item, m)?);
             }
             _ => {
                 return Err(ProberError::new(
