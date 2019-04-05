@@ -20,7 +20,6 @@ probers-noop = { path = "probers-noop", version = "0.1.0" }
 
 proc-macro-hack = "0.5"
 
-[dev-dependencies]
 failure = "0.1.5"
 once_cell = "0.1.8"
 
