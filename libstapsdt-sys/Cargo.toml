@@ -3,7 +3,7 @@ name = "libstapsdt-sys"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
-license = "LGPL-3.0-or-later"
+license = "MIT"
 links = "stapsdt"
 
 [dependencies]
