@@ -5,8 +5,7 @@ use probers::probe;
 
 mod submodule_with_struct {
     extern crate probers;
-
-    use probers_macros::prober;
+    use probers::prober;
 
     /// Note how this trait must be some kind of `pub`
     #[prober]

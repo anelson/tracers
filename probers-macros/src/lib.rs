@@ -259,10 +259,10 @@ fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> Toke
 
     quote_spanned! { item.span() =>
         mod #mod_name {
-            use ::failure::{bail, Fallible};
+            use ::probers::failure::{bail, Fallible};
             use ::probers::{SystemTracer,SystemProvider,Provider};
-            use ::probers_core::{ProviderBuilder,Tracer};
-            use ::once_cell::sync::OnceCell;
+            use ::probers::{ProviderBuilder,Tracer};
+            use ::probers::once_cell::sync::OnceCell;
 
             #[allow(dead_code)]
             pub(super) struct #struct_type_name<#struct_type_params> {
