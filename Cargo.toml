@@ -11,6 +11,18 @@ maintenance = { status = "experimental" }
 [workspace]
 exclude = ["probers-stap", "libstapsdt-sys", "libelf-sys"]
 
+[features]
+default = []
+
+# An optional feature will build binaries which are used to interact with the probing framework.  These are only useful
+# as part of our CI tests, or when troubleshooting unexpected behavior with the probes
+binaries = ["nom"]
+
+[[bin]]
+name = "testfire"
+path = "src/bin/testfire.rs"
+required-features = [ "binaries" ]
+
 [dependencies]
 probers-core = { path = "probers-core", version = "0.1.0" }
 probers-macros = { path = "probers-macros", version = "0.1.0" }
@@ -22,6 +34,8 @@ proc-macro-hack = "0.5"
 
 failure = "0.1.5"
 once_cell = "0.1.8"
+
+nom = { version = "4.2.3", optional = true, features = ["verbose-errors"] }
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "linux"))'.dependencies]
 probers-stap = { path = "probers-stap", version = "0.1.0" }
