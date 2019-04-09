@@ -260,7 +260,7 @@ impl ProbeSpecification {
         // be directly visible to the user and thus should not cause a warning if left un-called
         Ok(quote_spanned! { original_method.span() =>
             #[deprecated(note = #deprecation_message)]
-           #[allow(dead_code)]
+            #[allow(dead_code)]
             #vis #original_method {
                 if let Some(probes) = #struct_type_path::get() {
                     if probes.#probe_ident.is_enabled() {
@@ -270,6 +270,7 @@ impl ProbeSpecification {
             }
 
             #[allow(dead_code)]
+            #[doc(hidden)]
             #vis #enabled_method -> bool {
                 if let Some(probes) = #struct_type_path::get() {
                     probes.#probe_ident.is_enabled()
@@ -278,6 +279,7 @@ impl ProbeSpecification {
                 }
             }
 
+            #[doc(hidden)]
             #vis #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
                 #struct_type_path::get().map(|probes| &probes.#probe_ident)
             }

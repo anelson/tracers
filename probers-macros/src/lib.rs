@@ -18,13 +18,11 @@ use syn::parse_quote;
 use syn::spanned::Spanned;
 use syn::{parse_macro_input, Ident, ItemTrait, TraitItem};
 
-#[proc_macro_attribute]
-pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> CompilerTokenStream {
-    // In our case this attribute can only be applied to a trait.  If it's not a trait, this line
-    // will cause what looks to the user like a compile error complaining that it expected a trait.
-    let input = parse_macro_input!(item as ItemTrait);
+#[proc_macro_hack]
+pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
+    let input = parse_macro_input!(input as syn::Expr);
 
-    match prober_impl(input) {
+    match probe_impl(input) {
         Ok(stream) => stream,
         Err(err) => report_error(&err.message, err.span),
     }
@@ -32,10 +30,23 @@ pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> Compiler
 }
 
 #[proc_macro_hack]
-pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
-    let input = parse_macro_input!(input as syn::Expr);
+pub fn init_provider(input: CompilerTokenStream) -> CompilerTokenStream {
+    let input = parse_macro_input!(input as syn::TypePath);
 
-    match probe_impl(input) {
+    match init_provider_impl(input) {
+        Ok(stream) => stream,
+        Err(err) => report_error(&err.message, err.span),
+    }
+    .into()
+}
+
+#[proc_macro_attribute]
+pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> CompilerTokenStream {
+    // In our case this attribute can only be applied to a trait.  If it's not a trait, this line
+    // will cause what looks to the user like a compile error complaining that it expected a trait.
+    let input = parse_macro_input!(item as ItemTrait);
+
+    match prober_impl(input) {
         Ok(stream) => stream,
         Err(err) => report_error(&err.message, err.span),
     }
@@ -135,6 +146,12 @@ fn probe_impl(call: syn::Expr) -> ProberResult<TokenStream> {
     }
 }
 
+fn init_provider_impl(typ: syn::TypePath) -> ProberResult<TokenStream> {
+    Ok(quote_spanned! { typ.span() =>
+        #typ::__try_init_provider()
+    })
+}
+
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
 /// more testable
 fn prober_impl(item: ItemTrait) -> ProberResult<TokenStream> {
@@ -184,19 +201,74 @@ fn generate_prober_struct(
     // probing
     let span = item.span();
     let ident = &item.ident;
+    let attrs = &item.attrs;
     let vis = &item.vis;
 
     let mod_name = get_provider_impl_mod_name(&item.ident);
     let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
 
     let result = quote_spanned! { span =>
+        #(#attrs)*
         #vis struct #ident;
 
         impl #ident {
             #(#probe_methods)*
 
+            /// Initializes the provider, if it isn't already initialized, and if initialization
+            /// failed returns the error.
+            ///
+            /// # Usage
+            ///
+            /// Initializing the provider is not required.  By default, each provider will lazily
+            /// initialize the first time a probe is fired.  Explicit initialization can be useful
+            /// because it ensures that all of a provider's probes are registered and visible to
+            /// the platform-specific tracing tools, like `bpftrace` or `tplist` on Linux.
+            ///
+            /// It's ok to initialize a provider more than once; init operations are idempotent and
+            /// if repeated will not do anything
+            ///
+            /// # Caution
+            ///
+            /// Callers should not call this method directly.  Instead use the provided
+            /// `init_provider!` macro.  This will correctly elide the call when probing is
+            /// compile-time disabled.
+            ///
+            /// # Example
+            ///
+            /// ```
+            /// #[prober]
+            /// trait MyProbes {
+            ///     fn probe0();
+            /// }
+            ///
+            /// if let Some(err) = init_provider!(MyProbes) {
+            ///     eprintln!("Probe provider failed to initialize: {}", err);
+            /// }
+            ///
+            /// //Note that even if the provider fails to initialize, firing probes will never fail
+            /// //or panic...
+            ///
+            /// println!("Firing anyway...");
+            /// probe!(MyProbes::probe0());
+            /// ```
             #[allow(dead_code)]
-            fn get_init_error() -> Option<&'static ::failure::Error> {
+            #vis fn __try_init_provider() -> Option<&'static ::probers::failure::Error> {
+                #mod_name::#struct_type_name::get();
+                #mod_name::#struct_type_name::get_init_error()
+            }
+
+            /// If the provider has been initialized, and if that initialization failed, this
+            /// method returns the error information.  If the provider was not initialized, this
+            /// method does not initialize it.
+            ///
+            /// # Usage
+            ///
+            /// In general callers should prefer to use the `init_provider!` macro which wraps a
+            /// call to `__try_init_provider`.  Calls to `get_init_error()` directly are necessary
+            /// only when the caller specifically wants to avoid triggering initialization of the
+            /// provider, but merely to test if initialization was attempted and failed previously.
+            #[allow(dead_code)]
+            #vis fn __get_init_error() -> Option<&'static ::probers::failure::Error> {
                 #mod_name::#struct_type_name::get_init_error()
             }
         }
@@ -277,6 +349,12 @@ fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> Toke
             static IMPL_OPT: OnceCell<Option<&'static #struct_type_name>> = OnceCell::INIT;
 
             impl<#struct_type_params> #struct_type_name<#struct_type_params> {
+               pub(super) fn get_init_error() -> Option<&'static failure::Error> {
+                    //Don't do a whole re-init cycle again, but if the initialization has happened,
+                    //check for failure
+                    #struct_var_name.get().and_then(|fallible|  fallible.as_ref().err() )
+               }
+
                #[allow(dead_code)]
                pub(super) fn get() -> Option<&'static #struct_type_name<#struct_type_params>> {
                    let imp: &'static Option<&'static #struct_type_name> = IMPL_OPT.get_or_init(|| {
@@ -319,12 +397,6 @@ fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> Toke
                    //implemented as just a pointer, this should be effectively free
                    *imp
                }
-
-               pub(super) fn get_init_error() -> Option<&'static failure::Error> {
-                    //Don't do a whole re-init cycle again, but if the initialization has happened,
-                    //check for failure
-                    #struct_var_name.get().and_then(|fallible|  fallible.as_ref().err() )
-               }
             }
         }
     }
@@ -343,9 +415,19 @@ fn generate_define_provider_call(
         .iter()
         .map(|probe| probe.generate_add_probe_call(&builder))
         .collect();
+    let provider_name = item.ident.to_string().to_snake_case();
 
     quote_spanned! { item.span() =>
-        SystemTracer::define_provider(module_path!(), |mut #builder| {
+        // The provider name must be chosen carefully.  As of this writing (2019-04) the `bpftrace`
+        // and `bcc` tools have, shall we say, "evolving" support for USDT.  As of now, with the
+        // latest git version of `bpftrace`, the provider name can't have dots or colons.  For now,
+        // then, the provider name is just the name of the provider trait, converted into
+        // snake_case for consistency with USDT naming conventions.  If two modules in the same
+        // process have the same provider name, they will conflict and some unspecified `bad
+        // things` will happen.
+        let provider_name = #provider_name;
+
+        SystemTracer::define_provider(&provider_name, |mut #builder| {
             #(#add_probe_calls)*
 
             Ok(builder)
