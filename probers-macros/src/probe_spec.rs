@@ -194,6 +194,7 @@ impl ProbeSpecification {
     pub(super) fn generate_trait_methods(
         &self,
         trait_name: &syn::Ident,
+        provider_name: &str,
         struct_type_path: &syn::Path,
     ) -> ProberResult<TokenStream> {
         let vis = &self.vis;
@@ -254,36 +255,88 @@ impl ProbeSpecification {
             trait_name,
             probe_name);
 
+        //Keep any attributes that were on the original method, and add `doc` attributes at the end
+        //to provide some more information about the generated probe mechanics
+        let attrs = &self.original_method.attrs;
+        let probe_fire_comment = format!(
+            r###"
+To fire this probe, don't call this method directly. Instead, use the `probe!` macro, for example:
+
+```ignore
+// If the probe is enabled, fires the probe.  If the probe isn't enabled, or if provider
+// initialization failed for some reason, does not fire the probe, and does NOT evaluate the
+// arguments to the probe.
+probe!({trait_name}::{probe_name}(...));
+```
+"###,
+            trait_name = trait_name,
+            probe_name = probe_name
+        );
+        let systemtap_comment = format!(
+            r###"
+To trace the firing of this probe, use `bpftrace`, e.g.:
+```text
+sudo bpftrace -p ${{PID}} -e 'usdt::{provider}:{probe} {{ printf("Hello from {probe}\n"); }}'
+```
+
+where `${{PID}}` should be the actual process ID of the process you are tracing.
+"###,
+            provider = provider_name,
+            probe = probe_name
+        );
+
         // Note that we don't put an #[allow(dead_code)] attribute on the original method, because
         // the user declared that method.  If it's not being used, let the compiler warn them about
         // it just like it would any other unused method.  The methods we generate, however, won't
         // be directly visible to the user and thus should not cause a warning if left un-called
         Ok(quote_spanned! { original_method.span() =>
-            #[deprecated(note = #deprecation_message)]
-            #[allow(dead_code)]
-            #vis #original_method {
-                if let Some(probes) = #struct_type_path::get() {
-                    if probes.#probe_ident.is_enabled() {
-                        probes.#probe_ident.fire(#probe_args_tuple)
-                    }
-                };
-            }
+                                                    #(#attrs)*
+        #[doc = "# Probing
 
-            #[allow(dead_code)]
-            #[doc(hidden)]
-            #vis #enabled_method -> bool {
-                if let Some(probes) = #struct_type_path::get() {
-                    probes.#probe_ident.is_enabled()
-                } else {
-                    false
-                }
-            }
+This method is translated at compile-time by `probers` into a platform-specific tracing
+probe, which allows very high-performance and low-overhead tracing.
 
-            #[doc(hidden)]
-            #vis #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
-                #struct_type_path::get().map(|probes| &probes.#probe_ident)
-            }
-        })
+## How to fire probe
+
+"]
+                                #[doc = #probe_fire_comment]
+#[doc = "
+The exact details of how to interact with the probes depends on the underlying
+probing implementation.
+
+## SystemTap/USDT (Linux x64)
+"]
+                                #[doc = #systemtap_comment]
+#[doc ="
+## Other platforms
+
+TODO: No other platforms supported yet
+"]
+                                                    #[deprecated(note = #deprecation_message)]
+                                                    #[allow(dead_code)]
+                                                    #vis #original_method {
+                                                        if let Some(probes) = #struct_type_path::get() {
+                                                            if probes.#probe_ident.is_enabled() {
+                                                                probes.#probe_ident.fire(#probe_args_tuple)
+                                                            }
+                                                        };
+                                                    }
+
+                                                    #[allow(dead_code)]
+                                                    #[doc(hidden)]
+                                                    #vis #enabled_method -> bool {
+                                                        if let Some(probes) = #struct_type_path::get() {
+                                                            probes.#probe_ident.is_enabled()
+                                                        } else {
+                                                            false
+                                                        }
+                                                    }
+
+                                                    #[doc(hidden)]
+                                                    #vis #get_probe_method -> Option<&'static #get_probe_method_ret_type> {
+                                                        #struct_type_path::get().map(|probes| &probes.#probe_ident)
+                                                    }
+                                                })
     }
 
     /// When building a provider, individual probes are added by calling `add_probe` on the

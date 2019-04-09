@@ -193,8 +193,9 @@ fn generate_prober_struct(
     let mod_name = get_provider_impl_mod_name(&item.ident);
     let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
     let struct_type_path: syn::Path = parse_quote! { #mod_name::#struct_type_name };
+    let provider_name = get_provider_name(&item);
     for probe in probes.iter() {
-        probe_methods.push(probe.generate_trait_methods(&item.ident, &struct_type_path)?);
+        probe_methods.push(probe.generate_trait_methods(&item.ident, &provider_name, &struct_type_path)?);
     }
 
     // Re-generate the trait method that we took as input, with the modifications to support
@@ -214,7 +215,7 @@ fn generate_prober_struct(
     let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
     let systemtap_comment = format!(
         "This trait corresponds to a SystemTap/USDT provider named `{}`",
-        get_provider_name(item)
+        provider_name
     );
 
     let result = quote_spanned! { span =>
