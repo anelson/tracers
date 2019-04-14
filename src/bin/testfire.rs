@@ -6,6 +6,12 @@ use probers::probe;
 use probers::prober;
 use std::io::prelude::*;
 
+#[link_section = ".note.stapst"]
+pub static TEST_NOTE: [u8; 2] = [0x00, 0x01];
+
+#[link_section = ".stapsdt.base"]
+pub static TEST_BASE: [u8; 2] = [0x00, 0x01];
+
 /// This is a probe provider which is used to exercise the probing infrastructure with a few
 /// different combinations of arguments.
 #[prober]
@@ -113,11 +119,13 @@ fn fire_probe(pt: ProbeType) {
 }
 
 fn dump_status() {
-    println!("Probe status: probe0:{} probe1:{} probe2:{} probe3:{}", 
-             TestProbes::probe0_enabled(),
-             TestProbes::probe1_enabled(),
-             TestProbes::probe2_enabled(),
-             TestProbes::probe3_enabled());
+    println!(
+        "Probe status: probe0:{} probe1:{} probe2:{} probe3:{}",
+        TestProbes::probe0_enabled(),
+        TestProbes::probe1_enabled(),
+        TestProbes::probe2_enabled(),
+        TestProbes::probe3_enabled()
+    );
 }
 
 fn main() {
@@ -138,4 +146,3 @@ fn main() {
         }
     }
 }
-
