@@ -19,6 +19,27 @@ pub(crate) struct Target {
 
     /// Any additional files that are compiled by this target, meaning sub-modules or includes
     pub additional_source_files: Vec<&'static str>,
+
+    /// Any expected errors in any of the files.  Each element of the vector is a tuple consisting
+    /// of the source file path (relative to the root of the crate) and a string which should
+    /// appear in an error message associated with that file
+    pub expected_errors: Vec<(&'static str, &'static str)>,
+}
+
+impl Target {
+    pub fn new(
+        name: &'static str,
+        entrypoint: &'static str,
+        additional_source_files: Vec<&'static str>,
+        expected_errors: Option<Vec<(&'static str, &'static str)>>,
+    ) -> Target {
+        Target {
+            name,
+            entrypoint,
+            additional_source_files,
+            expected_errors: expected_errors.unwrap_or(Vec::new()),
+        }
+    }
 }
 
 pub(crate) struct TestCase {
@@ -34,55 +55,54 @@ lazy_static! {
         TestCase {
             root_directory: TEST_CASE_DIR.join("simplelib"),
             package_name: "simplelib",
-            targets: vec![Target {
-                name: "simplelib",
-                entrypoint: "src/lib.rs",
-                additional_source_files: vec!["src/child_module.rs"]
-            }],
+            targets: vec![Target::new(
+                "simplelib",
+                "src/lib.rs",
+                vec!["src/child_module.rs"],
+                None
+            )],
         },
         TestCase {
             root_directory: TEST_CASE_DIR.join("simplebin"),
             package_name: "simplebin",
-            targets: vec![Target {
-                name: "simplebin",
-                entrypoint: "src/main.rs",
-                additional_source_files: vec!["src/child_module.rs"]
-            }],
+            targets: vec![Target::new(
+                "simplebin",
+                "src/main.rs",
+                vec!["src/child_module.rs"],
+                None
+            )],
         },
         TestCase {
             root_directory: TEST_CASE_DIR.join("complexlib"),
             package_name: "complexlib",
             targets: vec![
-                Target {
-                    name: "complexlib",
-                    entrypoint: "src/lib.rs",
-                    additional_source_files: vec![]
-                },
-                Target {
-                    name: "bin1",
-                    entrypoint: "src/bin/bin1.rs",
-                    additional_source_files: vec![]
-                },
-                Target {
-                    name: "bin2",
-                    entrypoint: "src/bin/bin2.rs",
-                    additional_source_files: vec![]
-                },
-                Target {
-                    name: "ex1",
-                    entrypoint: "examples/ex1.rs",
-                    additional_source_files: vec![]
-                },
-                Target {
-                    name: "test1",
-                    entrypoint: "tests/test1.rs",
-                    additional_source_files: vec![]
-                },
-                Target {
-                    name: "test2",
-                    entrypoint: "tests/test2.rs",
-                    additional_source_files: vec![]
-                },
+                Target::new("complexlib", "src/lib.rs", vec![], None),
+                Target::new("bin1", "src/bin/bin1.rs", vec![], None),
+                Target::new("bin2", "src/bin/bin2.rs", vec![], None),
+                Target::new("ex1", "examples/ex1.rs", vec![], None),
+                Target::new("test1", "tests/test1.rs", vec![], None),
+                Target::new("test2", "tests/test2.rs", vec![], None),
+            ],
+        },
+        TestCase {
+            root_directory: TEST_CASE_DIR.join("errors"),
+            package_name: "erroneous",
+            targets: vec![
+                Target::new(
+                    "erroneous",
+                    "src/main.rs",
+                    vec!["src/child_mod/mod.rs", "src/child_mod/grandchild_mod.rs"],
+                    Some(vec![(
+                        "src/child_mod/grandchild_mod.rs",
+                        "this_mod_doesnt_exist"
+                    )])
+                ),
+                Target::new(
+                    "compile_errors",
+                    "tests/compile_errors.rs",
+                    vec![],
+                    Some(vec![("tests/with_errors/mod.rs", "expected `!")])
+                ),
             ],
         },
     ];

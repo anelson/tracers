@@ -196,7 +196,49 @@ mod test {
                 expected_paths.append(&mut additional_paths);
 
                 assert_eq!(expected_paths, visitor.paths);
-                assert_eq!(Vec::<(PathBuf, String)>::new(), visitor.errors);
+
+                //Go through the expected errors, and make sure they are all present.
+                //When we find an expected error, we'll remove it from the list of errors.
+                //Then at the end, we'll assert the errors array is empty and any remaining errors
+                //will cause that to fail
+                let unexpected_errors = visitor
+                    .errors
+                    .iter()
+                    .filter(|(file, error_msg)| {
+                        //Look in the expected errors; was this one expected?
+                        !target
+                            .expected_errors
+                            .iter()
+                            .any(|(expected_file, expected_substring)| {
+                                &case.root_directory.join(expected_file) == file
+                                    && error_msg.contains(expected_substring)
+                            })
+                    })
+                    .map(|(file, error_msg)| format!("{}: {}", file.to_str().unwrap(), error_msg))
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    Vec::<String>::new(),
+                    unexpected_errors,
+                    "Some unexpected errors were reported"
+                );;
+                let missing_errors = target
+                    .expected_errors
+                    .iter()
+                    .filter(|(expected_file, expected_substring)| {
+                        !visitor.errors.iter().any(|(file, error_msg)| {
+                            &case.root_directory.join(expected_file) == file
+                                && error_msg.contains(expected_substring)
+                        })
+                    })
+                    .map(|(expected_file, expected_substring)| {
+                        format!("{}: {}", expected_file, expected_substring)
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    Vec::<String>::new(),
+                    missing_errors,
+                    "Some expected errors were not reported"
+                );;
             }
         }
     }
