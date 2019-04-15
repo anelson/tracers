@@ -23,10 +23,6 @@ name = "testfire"
 path = "src/bin/testfire.rs"
 required-features = [ "binaries" ]
 
-[[bin]]
-name = "sectest"
-path = "src/bin/sectest.rs"
-
 [dependencies]
 probers-core = { path = "probers-core", version = "0.1.0" }
 probers-macros = { path = "probers-macros", version = "0.1.0" }

@@ -3,8 +3,10 @@
 use failure::{format_err, Fallible};
 use std::env;
 
+mod cache;
 mod cargo;
 mod visitor;
+mod hashing;
 
 #[cfg(test)]
 mod testdata;
