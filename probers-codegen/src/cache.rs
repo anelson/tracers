@@ -5,6 +5,7 @@
 
 use crate::hashing::*;
 use failure::{format_err, Fallible};
+use proc_macro2::TokenStream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fs::File;
 use std::io::Read;
@@ -17,7 +18,10 @@ use std::str;
 /// implements a cache whereby first the cache directory is checked to see if a previous operation
 /// has been attempted on the same file contents.  If found, that version is returned and the
 /// function is never invoked.
-pub fn cache_file_computation<T: Serialize + DeserializeOwned, F: FnOnce(&str) -> Fallible<T>>(
+pub(crate) fn cache_file_computation<
+    T: Serialize + DeserializeOwned,
+    F: FnOnce(&str) -> Fallible<T>,
+>(
     cache_path: &Path,
     input_path: &Path,
     f: F,
@@ -41,7 +45,7 @@ pub fn cache_file_computation<T: Serialize + DeserializeOwned, F: FnOnce(&str) -
         str::from_utf8(&content)
             .map_err(|e| {
                 format_err!(
-                    "Input file file {} contains invalid UTF-8 text: {}",
+                    "Input file {} contains invalid UTF-8 text: {}",
                     results_path.display(),
                     e
                 )
@@ -51,6 +55,31 @@ pub fn cache_file_computation<T: Serialize + DeserializeOwned, F: FnOnce(&str) -
                 //Result was computed; serialize it back
                 save_results::<T>(&results_path, &result).and(Ok(result))
             })
+    })
+}
+
+/// Similar to `cache_file_computation`, except the computation is not on the contents of a file
+/// but rather on a `TokenStream`.
+pub(crate) fn cache_tokenstream_computation<
+    T: Serialize + DeserializeOwned,
+    F: FnOnce(&TokenStream) -> Fallible<T>,
+>(
+    cache_path: &Path,
+    token_stream: &TokenStream,
+    f: F,
+) -> Fallible<T> {
+    //Just like the file scenario, use the tokenstream's hash to detect changes
+    let hash = hash_token_stream(token_stream);
+
+    let results_path = cached_results_path(cache_path, &Path::new("tokenstream"), hash);
+
+    //Try to load a cached results file.  If it doesn't exist or there's any kind of error loading
+    //it, just invoke the function again
+    load_cached_results::<T>(&results_path).or_else(|_| {
+        f(token_stream).and_then(|result| {
+            //Result was computed; serialize it back
+            save_results::<T>(&results_path, &result).and(Ok(result))
+        })
     })
 }
 
@@ -104,8 +133,10 @@ fn cached_results_path(cache_path: &Path, input_path: &Path, hash: HashCode) -> 
 #[cfg(test)]
 mod test {
     use super::*;
+    use quote::quote;
     use serde::Deserialize;
     use std::io::Write;
+    use syn::ItemTrait;
 
     #[derive(Deserialize, Serialize, Debug)]
     struct TestResult {
@@ -113,7 +144,7 @@ mod test {
     }
 
     #[test]
-    fn caches_results() {
+    fn caches_file_results() {
         let root_dir = tempfile::tempdir().unwrap();
         let cache_dir = root_dir.path().join("cache");
         let data_dir = root_dir.path().join("data");
@@ -184,5 +215,76 @@ mod test {
 
         assert_eq!(2, compute_count);
         assert_eq!("Fear is the mind killer".len(), result.answer);
+    }
+
+    #[test]
+    fn caches_tokenstream_results() {
+        let root_dir = tempfile::tempdir().unwrap();
+        let cache_dir = root_dir.path().join("cache");
+
+        let trait_foo1 = quote! {
+            trait FearIsTheMindKiller {}
+        };
+        let trait_foo2 = quote! {
+            #trait_foo1
+        };
+        let trait_bar = quote! {
+            trait IWillFaceMyFear {}
+        };
+
+        let mut compute_count: usize = 0;
+
+        //Invoke the computation for the first time; closure should be called and the result saved
+        let result: TestResult = cache_tokenstream_computation(&cache_dir, &trait_foo1, |input| {
+            compute_count += 1;
+            let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
+            Ok(TestResult {
+                answer: trait_item.ident.to_string().len(),
+            })
+        })
+        .unwrap();
+
+        assert_eq!(1, compute_count);
+        assert_eq!("FearIsTheMindKiller".len(), result.answer);
+
+        //Now invoke again; the result should have been cached
+        let result: TestResult = cache_tokenstream_computation(&cache_dir, &trait_foo1, |input| {
+            compute_count += 1;
+            let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
+            Ok(TestResult {
+                answer: trait_item.ident.to_string().len(),
+            })
+        })
+        .unwrap();
+
+        assert_eq!(1, compute_count);
+        assert_eq!("FearIsTheMindKiller".len(), result.answer);
+
+        //Now use another trait with a different name; a new result should be computed
+        let result: TestResult = cache_tokenstream_computation(&cache_dir, &trait_bar, |input| {
+            compute_count += 1;
+            let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
+            Ok(TestResult {
+                answer: trait_item.ident.to_string().len(),
+            })
+        })
+        .unwrap();
+
+        assert_eq!(2, compute_count);
+        assert_eq!("IWillFaceMyFear".len(), result.answer);
+
+        //Finally, use another instance of the TokenStream that should have the same content, and
+        //thus use the cached result
+        let result: TestResult = cache_tokenstream_computation(&cache_dir, &trait_foo2, |input| {
+            compute_count += 1;
+            let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
+            Ok(TestResult {
+                answer: trait_item.ident.to_string().len(),
+            })
+        })
+        .unwrap();
+
+        assert_eq!(2, compute_count);
+        assert_eq!("FearIsTheMindKiller".len(), result.answer);
     }
 }
