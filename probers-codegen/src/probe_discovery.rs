@@ -5,9 +5,61 @@
 use crate::probe_spec::ProbeSpecification;
 use heck::SnakeCase;
 use syn::spanned::Spanned;
+use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
 
 use crate::{ProberError, ProberResult};
+
+pub(crate) struct ProviderSpecification {
+    name: String,
+    probes: Vec<ProbeSpecification>,
+}
+
+/// Scans the AST of a Rust source file, finding all traits marked with the `prober` attribute,
+/// parses the contents of the trait, and deduces the provider spec from that.
+///
+/// Note that if any traits are encountered with the `prober` attribute but which are in some way
+/// invalid as providers, those traits will be silently ignored.  At compile time the `prober`
+/// attribute will cause a very detailed compile error so there's no chance the user will miss this
+/// mistake.
+pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
+    //Construct an implementation of the `syn` crate's `Visit` trait which will examine all trait
+    //declarations in the file looking for possible providers
+    struct Visitor {
+        providers: Vec<ProviderSpecification>,
+    }
+
+    impl<'ast> Visit<'ast> for Visitor {
+        fn visit_item_trait(&mut self, i: &'ast ItemTrait) {
+            //First pass through to the default impl
+            syn::visit::visit_item_trait(self, i);
+
+            //Check for the `prober` or `probers::prober` attribute
+            if i.attrs
+                .iter()
+                .any(|attr| match attr.path.segments.iter().last() {
+                    Some(syn::PathSegment { ident, .. }) if ident.to_string() == "probers" => true,
+                    _ => false,
+                })
+            {
+                //This looks like a provider trait
+                if let Ok(probes) = get_probes(i) {
+                    self.providers.push(ProviderSpecification {
+                        name: get_provider_name(i),
+                        probes,
+                    });
+                }
+            }
+        }
+    }
+
+    let mut visitor = Visitor {
+        providers: Vec::new(),
+    };
+    visitor.visit_file(ast);
+
+    visitor.providers
+}
 
 /// Looking at the methods defined on the trait, deduce from those methods the probes that we will
 /// need to define, including their arg counts and arg types.
