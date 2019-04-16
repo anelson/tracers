@@ -1,6 +1,9 @@
 #![deny(warnings)]
+#![allow(dead_code)] //TODO: temporary
+#![recursion_limit = "256"]
 
 use failure::{format_err, Fallible};
+use proc_macro2::Span;
 use std::env;
 
 mod cache;
@@ -8,8 +11,30 @@ mod cargo;
 mod deps;
 mod hashing;
 
+mod probe_discovery;
+mod probe_spec;
+pub mod proc_macros;
+mod syn_helpers;
+
 #[cfg(test)]
 mod testdata;
+
+#[derive(Debug)]
+pub struct ProberError {
+    pub message: String,
+    pub span: Span,
+}
+
+impl ProberError {
+    fn new<M: ToString>(message: M, span: Span) -> ProberError {
+        ProberError {
+            message: message.to_string(),
+            span: span,
+        }
+    }
+}
+
+pub type ProberResult<T> = std::result::Result<T, ProberError>;
 
 pub fn generate() -> Fallible<()> {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").map_err(|_| {
