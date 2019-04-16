@@ -25,6 +25,12 @@ pub struct ProberError {
     pub span: Span,
 }
 
+impl PartialEq<ProberError> for ProberError {
+    fn eq(&self, other: &ProberError) -> bool {
+        self.message == other.message
+    }
+}
+
 impl ProberError {
     fn new<M: ToString>(message: M, span: Span) -> ProberError {
         ProberError {

@@ -10,17 +10,31 @@ use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
+use std::fmt;
 
 use super::syn_helpers;
 use super::{ProberError, ProberResult};
 
-pub(super) struct ProbeSpecification {
+pub(crate) struct ProbeSpecification {
     name: String,
     method_name: Ident,
     original_method: TraitItemMethod,
     vis: Visibility,
     span: Span,
     args: Vec<(syn::PatIdent, syn::Type)>,
+}
+
+impl fmt::Debug for ProbeSpecification {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ProbeSpecification(name={}, args=(",
+            self.name)?;
+
+        for (name, typ) in self.args.iter() {
+            write!(f, "{}: {},", name.ident, quote! { #typ }.to_string())?;
+        }
+
+        write!(f, ")")
+    }
 }
 
 impl ProbeSpecification {
@@ -36,7 +50,7 @@ impl ProbeSpecification {
     /// * Not `unsafe`, `const`, `async`, or `extern "C"`
     /// * No type parameters; generics are not supported in probe types
     /// * Not variadic
-    pub(super) fn from_method(
+    pub(crate) fn from_method(
         item: &ItemTrait,
         method: &TraitItemMethod,
     ) -> ProberResult<ProbeSpecification> {
@@ -132,7 +146,7 @@ impl ProbeSpecification {
     /// name.  That's important because the `struct` we declare as part of the implementation of
     /// the prober trait maintains each of the probe's strongly-typed wrappers, and thus it will
     /// take _all_ of the lifetime parameters for _all_ of the probe functions.
-    pub(super) fn get_args_with_lifetime_annotations(
+    pub(crate) fn get_args_with_lifetime_annotations(
         probe: &ProbeSpecification,
     ) -> ProberResult<Vec<(syn::PatIdent, syn::Type)>> {
         fn generate_lifetime(
@@ -170,7 +184,7 @@ impl ProbeSpecification {
 
     /// The name of the variable in the implementation struct which will hold this particular
     /// probe's `ProviderProbe` wrapper object
-    pub(super) fn get_probe_var_name(&self) -> &Ident {
+    pub(crate) fn get_probe_var_name(&self) -> &Ident {
         &self.method_name
     }
 
@@ -191,7 +205,7 @@ impl ProbeSpecification {
     /// which when called will fire the probe.  If the probe is not enabled, this closure never
     /// gets called.  Thus, in this way callers can implement potentially expensive logic to
     /// prepare information for a probe, and only run this code when the probe is activated.
-    pub(super) fn generate_trait_methods(
+    pub(crate) fn generate_trait_methods(
         &self,
         trait_name: &syn::Ident,
         provider_name: &str,
@@ -342,7 +356,7 @@ TODO: No other platforms supported yet
     /// When building a provider, individual probes are added by calling `add_probe` on the
     /// `ProviderBuilder` implementation.  This method generates that call for this probe.  In this
     /// usage the lifetime parameters are not needed.
-    pub(super) fn generate_add_probe_call(&self, builder: &Ident) -> TokenStream {
+    pub(crate) fn generate_add_probe_call(&self, builder: &Ident) -> TokenStream {
         //The `add_probe` method takes one type parameter, which should be the tuple form of the
         //arguments for this probe.
         let args_type = self.get_args_as_tuple_type_with_lifetimes();
@@ -361,7 +375,7 @@ TODO: No other platforms supported yet
     /// Further complicating matters is that the lifetime elision that makes it so easy to declare
     /// functions with reference args isn't available here, so every reference parameter the probe
     /// takes needs to have a corresponding lifetime.  This gets messy, as you'll see.
-    pub(super) fn generate_provider_probe_type(&self) -> TokenStream {
+    pub(crate) fn generate_provider_probe_type(&self) -> TokenStream {
         let arg_tuple = self.get_args_as_tuple_type_with_lifetimes();
 
         //In addition to the lifetime params for any ref args, all `ProviderProbe`s have a lifetime
@@ -378,7 +392,7 @@ TODO: No other platforms supported yet
     /// that holds the `ProviderProbe` instance for this probe.  It's a complex declaration because
     /// it must include lifetime parameters for all of the reference types used by any of this
     /// probe's arguments
-    pub(super) fn generate_struct_member_declaration(&self) -> TokenStream {
+    pub(crate) fn generate_struct_member_declaration(&self) -> TokenStream {
         let name = self.get_probe_var_name();
         let typ = self.generate_provider_probe_type();
 
@@ -403,7 +417,7 @@ TODO: No other platforms supported yet
     /// ```
     ///
     /// This method generates just the line corresponding to this probe, without a trailing comma.
-    pub(super) fn generate_struct_member_initialization(&self, provider: &Ident) -> TokenStream {
+    pub(crate) fn generate_struct_member_initialization(&self, provider: &Ident) -> TokenStream {
         let name_literal = &self.name;
         let name_ident = &self.method_name;
         let args_tuple = self.get_args_as_tuple_type_without_lifetimes();
@@ -436,7 +450,7 @@ TODO: No other platforms supported yet
     /// `syn::Type` itself.  That is to say, for a typical `ProbeSpecification` instance, the args
     /// of the methods have already been decorated with lifetimes.  This method seperates the
     /// lifetimes out in to a separate vector.
-    pub(super) fn get_args_with_separate_lifetimes(
+    pub(crate) fn get_args_with_separate_lifetimes(
         &self,
     ) -> Vec<(syn::PatIdent, syn::Type, Vec<syn::Lifetime>)> {
         self.args
@@ -473,7 +487,7 @@ TODO: No other platforms supported yet
     ///
     /// // results in vec!['probe_arg0_1, 'probe_arg2, _1]
     /// ```
-    pub(super) fn get_args_lifetime_parameters(&self) -> Vec<syn::Lifetime> {
+    pub(crate) fn get_args_lifetime_parameters(&self) -> Vec<syn::Lifetime> {
         self.get_args_with_separate_lifetimes()
             .into_iter()
             .map(|(_, _, lifetimes)| lifetimes)
@@ -487,7 +501,7 @@ TODO: No other platforms supported yet
     /// ```noexecute
     /// fn probe(arg0: &str, arg1: usize); //results in tuple: (arg0, arg1,)
     /// ```
-    pub(super) fn get_args_as_tuple_value(&self) -> TokenStream {
+    pub(crate) fn get_args_as_tuple_value(&self) -> TokenStream {
         let names = self.args.iter().map(|(nam, _)| nam);
 
         if self.args.is_empty() {
@@ -502,7 +516,7 @@ TODO: No other platforms supported yet
     /// Build a tuple type expression whose elements correspond to the arguments of this probe.
     /// This includes only the type of each argument, and has no explicit lifetimes specified.  For
     /// that there is `get_args_as_tuple_type_with_lifetimes`
-    pub(super) fn get_args_as_tuple_type_without_lifetimes(&self) -> TokenStream {
+    pub(crate) fn get_args_as_tuple_type_without_lifetimes(&self) -> TokenStream {
         //When the probe spec is constructed lifetime parameters are added, so to construct a tuple
         //type without them they need to be stripped
         if self.args.is_empty() {
@@ -525,7 +539,7 @@ TODO: No other platforms supported yet
     /// Like the method above constructs a tuple type corresponding to the types of the arguments of this probe.
     ///  Unlike the above method, this tuple type is also annotated with explicit lifetime
     ///  parameters for all reference types in the tuple.
-    pub(super) fn get_args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
+    pub(crate) fn get_args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
         // The type of each arg is already decorated with lifetime params by default, so just
         // return
         let types = self.args.iter().map(|(_, typ)| typ);
@@ -543,8 +557,41 @@ TODO: No other platforms supported yet
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::testdata::*;
     use quote::quote;
     use syn::{parse_quote, TraitItemMethod};
+
+    /// Allow test cases to match probe specifications against other probe specs
+    impl PartialEq<ProbeSpecification> for ProbeSpecification {
+        fn eq(&self, other: &ProbeSpecification) -> bool {
+            //All members except Span support this already
+            self.name == other.name
+                && self.method_name == other.method_name
+                && self.original_method == other.original_method
+                && self.vis == other.vis
+                && self.args == other.args
+        }
+    }
+
+    /// Allows tests to compare test data directly to ProbeSpecification instances
+    impl PartialEq<TestProbe> for ProbeSpecification {
+        fn eq(&self, other: &TestProbe) -> bool {
+            //All members except Span support this already
+            self.name == other.name
+                && self.args.len() == other.args.len()
+                && self
+                    .get_args_with_separate_lifetimes() // strip lifetimes so types will match
+                    .iter()
+                    .zip(other.args.iter())
+                    .all(|(self_arg, spec_arg)| {
+                        let (self_arg_name, self_arg_type, _) = self_arg;
+                        let (spec_arg_name, spec_arg_type, _) = spec_arg;
+
+                        self_arg_name.ident.to_string() == *spec_arg_name
+                            && self_arg_type == spec_arg_type
+                    })
+        }
+    }
 
     mod data {
         use super::*;

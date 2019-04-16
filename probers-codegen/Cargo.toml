@@ -33,4 +33,3 @@ features = ["full", "visit"]
 [dev-dependencies]
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
-

@@ -4,6 +4,7 @@
 //! in this crate can then process them in various ways
 use crate::probe_spec::ProbeSpecification;
 use heck::SnakeCase;
+use std::fmt;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
@@ -11,8 +12,26 @@ use syn::{ItemTrait, TraitItem};
 use crate::{ProberError, ProberResult};
 
 pub(crate) struct ProviderSpecification {
-    name: String,
-    probes: Vec<ProbeSpecification>,
+    pub name: String,
+    pub probes: Vec<ProbeSpecification>,
+}
+
+impl fmt::Debug for ProviderSpecification {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "ProviderSpecification(
+    name='{}',
+    probes:\n",
+            self.name
+        )?;
+
+        for probe in self.probes.iter() {
+            write!(f, "        {:?},\n", probe)?;
+        }
+
+        write!(f, ")")
+    }
 }
 
 /// Scans the AST of a Rust source file, finding all traits marked with the `prober` attribute,
@@ -38,7 +57,7 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
             if i.attrs
                 .iter()
                 .any(|attr| match attr.path.segments.iter().last() {
-                    Some(syn::PathSegment { ident, .. }) if ident.to_string() == "probers" => true,
+                    Some(syn::PathSegment { ident, .. }) if ident.to_string() == "prober" => true,
                     _ => false,
                 })
             {
@@ -107,208 +126,111 @@ pub(crate) fn get_provider_name(item: &ItemTrait) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use quote::quote;
-    use syn::{parse_quote, ItemTrait};
+    use crate::testdata::*;
+    use syn::parse_quote;
 
-    mod data {
-        use super::*;
-
-        pub(crate) fn simple_valid() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: i32);
-                    fn probe1(arg0: &str);
-                    fn probe2(arg0: &str, arg1: usize);
-                }
-            }
+    impl PartialEq<ProviderSpecification> for ProviderSpecification {
+        fn eq(&self, other: &ProviderSpecification) -> bool {
+            self.name == other.name && self.probes == other.probes
         }
+    }
 
-        pub(crate) fn valid_with_many_refs() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: i32);
-                    fn probe1(arg0: &str);
-                    fn probe2(arg0: &str, arg1: usize);
-                    fn probe3(arg0: &str, arg1: &usize, arg2: &Option<i32>);
-                }
-            }
+    /// Allows tests to compare a test case directly to a ProviderSpecification to ensure they match
+    impl PartialEq<TestProviderTrait> for ProviderSpecification {
+        fn eq(&self, other: &TestProviderTrait) -> bool {
+            self.name == other.provider_name
+                && other
+                    .probes
+                    .as_ref()
+                    .map(|probes| &self.probes == probes)
+                    .unwrap_or(false)
         }
+    }
 
-        pub(crate) fn has_trait_type_param() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait<T: Debug> {
-                    fn probe0(arg0: i32);
-                    fn probe1(arg0: &str);
-                    fn probe2(arg0: &str, arg1: usize);
-                }
-            }
-        }
-
-        pub(crate) fn has_const() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: i32);
-                    const FOO: usize = 5;
-                }
-            }
-        }
-
-        pub(crate) fn has_type() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: i32);
-                    type Foo = Debug;
-                }
-            }
-        }
-
-        pub(crate) fn has_macro_invocation() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    println!("WTF");
-
-                    fn probe0(arg0: i32);
-                }
-            }
-        }
-
-        pub(crate) fn has_const_fn() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    const fn probe0(arg0: i32);
-                }
-            }
-        }
-
-        pub(crate) fn has_unsafe_fn() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    unsafe fn probe0(arg0: i32);
-                }
-            }
-        }
-
-        pub(crate) fn has_extern_fn() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    extern "C" fn probe0(arg0: i32);
-                }
-            }
-        }
-
-        pub(crate) fn has_fn_type_param() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0<T: Debug>(arg0: T);
-                }
-            }
-        }
-
-        pub(crate) fn has_explicit_unit_retval() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: usize) -> ();
-                }
-            }
-        }
-
-        pub(crate) fn has_non_unit_retval() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: usize) -> bool;
-                }
-            }
-        }
-        pub(crate) fn has_default_impl() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(arg0: i32) { prinln!("{}", arg0); }
-                }
-            }
-        }
-
-        pub(crate) fn has_non_static_method() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(&self, arg0: i32);
-                }
-            }
-        }
-
-        pub(crate) fn has_mut_self_method() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(&mut self, arg0: i32);
-                }
-            }
-        }
-
-        pub(crate) fn has_self_by_val_method() -> ItemTrait {
-            parse_quote! {
-                trait TestTrait {
-                    fn probe0(self, arg0: i32);
-                }
-            }
-        }
-
+    fn get_filtered_test_traits(with_errors: bool) -> Vec<TestProviderTrait> {
+        get_test_provider_traits()
+            .into_iter()
+            .filter(|t| t.expected_error.is_some() == with_errors)
+            .collect()
     }
 
     #[test]
-    fn works_with_valid_cases() {
-        assert_eq!(true, get_probes(&data::simple_valid()).is_ok());
-        assert_eq!(true, get_probes(&data::valid_with_many_refs()).is_ok());
+    fn find_providers_ignores_invalid_traits() {
+        for test_trait in get_filtered_test_traits(true) {
+            let trait_decl = test_trait.tokenstream;
+            let test_file: syn::File = parse_quote! {
+                #[prober]
+                #trait_decl
+            };
+
+            assert_eq!(
+                None,
+                find_providers(&test_file).first(),
+                "The invalid trait '{}' was returned by find_providers as valid",
+                test_trait.description
+            );
+        }
     }
 
     #[test]
-    fn trait_type_params_not_allowed() {
-        // We need to be able to programmatically generate an impl of the probe trait which means
-        // it cannot take any type parameters which we would not know how to provide
-        assert_eq!(true, get_probes(&data::has_trait_type_param()).is_err());
+    fn find_providers_finds_valid_traits() {
+        for test_trait in get_filtered_test_traits(false) {
+            let trait_decl = test_trait.tokenstream.clone();
+            let test_file: syn::File = parse_quote! {
+                #[prober]
+                #trait_decl
+            };
+
+            let mut providers = find_providers(&test_file);
+            assert_ne!(
+                0,
+                providers.len(),
+                "the test trait '{}' was not properly detected by find_provider",
+                test_trait.description
+            );
+
+            assert_eq!(providers.pop().unwrap(), test_trait);
+        }
     }
 
     #[test]
-    fn non_method_items_not_allowed() {
-        // A probe trait can't have anything other than methods.  That means no types, consts, etc
-        assert_eq!(true, get_probes(&data::has_const()).is_err());
-        assert_eq!(true, get_probes(&data::has_type()).is_err());
-        assert_eq!(true, get_probes(&data::has_macro_invocation()).is_err());
+    fn get_probes_fails_with_invalid_traits() {
+        for test_trait in get_filtered_test_traits(true) {
+            let trait_decl = test_trait.tokenstream;
+            let item_trait: syn::ItemTrait = parse_quote! {
+                #[prober]
+                #trait_decl
+            };
+
+            let error = get_probes(&item_trait).err();
+            assert_ne!(
+                None, error,
+                "The invalid trait '{}' was returned by get_probes as valid",
+                test_trait.description
+            );
+
+            let expected_error_substring = test_trait.expected_error.unwrap();
+            let message = error.unwrap().message;
+            assert!(message.contains(expected_error_substring),
+                "The invalid trait '{}' should produce an error containing '{}' but instead it produced '{}'",
+                test_trait.description,
+                expected_error_substring,
+                message
+            );
+        }
     }
 
     #[test]
-    fn method_modifiers_not_allowed() {
-        // None of the Rust method modifiers like const, unsafe, async, or extern are allowed
-        assert_eq!(true, get_probes(&data::has_const_fn()).is_err());
-        assert_eq!(true, get_probes(&data::has_unsafe_fn()).is_err());
-        assert_eq!(true, get_probes(&data::has_extern_fn()).is_err());
-    }
+    fn get_probes_succeeds_with_valid_traits() {
+        for test_trait in get_filtered_test_traits(false) {
+            let trait_decl = test_trait.tokenstream;
+            let item_trait: syn::ItemTrait = parse_quote! {
+                #[prober]
+                #trait_decl
+            };
 
-    #[test]
-    fn generic_methods_not_allowed() {
-        // Probe methods must not be generic
-        assert_eq!(true, get_probes(&data::has_fn_type_param()).is_err());
-    }
-
-    #[test]
-    fn method_retvals_not_allowed() {
-        // Probe methods never return a value.  I would like to be able to support methods that
-        // explicitly return `()`, but it wasn't immediately obvious how to do that with `syn` and
-        // it's more convenient to declare probe methods without any return type anyway
-        assert_eq!(true, get_probes(&data::has_explicit_unit_retval()).is_err());
-        assert_eq!(true, get_probes(&data::has_non_unit_retval()).is_err());
-    }
-
-    #[test]
-    fn methods_must_not_take_self() {
-        // Probe methods should not take a `self` parameter
-        assert_eq!(true, get_probes(&data::has_non_static_method()).is_err());
-        assert_eq!(true, get_probes(&data::has_mut_self_method()).is_err());
-        assert_eq!(true, get_probes(&data::has_self_by_val_method()).is_err());
-    }
-
-    #[test]
-    fn methods_must_not_have_default_impl() {
-        // The whole point of this macro is to generate implementations of the probe methods so ti
-        // doesn't make sense for the caller to provide their own
-        assert_eq!(true, get_probes(&data::has_default_impl()).is_err());
+            let probes = get_probes(&item_trait).unwrap();
+            assert_eq!(probes, test_trait.probes.unwrap_or(Vec::new()));
+        }
     }
 }
