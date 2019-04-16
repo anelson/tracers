@@ -16,12 +16,12 @@ use super::syn_helpers;
 use super::{ProberError, ProberResult};
 
 pub(crate) struct ProbeSpecification {
-    name: String,
+    pub name: String,
     method_name: Ident,
     original_method: TraitItemMethod,
     vis: Visibility,
     span: Span,
-    args: Vec<(syn::PatIdent, syn::Type)>,
+    pub args: Vec<(syn::PatIdent, syn::Type)>,
 }
 
 impl fmt::Debug for ProbeSpecification {

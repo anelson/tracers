@@ -4,7 +4,10 @@
 //! in this crate can then process them in various ways
 use crate::probe_spec::ProbeSpecification;
 use heck::SnakeCase;
+use proc_macro2::TokenStream;
+use quote::quote;
 use std::fmt;
+use std::path::PathBuf;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
@@ -13,6 +16,9 @@ use crate::{ProberError, ProberResult};
 
 pub(crate) struct ProviderSpecification {
     pub name: String,
+    pub hash: crate::hashing::HashCode,
+    pub item_trait: ItemTrait,
+    pub token_stream: TokenStream,
     pub probes: Vec<ProbeSpecification>,
 }
 
@@ -31,6 +37,33 @@ impl fmt::Debug for ProviderSpecification {
         }
 
         write!(f, ")")
+    }
+}
+
+impl ProviderSpecification {
+    fn new(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
+        let probes = get_probes(item_trait)?;
+        let token_stream = quote! { #item_trait };
+        let hash = crate::hashing::hash_token_stream(&token_stream);
+        Ok(ProviderSpecification {
+            name: get_provider_name(item_trait),
+            hash,
+            item_trait: item_trait.clone(),
+            token_stream,
+            probes,
+        })
+    }
+
+    pub(crate) fn name_with_hash(&self) -> String {
+        format!("{}-{:x}", self.name, self.hash)
+    }
+
+    pub(crate) fn native_provider_source_filename(&self) -> PathBuf {
+        PathBuf::from(format!("{}.cpp", self.name_with_hash()))
+    }
+
+    pub(crate) fn native_provider_lib_filename(&self) -> PathBuf {
+        PathBuf::from(format!("{}.a", self.name_with_hash()))
     }
 }
 
@@ -62,11 +95,8 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
                 })
             {
                 //This looks like a provider trait
-                if let Ok(probes) = get_probes(i) {
-                    self.providers.push(ProviderSpecification {
-                        name: get_provider_name(i),
-                        probes,
-                    });
+                if let Ok(provider) = ProviderSpecification::new(i) {
+                    self.providers.push(provider)
                 }
             }
         }

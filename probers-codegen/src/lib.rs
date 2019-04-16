@@ -6,14 +6,15 @@ use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use std::env;
 
+mod argtypes;
 mod cache;
 mod cargo;
 mod deps;
+mod gen;
 mod hashing;
-
-mod probe_discovery;
 mod probe_spec;
 pub mod proc_macros;
+mod provider_discovery;
 mod syn_helpers;
 
 #[cfg(test)]
