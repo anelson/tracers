@@ -18,6 +18,7 @@
 //!
 //!
 use std::fmt::Debug;
+use strum_macros::IntoStaticStr;
 
 pub mod bool;
 pub mod cstring;
@@ -37,21 +38,40 @@ pub use pointer::*;
 pub use refs::*;
 pub use string::*;
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Clone, PartialEq, Hash, Eq, IntoStaticStr)]
 pub enum CType {
+    #[strum(serialize = "void")]
     NoArg,
+    #[strum(serialize = "void*")]
     VoidPtr,
+    #[strum(serialize = "char*")]
     CharPtr,
+    #[strum(serialize = "unsigned char*")]
+    UCharPtr,
+    #[strum(serialize = "char")]
     Char,
+    #[strum(serialize = "unsigned char")]
     UChar,
+    #[strum(serialize = "short")]
     Short,
+    #[strum(serialize = "unsigned short")]
     UShort,
+    #[strum(serialize = "int")]
     Int,
+    #[strum(serialize = "unsigned int")]
     UInt,
+    #[strum(serialize = "long")]
     Long,
+    #[strum(serialize = "unsigned long")]
     ULong,
+    #[strum(serialize = "long long")]
     LongLong,
+    #[strum(serialize = "unsigned long long")]
     ULongLong,
+    #[strum(serialize = "size_t")]
+    SizeT,
+    #[strum(serialize = "ssize_t")]
+    SSizeT,
 }
 
 /// Marker trait which decorates only those std::os::raw types which correspond to C types
@@ -61,6 +81,13 @@ pub enum CType {
 /// therefore adds the `get_default_value()` method.
 pub trait ProbeArgNativeTypeInfo {
     fn get_c_type() -> CType;
+
+    fn get_c_type_str() -> &'static str {
+        // The #[strum...] attr contains the string representation of the C type for each member
+        Self::get_c_type().into()
+    }
+
+    fn get_rust_type_str() -> &'static str;
 }
 
 /// The other half of `ProbeArgNativeTypeInfo`, which takes a type parameter and thus adds

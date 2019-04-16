@@ -1,4 +1,5 @@
 use super::{ProbeArgType, ProbeArgWrapper};
+use std::os::raw;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -27,23 +28,26 @@ macro_rules! impl_integer_arg_type {
         #[cfg(test)]
         mod $tests {
             use crate::{wrap, ProbeArgWrapper};
+            use std::mem::size_of;
 
             #[quickcheck]
             fn converts_to_c_type(x: $rust_type) {
                 let wrapper = wrap(x);
 
+                assert_eq!(size_of!($rust_type), size_of!($c_type));
                 assert_eq!(<$c_type>::from(x), wrapper.as_c_type());
             }
         }
     };
 }
 
-impl_integer_arg_type!(usize, usize, usize_test);
-impl_integer_arg_type!(u64, u64, u64_test);
-impl_integer_arg_type!(i64, i64, i64_test);
-impl_integer_arg_type!(u32, u32, u32_test);
-impl_integer_arg_type!(i32, i32, i32_test);
-impl_integer_arg_type!(u16, u32, u16_test); //C variadics can't take shorts so these are passed as ints
-impl_integer_arg_type!(i16, i32, i16_test);
-impl_integer_arg_type!(u8, u32, u8_test); //Ditto about chars
-impl_integer_arg_type!(i8, i32, i8_test);
+impl_integer_arg_type!(usize, libc::size_t, usize_test);
+impl_integer_arg_type!(isize, libc::ssize_t, isize_test);
+impl_integer_arg_type!(u64, raw::c_ulonglong, u64_test);
+impl_integer_arg_type!(i64, raw::c_longlong, i64_test);
+impl_integer_arg_type!(u32, raw::c_uint, u32_test);
+impl_integer_arg_type!(i32, raw::c_int, i32_test);
+impl_integer_arg_type!(u16, raw::c_ushort, u16_test);
+impl_integer_arg_type!(i16, raw::c_short, i16_test);
+impl_integer_arg_type!(u8, raw::c_uchar, u8_test);
+impl_integer_arg_type!(i8, raw::c_char, i8_test);
