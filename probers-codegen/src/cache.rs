@@ -83,6 +83,20 @@ pub(crate) fn cache_tokenstream_computation<
     })
 }
 
+/// Given the path to some root directory, generates a path to a subdirectory which is suitable for
+/// use as a cache.  This automatically adds the version of the crate to the path to ensure caches
+/// are invalidated whenever a new version is released
+pub(crate) fn get_cache_path(root: &Path) -> PathBuf {
+    let mut root = root.to_owned();
+    root.push("cache");
+    root.push(format!(concat!(
+        env!("CARGO_PKG_NAME"),
+        "-",
+        env!("CARGO_PKG_VERSION")
+    )));
+    root
+}
+
 fn load_cached_results<T: Serialize + DeserializeOwned>(results_path: &Path) -> Fallible<T> {
     let file = File::open(results_path)?;
     let reader = BufReader::new(file);
@@ -146,7 +160,7 @@ mod test {
     #[test]
     fn caches_file_results() {
         let root_dir = tempfile::tempdir().unwrap();
-        let cache_dir = root_dir.path().join("cache");
+        let cache_dir = get_cache_path(root_dir.path());
         let data_dir = root_dir.path().join("data");
         let input_path = data_dir.join("input.txt");
 
