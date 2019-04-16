@@ -5,7 +5,7 @@ use std::env;
 
 mod cache;
 mod cargo;
-mod visitor;
+mod deps;
 mod hashing;
 
 #[cfg(test)]
