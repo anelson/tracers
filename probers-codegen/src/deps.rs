@@ -133,7 +133,7 @@ mod test {
 
     #[test]
     fn test_case() {
-        for case in TEST_CASES.iter() {
+        for case in TEST_CRATES.iter() {
             for target in case.targets.iter() {
                 let entrypoint = case.root_directory.join(target.entrypoint);
                 let (paths, errors) = find_sources(&entrypoint);

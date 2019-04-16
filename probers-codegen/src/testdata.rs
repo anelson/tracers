@@ -42,18 +42,18 @@ impl Target {
     }
 }
 
-pub(crate) struct TestCase {
+pub(crate) struct TestCrate {
     pub root_directory: PathBuf,
     pub package_name: &'static str,
     pub targets: Vec<Target>,
 }
 
 lazy_static! {
-    pub(crate) static ref TEST_CASE_DIR: PathBuf =
+    pub(crate) static ref TEST_CRATE_DIR: PathBuf =
         PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/testdata"));
-    pub(crate) static ref TEST_CASES: Vec<TestCase> = vec![
-        TestCase {
-            root_directory: TEST_CASE_DIR.join("simplelib"),
+    pub(crate) static ref TEST_CRATES: Vec<TestCrate> = vec![
+        TestCrate {
+            root_directory: TEST_CRATE_DIR.join("simplelib"),
             package_name: "simplelib",
             targets: vec![Target::new(
                 "simplelib",
@@ -62,8 +62,8 @@ lazy_static! {
                 None
             )],
         },
-        TestCase {
-            root_directory: TEST_CASE_DIR.join("simplebin"),
+        TestCrate {
+            root_directory: TEST_CRATE_DIR.join("simplebin"),
             package_name: "simplebin",
             targets: vec![Target::new(
                 "simplebin",
@@ -72,8 +72,8 @@ lazy_static! {
                 None
             )],
         },
-        TestCase {
-            root_directory: TEST_CASE_DIR.join("complexlib"),
+        TestCrate {
+            root_directory: TEST_CRATE_DIR.join("complexlib"),
             package_name: "complexlib",
             targets: vec![
                 Target::new("complexlib", "src/lib.rs", vec![], None),
@@ -84,8 +84,8 @@ lazy_static! {
                 Target::new("test2", "tests/test2.rs", vec![], None),
             ],
         },
-        TestCase {
-            root_directory: TEST_CASE_DIR.join("errors"),
+        TestCrate {
+            root_directory: TEST_CRATE_DIR.join("errors"),
             package_name: "erroneous",
             targets: vec![
                 Target::new(

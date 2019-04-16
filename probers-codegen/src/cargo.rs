@@ -32,7 +32,7 @@ mod test {
 
     #[test]
     fn gets_correct_targets() {
-        for case in TEST_CASES.iter() {
+        for case in TEST_CRATES.iter() {
             let expected_targets: Vec<_> = case
                 .targets
                 .iter()
