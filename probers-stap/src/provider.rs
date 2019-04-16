@@ -215,7 +215,9 @@ impl StapProvider {
             CType::ULong => ArgType_t_uint64,
             CType::LongLong => ArgType_t_int64,
             CType::ULongLong => ArgType_t_uint64,
-            CType::VoidPtr | CType::CharPtr => ArgType_t_uint64, //we can hard-code this because we only support 64-bit linux
+            CType::SSizeT => ArgType_t_int64,
+            CType::SizeT => ArgType_t_uint64,
+            CType::VoidPtr | CType::CharPtr | CType::UCharPtr => ArgType_t_uint64, //we can hard-code this because we only support 64-bit linux
         }
     }
 }
