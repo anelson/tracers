@@ -168,16 +168,18 @@ macro_rules! probe_arg {
 
 //Alas, the types in `syn` and `proc_macro2` aren't Send+Sync, which means they can't be used as
 //statics.  So the trait test data must be re-created by every test that needs it.  Pity.
-pub(crate) fn get_test_provider_traits() -> Vec<TestProviderTrait> {
-    vec![
+pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
+    filter: impl Into<Option<F>>,
+) -> Vec<TestProviderTrait> {
+    let traits = vec![
         TestProviderTrait::new_valid(
             "empty trait",
             "test_trait",
             quote! {
                 trait TestTrait {}
             },
-            vec![]
-            ),
+            vec![],
+        ),
         TestProviderTrait::new_valid(
             "simple trait",
             "test_trait",
@@ -379,7 +381,14 @@ pub(crate) fn get_test_provider_traits() -> Vec<TestProviderTrait> {
             },
             "Probe methods must not have any `self`",
         ),
-    ]
+    ];
+
+    let filter = filter.into();
+    if let Some(filter) = filter {
+        traits.into_iter().filter(filter).collect()
+    } else {
+        traits
+    }
 }
 
 lazy_static! {

@@ -178,10 +178,7 @@ mod test {
     }
 
     fn get_filtered_test_traits(with_errors: bool) -> Vec<TestProviderTrait> {
-        get_test_provider_traits()
-            .into_iter()
-            .filter(|t| t.expected_error.is_some() == with_errors)
-            .collect()
+        get_test_provider_traits(|t: &TestProviderTrait| t.expected_error.is_some() == with_errors)
     }
 
     #[test]

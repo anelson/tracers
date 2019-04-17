@@ -133,6 +133,8 @@ impl ArgTypeInfo {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::testdata::*;
+
     macro_rules! test_type {
         ($rust_t:ty, $c_type:expr, $rust_type_str:expr) => {
             let syn_typ: syn::Type = parse_quote! { $rust_t };
@@ -217,6 +219,32 @@ mod test {
         //Plus, this way if I ever go and add support for a new type, if I add an example of it to
         //the test cases, this test will fail, which will remind me I need to enable support for
         //that type here.
-        unimplemented!()
+        for test_trait in
+            get_test_provider_traits(|t: &TestProviderTrait| t.expected_error.is_none()).into_iter()
+        {
+            //The test data don't tell us anything about what the expected C wrapper type of each
+            //arg will be.  Nor should they; that's what this module's tests are for.
+            //The purpose of this test is to ensure there are no probe args in any of the traits
+            //which are expected to be valid, that cannot be identified from their `syn::Type`
+            //representation
+            for probe in test_trait.probes.unwrap().into_iter() {
+                for (name, rust_syn_type, c_type) in probe.args.into_iter() {
+                    let arg_type_info = from_syn_type(&rust_syn_type);
+
+                    assert_ne!(None, arg_type_info,
+                               "test trait '{}' probe '{}' arg '{}' has a type which `from_syn_type` can't identify",
+                               test_trait.description,
+                               probe.name,
+                               name);
+
+                    let arg_type_info = arg_type_info.unwrap();
+                    assert_eq!(c_type, arg_type_info.get_c_type_enum(),
+                               "test trait '{}' probe '{}' arg '{}' has a type for which `from_syn_type` returned an incorrect `CType` (and, probably, other wrapper types also)",
+                               test_trait.description,
+                               probe.name,
+                               name);
+                }
+            }
+        }
     }
 }
