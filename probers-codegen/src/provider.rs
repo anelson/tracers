@@ -2,7 +2,7 @@
 //! `probe-rs` provider traits therein, as well as analyze those traits and produce `ProbeSpec`s for
 //! each of the probes they contain.  Once the provider traits have been discovered, other modules
 //! in this crate can then process them in various ways
-use crate::probe_spec::ProbeSpecification;
+use crate::probe::ProbeSpecification;
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;

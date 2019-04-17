@@ -5,12 +5,14 @@
 //! This module encapsulates most of the messy details of translating a simple trait method into
 //! the definition of a probe.
 
+use crate::argtypes::{from_syn_type, ArgTypeInfo};
+use crate::probe_arg::ProbeArgSpecification;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
+use std::fmt;
 use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
-use std::fmt;
 
 use super::syn_helpers;
 use super::{ProberError, ProberResult};
@@ -21,16 +23,15 @@ pub(crate) struct ProbeSpecification {
     original_method: TraitItemMethod,
     vis: Visibility,
     span: Span,
-    pub args: Vec<(syn::PatIdent, syn::Type)>,
+    pub args: Vec<ProbeArgSpecification>,
 }
 
 impl fmt::Debug for ProbeSpecification {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ProbeSpecification(name={}, args=(",
-            self.name)?;
+        write!(f, "ProbeSpecification(name={}, args=(", self.name)?;
 
-        for (name, typ) in self.args.iter() {
-            write!(f, "{}: {},", name.ident, quote! { #typ }.to_string())?;
+        for arg in self.args.iter() {
+            write!(f, "{:?}\n", arg)?;
         }
 
         write!(f, ")")
@@ -98,21 +99,12 @@ impl ProbeSpecification {
             ));
         }
 
-        let mut args: Vec<(syn::PatIdent, syn::Type)> = Vec::new();
+        let mut args: Vec<ProbeArgSpecification> = Vec::new();
         for arg in method.sig.decl.inputs.iter() {
-            if let FnArg::Captured(captured) = arg {
-                if let syn::Pat::Ident(pat_ident) = &captured.pat {
-                    args.push((pat_ident.clone(), captured.ty.clone()));
-                    continue;
-                }
-            }
-            return Err(ProberError::new(
-                &format!("Probe method arguments should be in the form `name: TypeName`; {:?} is not an expected argument", arg),
-                arg.span(),
-            ));
+            args.push(ProbeArgSpecification::from_fnarg(arg)?);
         }
 
-        let mut spec = ProbeSpecification {
+        let spec = ProbeSpecification {
             name: method.sig.ident.to_string(),
             method_name: method.sig.ident.clone(),
             original_method: method.clone(),
@@ -122,7 +114,8 @@ impl ProbeSpecification {
         };
 
         //Pre-process the args to ensure that all reference types have a lifetime parameter
-        spec.args = Self::get_args_with_lifetime_annotations(&spec)?;
+        //TODO: Refactor so this is exposed at the ProbeArgSpecification level
+        //spec.args = Self::get_args_with_lifetime_annotations(&spec)?;
 
         Ok(spec)
     }
@@ -163,15 +156,15 @@ impl ProbeSpecification {
         }
 
         let mut args = Vec::new();
-        for (nam, typ) in probe.args.iter() {
+        for arg in probe.args.iter() {
             let mut count = 0usize;
             args.push((
-                nam.clone(),
-                syn_helpers::transform_types(typ, |typ: &syn::Type| {
+                arg.ident.clone(),
+                syn_helpers::transform_types(&arg.syn_typ, |typ: &syn::Type| {
                     let mut new_typ = typ.clone();
 
                     if let syn::Type::Reference(ref mut tr) = new_typ {
-                        tr.lifetime = Some(generate_lifetime(probe, &mut count, nam, &typ));
+                        tr.lifetime = Some(generate_lifetime(probe, &mut count, &arg.ident, &typ));
                     }
 
                     Ok(new_typ)
@@ -455,8 +448,11 @@ TODO: No other platforms supported yet
     ) -> Vec<(syn::PatIdent, syn::Type, Vec<syn::Lifetime>)> {
         self.args
             .iter()
-            .map(|(nam, typ)| {
+            .map(|arg| {
+                //TODO: Factor this out to ProbeArgSpecification
                 let mut lifetimes = Vec::new();
+                let typ = &arg.syn_typ;
+                let nam = &arg.ident;
 
                 // Traverse the types tree, pulling out the lifetimes and putting them into a list.
                 let new_typ = syn_helpers::transform_types(typ, |typ| {
@@ -502,7 +498,7 @@ TODO: No other platforms supported yet
     /// fn probe(arg0: &str, arg1: usize); //results in tuple: (arg0, arg1,)
     /// ```
     pub(crate) fn get_args_as_tuple_value(&self) -> TokenStream {
-        let names = self.args.iter().map(|(nam, _)| nam);
+        let names = self.args.iter().map(|arg| &arg.ident);
 
         if self.args.is_empty() {
             quote! { () }
@@ -542,7 +538,7 @@ TODO: No other platforms supported yet
     pub(crate) fn get_args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
         // The type of each arg is already decorated with lifetime params by default, so just
         // return
-        let types = self.args.iter().map(|(_, typ)| typ);
+        let types = self.args.iter().map(|arg| &arg.syn_typ);
 
         if self.args.is_empty() {
             quote! { () }
@@ -690,7 +686,8 @@ mod test {
 
             //Re-construct the probe method using the args as they've been computed in the
             //ProbeSpecification.  The lifetimes should be present
-            let args = probe.args.iter().map(|(nam, typ)| {
+            let args = probe.args.iter().map(|arg| {
+                let (nam, typ) = (&arg.ident, &arg.syn_typ);
                 quote! { #nam: #typ }
             });
 

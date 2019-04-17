@@ -74,8 +74,7 @@ impl<'a> Probe<'a> {
         let args: Vec<_> = probe
             .args
             .iter()
-            /*.map(|(name, typ)| ProbeArg::new(name.ident.to_string(), typ.to_string()))*/
-            d
+            .map(|(name, typ)| ProbeArg::new(name.ident.to_string(), typ.to_string()))
             .collect();
 
         Probe {

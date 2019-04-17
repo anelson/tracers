@@ -1,5 +1,6 @@
 #![deny(warnings)]
 #![allow(dead_code)] //TODO: temporary
+#![allow(unused_imports)] //Also temporary
 #![recursion_limit = "256"]
 
 use failure::{format_err, Fallible};
@@ -12,9 +13,10 @@ mod cargo;
 mod deps;
 mod gen;
 mod hashing;
-mod probe_spec;
+mod probe;
+mod probe_arg;
 pub mod proc_macros;
-mod provider_discovery;
+mod provider;
 mod syn_helpers;
 
 #[cfg(test)]

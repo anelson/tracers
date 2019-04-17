@@ -3,8 +3,8 @@
 //! macros and nothing else.  That's an inconvenient restriction, especially since there's quite a
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
-use crate::provider_discovery::{get_probes, get_provider_name};
-use crate::probe_spec::ProbeSpecification;
+use crate::probe::ProbeSpecification;
+use crate::provider::{get_probes, get_provider_name};
 use crate::{ProberError, ProberResult};
 use heck::{ShoutySnakeCase, SnakeCase};
 use proc_macro2::TokenStream;

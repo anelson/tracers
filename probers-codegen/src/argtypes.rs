@@ -70,7 +70,7 @@ macro_rules! maybe_types {
 
 /// Given a type expression from a Rust AST, tries to get the type information for that type.
 /// If it can't be resolved, returns `None`
-fn from_syn_type(ty: &syn::Type) -> Option<ArgTypeInfo> {
+pub(crate) fn from_syn_type(ty: &syn::Type) -> Option<ArgTypeInfo> {
     //TODO: There HAS to be a better and more performant way to do this, but working with the syn
     //type hierarchy directly is just agony
     maybe_types!(@primitive ty, i8, u8, i16, u16, i32, u32, i64, u64, usize, isize);
