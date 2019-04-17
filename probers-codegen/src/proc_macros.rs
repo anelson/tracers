@@ -3,8 +3,9 @@
 //! macros and nothing else.  That's an inconvenient restriction, especially since there's quite a
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
-use crate::probe::ProbeSpecification;
-use crate::provider::{find_probes, get_provider_name};
+use crate::probe;
+use crate::provider;
+use crate::provider::ProviderSpecification;
 use crate::{ProberError, ProberResult};
 use heck::{ShoutySnakeCase, SnakeCase};
 use proc_macro2::TokenStream;
@@ -111,17 +112,17 @@ pub fn init_provider_impl(typ: syn::TypePath) -> ProberResult<TokenStream> {
 /// more testable
 pub fn prober_impl(item: ItemTrait) -> ProberResult<TokenStream> {
     // Look at the methods on the trait and translate each one into a probe specification
-    let probes = find_probes(&item)?;
+    let provider = ProviderSpecification::from_trait(&item)?;
 
     // Re-generate this trait as a struct with our probing implementation in it
-    let probe_struct = generate_prober_struct(&item, &probes)?;
+    let prober_struct = generate_prober_struct(&item, &provider)?;
 
     // Generate code for a struct and some `OnceCell` statics to hold the instance of the provider
     // and individual probe wrappers
-    let impl_mod = generate_impl_mod(&item, &probes);
+    let impl_mod = generate_impl_mod(&item, &provider);
 
     Ok(quote_spanned! { item.span() =>
-        #probe_struct
+        #prober_struct
 
         #impl_mod
     })
@@ -133,7 +134,7 @@ pub fn prober_impl(item: ItemTrait) -> ProberResult<TokenStream> {
 /// name whose implementation actually performs the firing of the probes.
 fn generate_prober_struct(
     item: &ItemTrait,
-    probes: &Vec<ProbeSpecification>,
+    provider: &ProviderSpecification,
 ) -> ProberResult<TokenStream> {
     // From the probe specifications, generate the corresponding methods that will be on the probe
     // struct.
@@ -141,8 +142,8 @@ fn generate_prober_struct(
     let mod_name = get_provider_impl_mod_name(&item.ident);
     let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
     let struct_type_path: syn::Path = parse_quote! { #mod_name::#struct_type_name };
-    let provider_name = get_provider_name(&item);
-    for probe in probes.iter() {
+    let provider_name = provider.name();
+    for probe in provider.probes().iter() {
         probe_methods.push(probe.generate_trait_methods(
             &item.ident,
             &provider_name,
@@ -273,20 +274,22 @@ TODO: No other platforms supported yet
 /// * A declaration of a `struct` which will hold references to all of the probes
 /// * Multiple static `OnceCell` variables which hold the underlying provider instance as well as
 /// the instance of the `struct` which holds references to all of the probes
-fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> TokenStream {
+fn generate_impl_mod(item: &ItemTrait, provider: &ProviderSpecification) -> TokenStream {
     let mod_name = get_provider_impl_mod_name(&item.ident);
     let struct_type_name = get_provider_impl_struct_type_name(&item.ident);
     let struct_var_name = get_provider_impl_struct_var_name(&item.ident);
-    let struct_type_params = get_provider_struct_type_params(probes);
+    let struct_type_params = get_provider_struct_type_params(&provider);
     let instance_var_name = get_provider_instance_var_name(&item.ident);
-    let define_provider_call = generate_define_provider_call(&item, probes);
+    let define_provider_call = generate_define_provider_call(&item, &provider);
     let provider_var_name = syn::Ident::new("p", item.span());
-    let struct_members: Vec<_> = probes
+    let struct_members: Vec<_> = provider
+        .probes()
         .iter()
         .map(|probe| probe.generate_struct_member_declaration())
         .collect();
 
-    let struct_initializers: Vec<_> = probes
+    let struct_initializers: Vec<_> = provider
+        .probes()
         .iter()
         .map(|probe| probe.generate_struct_member_initialization(&provider_var_name))
         .collect();
@@ -370,14 +373,15 @@ fn generate_impl_mod(item: &ItemTrait, probes: &Vec<ProbeSpecification>) -> Toke
 /// each of the probes to the provider
 fn generate_define_provider_call(
     item: &ItemTrait,
-    probes: &Vec<ProbeSpecification>,
+    provider: &ProviderSpecification,
 ) -> TokenStream {
     let builder = Ident::new("builder", item.ident.span());
-    let add_probe_calls: Vec<TokenStream> = probes
+    let add_probe_calls: Vec<TokenStream> = provider
+        .probes()
         .iter()
         .map(|probe| probe.generate_add_probe_call(&builder))
         .collect();
-    let provider_name = get_provider_name(item);
+    let provider_name = provider.name();
 
     quote_spanned! { item.span() =>
         // The provider name must be chosen carefully.  As of this writing (2019-04) the `bpftrace`
@@ -404,9 +408,10 @@ fn generate_define_provider_call(
 ///
 /// The return value of this is a token stream consisting of all of the types, but not including
 /// the angle brackets.
-fn get_provider_struct_type_params(probes: &Vec<ProbeSpecification>) -> TokenStream {
+fn get_provider_struct_type_params(provider: &ProviderSpecification) -> TokenStream {
     // Make a list of all of the reference param lifetimes of all the probes
-    let probe_lifetimes: Vec<syn::Lifetime> = probes
+    let probe_lifetimes: Vec<syn::Lifetime> = provider
+        .probes()
         .iter()
         .map(|p| p.args_lifetime_parameters())
         .flatten()

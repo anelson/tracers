@@ -15,11 +15,11 @@ use syn::{ItemTrait, TraitItem};
 use crate::{ProberError, ProberResult};
 
 pub(crate) struct ProviderSpecification {
-    pub name: String,
-    pub hash: crate::hashing::HashCode,
-    pub item_trait: ItemTrait,
-    pub token_stream: TokenStream,
-    pub probes: Vec<ProbeSpecification>,
+    name: String,
+    hash: crate::hashing::HashCode,
+    item_trait: ItemTrait,
+    token_stream: TokenStream,
+    probes: Vec<ProbeSpecification>,
 }
 
 impl fmt::Debug for ProviderSpecification {
@@ -41,12 +41,19 @@ impl fmt::Debug for ProviderSpecification {
 }
 
 impl ProviderSpecification {
-    fn new(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
+    pub(crate) fn from_trait(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
         let probes = find_probes(item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash_token_stream(&token_stream);
+        // The provider name must be chosen carefully.  As of this writing (2019-04) the `bpftrace`
+        // and `bcc` tools have, shall we say, "evolving" support for USDT.  As of now, with the
+        // latest git version of `bpftrace`, the provider name can't have dots or colons.  For now,
+        // then, the provider name is just the name of the provider trait, converted into
+        // snake_case for consistency with USDT naming conventions.  If two modules in the same
+        // process have the same provider name, they will conflict and some unspecified `bad
+        // things` will happen.
         Ok(ProviderSpecification {
-            name: get_provider_name(item_trait),
+            name: item_trait.ident.to_string().to_snake_case(),
             hash,
             item_trait: item_trait.clone(),
             token_stream,
@@ -64,6 +71,14 @@ impl ProviderSpecification {
 
     pub(crate) fn native_provider_lib_filename(&self) -> PathBuf {
         PathBuf::from(format!("{}.a", self.name_with_hash()))
+    }
+
+    pub(crate) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(crate) fn probes(&self) -> &Vec<ProbeSpecification> {
+        &self.probes
     }
 }
 
@@ -95,7 +110,7 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
                 })
             {
                 //This looks like a provider trait
-                if let Ok(provider) = ProviderSpecification::new(i) {
+                if let Ok(provider) = ProviderSpecification::from_trait(i) {
                     self.providers.push(provider)
                 }
             }
@@ -115,7 +130,7 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
 ///
 /// If the trait contains anything other than method declarations, or any of the declarations are
 /// not suitable as probes, an error is returned
-pub(crate) fn find_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
+fn find_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
     if item.generics.type_params().next() != None || item.generics.lifetimes().next() != None {
         return Err(ProberError::new(
             "Probe traits must not take any lifetime or type parameters",
@@ -140,17 +155,6 @@ pub(crate) fn find_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecificati
     }
 
     Ok(specs)
-}
-
-pub(crate) fn get_provider_name(item: &ItemTrait) -> String {
-    // The provider name must be chosen carefully.  As of this writing (2019-04) the `bpftrace`
-    // and `bcc` tools have, shall we say, "evolving" support for USDT.  As of now, with the
-    // latest git version of `bpftrace`, the provider name can't have dots or colons.  For now,
-    // then, the provider name is just the name of the provider trait, converted into
-    // snake_case for consistency with USDT naming conventions.  If two modules in the same
-    // process have the same provider name, they will conflict and some unspecified `bad
-    // things` will happen.
-    item.ident.to_string().to_snake_case()
 }
 
 #[cfg(test)]
