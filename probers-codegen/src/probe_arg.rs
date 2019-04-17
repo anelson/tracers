@@ -106,7 +106,7 @@ impl ProbeArgSpecification {
 
     /// Returns the Rust AST representation of this argument's type, with lifetime annotations
     /// added for every reference type.  See `add_lifetimes_to_syn_type` for more details;
-    pub fn syn_typ_with_lifetime(&self) -> &syn::Type {
+    pub fn syn_typ_with_lifetimes(&self) -> &syn::Type {
         &self.syn_typ_with_lifetimes
     }
 
@@ -117,7 +117,7 @@ impl ProbeArgSpecification {
         let mut lifetimes = Vec::new();
 
         // Traverse the types tree, pulling out the lifetimes and putting them into a list.
-        let _ = syn_helpers::transform_types(&self.syn_typ, |typ| {
+        let _ = syn_helpers::transform_types(&self.syn_typ_with_lifetimes, |typ| {
             let typ = typ.clone();
             if let syn::Type::Reference(ref tr) = typ {
                 if let Some(ref lt) = tr.lifetime {
@@ -204,11 +204,126 @@ impl ProbeArgSpecification {
 #[cfg(test)]
 mod test {
     use super::*;
+    use quote::quote;
+    use syn::parse_quote;
 
     //Implement equality tests only for testing; in real use they're not needed
     impl PartialEq<ProbeArgSpecification> for ProbeArgSpecification {
         fn eq(&self, other: &ProbeArgSpecification) -> bool {
             self.name == other.name && self.ident == other.ident && self.syn_typ == other.syn_typ
+        }
+    }
+
+    struct TestCase {
+        probe_method: syn::TraitItemMethod,
+        expected_error: Option<&'static str>,
+        arg_name: &'static str,
+        arg_type: syn::Type,
+        arg_type_with_lifetimes: syn::Type,
+        lifetimes: Vec<syn::Lifetime>,
+    }
+
+    impl TestCase {
+        fn new(
+            probe_method: proc_macro2::TokenStream,
+            expected_error: impl Into<Option<&'static str>>,
+            arg_name: &'static str,
+            arg_type: syn::Type,
+            arg_type_with_lifetimes: syn::Type,
+            lifetimes: Vec<syn::Lifetime>,
+        ) -> TestCase {
+            TestCase {
+                probe_method: parse_quote! { #probe_method },
+                expected_error: expected_error.into(),
+                arg_name,
+                arg_type,
+                arg_type_with_lifetimes,
+                lifetimes,
+            }
+        }
+    }
+
+    macro_rules! test_case {
+        ($expected_error:expr, $probe_name:ident, $arg_name:ident, $arg_type:ty, $arg_type_with_lifetimes:ty, $($lifetime:lifetime),*) => {
+            TestCase::new(
+                quote!{ fn $probe_name($arg_name: $arg_type); },
+                $expected_error,
+                stringify!($arg_name),
+                parse_quote! { $arg_type },
+                parse_quote! { $arg_type_with_lifetimes },
+                vec![$(
+                    parse_quote! { $lifetime }
+                    ),*]
+                )
+        };
+        //This is an overload for test cases in which there are no lifetimes expected
+        ($expected_error:expr, $probe_name:ident, $arg_name:ident, $arg_type:ty) => {
+            test_case!($expected_error, $probe_name, $arg_name, $arg_type, $arg_type, )
+        };
+    }
+
+    fn get_test_cases() -> Vec<TestCase> {
+        vec![
+            test_case!(None, probe0, arg0, u8),
+            test_case!(None, probe0, arg0, bool),
+            test_case!(None, probe0, arg0, &str, &'probe0_arg0_1 str, 'probe0_arg0_1),
+            test_case!(None, probe0, arg0, &String, &'probe0_arg0_1 String, 'probe0_arg0_1),
+            test_case!(None, probe0, arg0, &Option<usize>, &'probe0_arg0_1 Option<usize>, 'probe0_arg0_1),
+            test_case!(None, probe0, arg0, &Option<&str>, &'probe0_arg0_1 Option<&'probe0_arg0_2 str>, 'probe0_arg0_1, 'probe0_arg0_2),
+        ]
+    }
+
+    fn get_arg_from_test_case(case: &TestCase) -> ProberResult<ProbeArgSpecification> {
+        let tokens = &case.probe_method;
+        let method: syn::TraitItemMethod = parse_quote! { #tokens };
+        let arg = method
+            .sig
+            .decl
+            .inputs
+            .iter()
+            .next()
+            .expect("expecting exactly one arg");
+
+        ProbeArgSpecification::from_fnarg(&method, 0, &arg)
+    }
+
+    #[test]
+    fn parses_valid_test_cases() {
+        for (index, case) in get_test_cases()
+            .into_iter()
+            .enumerate()
+            .filter(|(_, c)| c.expected_error.is_none())
+        {
+            let arg = get_arg_from_test_case(&case).expect("unexpected error parsing arg");
+
+            assert_eq!(case.arg_name, arg.name(), "test# {}", index);
+            assert_eq!(
+                syn_helpers::convert_to_string(&case.arg_type),
+                syn_helpers::convert_to_string(&arg.syn_typ()),
+                "test# {}",
+                index
+            );
+
+            assert_eq!(
+                syn_helpers::convert_to_string(&case.arg_type_with_lifetimes),
+                syn_helpers::convert_to_string(arg.syn_typ_with_lifetimes()),
+                "test# {}",
+                index
+            );
+
+            //Asserting equality on lifetimes makes for some messy error messages if there's a
+            //mismatch.  So assert on equality of their string representations
+            let expected: Vec<_> = case
+                .lifetimes
+                .iter()
+                .map(syn_helpers::convert_to_string)
+                .collect();
+            let actual: Vec<_> = arg
+                .lifetimes()
+                .iter()
+                .map(syn_helpers::convert_to_string)
+                .collect();
+            assert_eq!(expected, actual, "test# {}", index);
         }
     }
 }
