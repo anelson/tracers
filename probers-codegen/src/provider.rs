@@ -42,7 +42,7 @@ impl fmt::Debug for ProviderSpecification {
 
 impl ProviderSpecification {
     fn new(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
-        let probes = get_probes(item_trait)?;
+        let probes = find_probes(item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash_token_stream(&token_stream);
         Ok(ProviderSpecification {
@@ -115,7 +115,7 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
 ///
 /// If the trait contains anything other than method declarations, or any of the declarations are
 /// not suitable as probes, an error is returned
-pub(crate) fn get_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
+pub(crate) fn find_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
     if item.generics.type_params().next() != None || item.generics.lifetimes().next() != None {
         return Err(ProberError::new(
             "Probe traits must not take any lifetime or type parameters",
@@ -221,7 +221,7 @@ mod test {
     }
 
     #[test]
-    fn get_probes_fails_with_invalid_traits() {
+    fn find_probes_fails_with_invalid_traits() {
         for test_trait in get_filtered_test_traits(true) {
             let trait_decl = test_trait.tokenstream;
             let item_trait: syn::ItemTrait = parse_quote! {
@@ -229,10 +229,10 @@ mod test {
                 #trait_decl
             };
 
-            let error = get_probes(&item_trait).err();
+            let error = find_probes(&item_trait).err();
             assert_ne!(
                 None, error,
-                "The invalid trait '{}' was returned by get_probes as valid",
+                "The invalid trait '{}' was returned by find_probes as valid",
                 test_trait.description
             );
 
@@ -248,7 +248,7 @@ mod test {
     }
 
     #[test]
-    fn get_probes_succeeds_with_valid_traits() {
+    fn find_probes_succeeds_with_valid_traits() {
         for test_trait in get_filtered_test_traits(false) {
             let trait_decl = test_trait.tokenstream;
             let item_trait: syn::ItemTrait = parse_quote! {
@@ -256,7 +256,7 @@ mod test {
                 #trait_decl
             };
 
-            let probes = get_probes(&item_trait).unwrap();
+            let probes = find_probes(&item_trait).unwrap();
             assert_eq!(probes, test_trait.probes.unwrap_or(Vec::new()));
         }
     }

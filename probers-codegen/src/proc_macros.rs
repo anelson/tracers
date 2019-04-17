@@ -4,7 +4,7 @@
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
 use crate::probe::ProbeSpecification;
-use crate::provider::{get_probes, get_provider_name};
+use crate::provider::{find_probes, get_provider_name};
 use crate::{ProberError, ProberResult};
 use heck::{ShoutySnakeCase, SnakeCase};
 use proc_macro2::TokenStream;
@@ -111,7 +111,7 @@ pub fn init_provider_impl(typ: syn::TypePath) -> ProberResult<TokenStream> {
 /// more testable
 pub fn prober_impl(item: ItemTrait) -> ProberResult<TokenStream> {
     // Look at the methods on the trait and translate each one into a probe specification
-    let probes = get_probes(&item)?;
+    let probes = find_probes(&item)?;
 
     // Re-generate this trait as a struct with our probing implementation in it
     let probe_struct = generate_prober_struct(&item, &probes)?;
