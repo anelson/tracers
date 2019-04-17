@@ -162,7 +162,7 @@ impl ProbeSpecification {
         //Generate an (probe)_probe method which returns the raw Option<ProviderProbe>
         let mut probe_method = original_method.clone();
         probe_method.ident = Ident::new(
-            &format!("{}_probe", probe_method.ident),
+            &format!("get_{}_probe", probe_method.ident),
             probe_method.ident.span(),
         );
         probe_method.decl.inputs = syn::punctuated::Punctuated::new();
@@ -357,7 +357,7 @@ TODO: No other platforms supported yet
         let args_tuple = self.args_as_tuple_type_without_lifetimes();
 
         quote_spanned! { self.span =>
-            #name_ident: #provider.probe::<#args_tuple>(#name_literal)?
+            #name_ident: #provider.get_probe::<#args_tuple>(#name_literal)?
         }
     }
 
@@ -421,7 +421,7 @@ TODO: No other platforms supported yet
     ///  parameters for all reference types in the tuple.
     pub(crate) fn args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
         // same as the above method, but use the version with lifetime annotations
-        let types = self.args.iter().map(|arg| arg.syn_typ_with_lifetime());
+        let types = self.args.iter().map(|arg| arg.syn_typ_with_lifetimes());
 
         if self.args.is_empty() {
             quote! { () }
@@ -573,7 +573,7 @@ mod test {
             //Re-construct the probe method using the args as they've been computed in the
             //ProbeSpecification.  The lifetimes should be present
             let args = probe.args.iter().map(|arg| {
-                let (nam, typ) = (&arg.ident(), &arg.syn_typ_with_lifetime());
+                let (nam, typ) = (&arg.ident(), &arg.syn_typ_with_lifetimes());
                 quote! { #nam: #typ }
             });
 
