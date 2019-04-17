@@ -381,6 +381,26 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
             },
             "Probe methods must not have any `self`",
         ),
+        TestProviderTrait::new_invalid(
+            "has a nested Option parameter which is not supported",
+            "test_trait",
+            quote! {
+                trait TestTrait {
+                    fn probe0(arg0: &Option<Option<&str>>);
+                }
+            },
+            "is not supported for probing",
+        ),
+        TestProviderTrait::new_invalid(
+            "has a Result parameter which is not supported",
+            "test_trait",
+            quote! {
+                trait TestTrait {
+                    fn probe0(arg0: &Result<&str, &str>);
+                }
+            },
+            "is not supported for probing",
+        ),
     ];
 
     let filter = filter.into();

@@ -10,9 +10,20 @@ use heck::{ShoutySnakeCase, SnakeCase};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use std::borrow::BorrowMut;
+use std::fmt::Display;
 use syn::parse_quote;
 use syn::spanned::Spanned;
 use syn::{Ident, ItemTrait};
+
+/// Uses the `syn` library's `Error` struct to report an error in the form of a `TokenStream`, so
+/// that a proc macro can insert this token stream into its output and thereby report a detailed
+/// error message to the user.
+///
+/// The span of this error corresponds to the `tokens` parameter, so the user gets the relevant
+/// context for the error
+pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> TokenStream {
+    syn::Error::new_spanned(tokens.clone(), message).to_compile_error()
+}
 
 /// Translates what looks to be an explicit call to the associated function corresponding to a
 /// probe on a provider trait, into something which at runtime will most efficiently attempt to
@@ -397,7 +408,7 @@ fn get_provider_struct_type_params(probes: &Vec<ProbeSpecification>) -> TokenStr
     // Make a list of all of the reference param lifetimes of all the probes
     let probe_lifetimes: Vec<syn::Lifetime> = probes
         .iter()
-        .map(|p| p.get_args_lifetime_parameters())
+        .map(|p| p.args_lifetime_parameters())
         .flatten()
         .collect();
 

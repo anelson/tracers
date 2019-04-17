@@ -1,6 +1,7 @@
 //! This module contains some helpers for working with the `syn` crate.  They grew to be
 //! sufficiently complex as to merit a standalone module with separate tests.
 use super::*;
+use quote::quote;
 use syn::Ident;
 
 /// In the `probers` macro implementation there are some cases where, given a `Type` instance, I
@@ -135,10 +136,21 @@ pub(crate) fn add_suffix_to_ident(ident: &Ident, suffix: &str) -> Ident {
     Ident::new(&format!("{}{}", ident, suffix), ident.span())
 }
 
+/// Helper which converts any type in the `quote/proc_macro2/syn` crates which implements
+/// `ToTokens` (that is to say, anything that can be placed inside a `quote!` or `parse_quote!`
+/// block), to a Rust string.  This isn't a cheap conversion so don't undertake it lightly.
+///
+/// It should primarily be used when generating error messages or in unit tests.  Using it in
+/// production code is an anti-pattern
+pub(crate) fn convert_to_string<T: quote::ToTokens>(item: &T) -> String {
+    let tokenstream = quote! { #item };
+
+    tokenstream.to_string()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use quote::quote;
     use syn::parse_quote;
 
     /// Gets test data, where each test case is a tuple with the input type, and the output type
