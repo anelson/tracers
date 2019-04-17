@@ -77,6 +77,10 @@ impl ProviderSpecification {
         &self.name
     }
 
+    pub(crate) fn item_trait(&self) -> &syn::ItemTrait {
+        &self.item_trait
+    }
+
     pub(crate) fn probes(&self) -> &Vec<ProbeSpecification> {
         &self.probes
     }
