@@ -7,6 +7,7 @@ use crate::{CodeGenerator, ProberResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 
+mod probe_call;
 mod provider_trait;
 
 pub struct StapUsdtGenerator {}
@@ -19,8 +20,8 @@ impl CodeGenerator for StapUsdtGenerator {
         generator.generate()
     }
 
-    fn handle_probe_call(_call: &syn::Expr) -> ProberResult<TokenStream> {
-        unimplemented!()
+    fn handle_probe_call(call: &syn::Expr) -> ProberResult<TokenStream> {
+        probe_call::generate_probe_call(call)
     }
 
     fn handle_provider_init(_typ: &syn::TypePath) -> ProberResult<TokenStream> {

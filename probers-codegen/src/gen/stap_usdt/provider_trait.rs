@@ -1,4 +1,4 @@
-//! Code in this module processes the provider trait decorated with the `probers` attribute, and
+//!Code in this module processes the provider trait decorated with the `probers` attribute, and
 //!replaces it with an implementation using libstapsdt.
 use crate::probe::ProbeSpecification;
 use crate::provider::ProviderSpecification;
@@ -36,7 +36,8 @@ impl<'spec> ProviderTraitGenerator<'spec> {
         // and individual probe wrappers
         let impl_mod = self.generate_impl_mod();
 
-        Ok(quote_spanned! { self.spec.item_trait().span() =>
+        let span = self.spec.item_trait().span();
+        Ok(quote_spanned! {span=>
             #prober_struct
 
             #impl_mod
@@ -82,7 +83,7 @@ impl<'spec> ProviderTraitGenerator<'spec> {
             provider_name
         );
 
-        let result = quote_spanned! { span =>
+        let result = quote_spanned! {span=>
             #(#attrs)*
             #[doc = "# Probing
 
@@ -205,7 +206,8 @@ TODO: No other platforms supported yet
             .map(|probe| probe.generate_struct_member_initialization(&provider_var_name))
             .collect();
 
-        quote_spanned! { self.spec.item_trait().span() =>
+        let span = self.spec.item_trait().span();
+        quote_spanned! {span=>
             mod #mod_name {
                 use ::probers::failure::{bail, Fallible};
                 use ::probers::{SystemTracer,SystemProvider,Provider};
@@ -291,7 +293,8 @@ TODO: No other platforms supported yet
             .collect();
         let provider_name = self.spec.name();
 
-        quote_spanned! { self.spec.item_trait().span() =>
+        let span = self.spec.item_trait().span();
+        quote_spanned! {span=>
             // The provider name must be chosen carefully.  As of this writing (2019-04) the `bpftrace`
             // and `bcc` tools have, shall we say, "evolving" support for USDT.  As of now, with the
             // latest git version of `bpftrace`, the provider name can't have dots or colons.  For now,
@@ -498,7 +501,8 @@ where `${{PID}}` should be the actual process ID of the process you are tracing.
         // the user declared that method.  If it's not being used, let the compiler warn them about
         // it just like it would any other unused method.  The methods we generate, however, won't
         // be directly visible to the user and thus should not cause a warning if left un-called
-        Ok(quote_spanned! { original_method.span() =>
+        let span = original_method.span();
+        Ok(quote_spanned! {span=>
                                                             #(#attrs)*
                 #[doc = "# Probing
 
@@ -557,7 +561,8 @@ TODO: No other platforms supported yet
         let args_type = self.args_as_tuple_type_with_lifetimes();
         let probe_name = &self.spec.name;
 
-        quote_spanned! { self.spec.original_method.span() =>
+        let span = self.spec.original_method.span();
+        quote_spanned! {span=>
             #builder.add_probe::<#args_type>(#probe_name)?;
         }
     }
@@ -578,7 +583,8 @@ TODO: No other platforms supported yet
         //which they wrap.  That is the same for all probes, so we just hard-code it as 'a
         let a_lifetime = syn::Lifetime::new("'a", self.spec.span);
 
-        quote_spanned! { self.spec.span =>
+        let span = self.spec.span;
+        quote_spanned! {span=>
             ::probers::ProviderProbe<#a_lifetime, ::probers::SystemProbe, #arg_tuple>
         }
     }
@@ -591,7 +597,8 @@ TODO: No other platforms supported yet
         let name = self.probe_var_name();
         let typ = self.generate_provider_probe_type();
 
-        quote_spanned! { self.spec.span =>
+        let span = self.spec.span;
+        quote_spanned! {span=>
             #name: #typ
         }
     }
@@ -617,7 +624,8 @@ TODO: No other platforms supported yet
         let name_ident = &self.spec.method_name;
         let args_tuple = self.args_as_tuple_type_without_lifetimes();
 
-        quote_spanned! { self.spec.span =>
+        let span = self.spec.span;
+        quote_spanned! {span=>
             #name_ident: #provider.get_probe::<#args_tuple>(#name_literal)?
         }
     }
@@ -653,7 +661,8 @@ TODO: No other platforms supported yet
         if self.spec.args.is_empty() {
             quote! { () }
         } else {
-            quote_spanned! { self.spec.original_method.sig.decl.inputs.span() =>
+            let span = self.spec.original_method.sig.decl.inputs.span();
+            quote_spanned! {span=>
                 ( #(#names),* ,)
             }
         }
@@ -666,13 +675,15 @@ TODO: No other platforms supported yet
         //When the probe spec is constructed lifetime parameters are added, so to construct a tuple
         //type without them they need to be stripped
         if self.spec.args.is_empty() {
-            quote_spanned! { self.spec.span => () }
+            let span = self.spec.original_method.sig.decl.inputs.span();
+            quote_spanned! {span=> () }
         } else {
             // Build alist of all of the arg types, but use the version without lifetimes
             let args = self.spec.args.iter().map(|arg| arg.syn_typ());
 
             //Now make a tuple type with the types
-            quote_spanned! { self.spec.span =>
+            let span = self.spec.span;
+            quote_spanned! {span=>
                 ( #(#args),* ,)
             }
         }
@@ -692,7 +703,8 @@ TODO: No other platforms supported yet
         if self.spec.args.is_empty() {
             quote! { () }
         } else {
-            quote_spanned! { self.spec.original_method.sig.decl.inputs.span() =>
+            let span = self.spec.original_method.sig.decl.inputs.span();
+            quote_spanned! {span=>
                 ( #(#types),* ,)
             }
         }

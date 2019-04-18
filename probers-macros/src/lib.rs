@@ -54,7 +54,7 @@ fn report_error(msg: &str, span: Span) -> TokenStream {
     //
     //span.unwrap().error(msg).emit();
     //TokenStream::new()
-    quote_spanned! { span =>
+    quote_spanned! {span=>
         compile_error! { #msg }
     }
 }
