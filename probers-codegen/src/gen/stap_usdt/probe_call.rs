@@ -53,7 +53,16 @@ pub(super) fn generate_probe_call(call: ProbeCall) -> ProberResult<TokenStream> 
             );
             let span = details.call.span();
             let provider = details.provider;
-            let args = details.args;
+
+            //the `fire` method on the probe object takes a single argument, which is a tuple of
+            //all of the probe args.  Build that here, though note there's a different syntax for
+            //an empty tuple
+            let args = if details.args.len() == 0 {
+                quote! { () }
+            } else {
+                let args = details.args;
+                quote! { (#(#args),*,) }
+            };
             Ok(quote_spanned! {span=>
                 {
                     if let Some(__probers_probe) = #provider::#probe_func_name() {
