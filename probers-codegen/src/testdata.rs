@@ -115,7 +115,7 @@ impl TestProviderTrait {
         }
     }
 
-    fn get_item_trait(&self) -> syn::ItemTrait {
+    pub fn get_item_trait(&self) -> syn::ItemTrait {
         syn::parse2(self.tokenstream.clone()).expect("Expected a valid trait")
     }
 }

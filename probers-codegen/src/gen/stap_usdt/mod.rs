@@ -5,18 +5,16 @@
 use crate::provider::ProviderSpecification;
 use crate::{CodeGenerator, ProberResult};
 use proc_macro2::TokenStream;
-use provider::ProviderGenerator;
 use std::io::Write;
 
-mod probe;
-mod provider;
+mod provider_trait;
 
 pub struct StapUsdtGenerator {}
 
 impl CodeGenerator for StapUsdtGenerator {
     fn handle_provider_trait(trait_item: &syn::ItemTrait) -> ProberResult<TokenStream> {
         let spec = ProviderSpecification::from_trait(trait_item)?;
-        let generator = ProviderGenerator::new(&spec);
+        let generator = provider_trait::ProviderTraitGenerator::new(&spec);
 
         generator.generate()
     }
