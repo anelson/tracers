@@ -17,7 +17,7 @@ use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
 use super::syn_helpers;
 use super::{ProberError, ProberResult};
 
-pub(crate) struct ProbeSpecification {
+pub struct ProbeSpecification {
     pub name: String,
     pub method_name: Ident,
     pub original_method: TraitItemMethod,

@@ -12,7 +12,7 @@ use crate::argtypes;
 use crate::syn_helpers;
 use crate::{ProberError, ProberResult};
 
-pub(crate) struct ProbeArgSpecification {
+pub struct ProbeArgSpecification {
     name: String,
     probe_name: String,
     ordinal: usize,

@@ -7,6 +7,8 @@
 //! what behavior to expect for each one.
 #![cfg(test)]
 
+use crate::probe_call::ProbeCall;
+use crate::probe_call::ProbeCallDetails;
 use lazy_static::lazy_static;
 use probers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
 
@@ -14,6 +16,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
 use std::path::PathBuf;
+use syn::parse2;
 
 pub(crate) struct Target {
     pub name: &'static str,
@@ -152,6 +155,14 @@ impl TestProbe {
 
         TestProbe { name, args }
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct TestProbeCall {
+    pub call: TokenStream,
+    //The expected probe call if this token stream is valid, or a substring expected to be found in
+    //the error if it's not valid
+    pub expected: Result<ProbeCall, &'static str>,
 }
 
 /// Helper macro allows us to express the details of a probe arg with a minimum of verbiage and
@@ -409,6 +420,68 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
     } else {
         traits
     }
+}
+
+/// Helper macro to help declare test probe calls
+/// TODO: Add support for FireWithCode variations
+macro_rules! test_probe_call {
+    ($call:expr, @result $provider:path, $probe:path, $($arg:expr),*) => {
+        TestProbeCall {
+            call: quote! { $call },
+            expected: Ok(
+                ProbeCall::FireOnly(
+                    ProbeCallDetails {
+                        call: {
+                            match ::syn::parse2::<syn::Expr>(quote! { $provider::$probe($($arg),*) }).unwrap(){
+                                syn::Expr::Call(call) => call,
+                                _ => {
+                                    assert!(false, "The impossible happened!");
+                                    unimplemented!()
+                                }
+                            }
+                        },
+                        probe_fq_path: ::syn::parse2::<syn::Path>(quote! { $provider::$probe }).unwrap(),
+                        provider: ::syn::parse2::<syn::Path>(quote! { $provider }).unwrap(),
+                        probe: ::syn::parse2::<syn::PathSegment>(quote! { $probe }).unwrap(),
+                        args: vec![
+                            $(
+                                syn::parse2::<syn::Expr>(quote! { $arg }).unwrap()
+                                ),*
+                        ]
+                    }
+                    )
+                )
+        }
+    };
+
+    ($call:expr, @result $provider:path, $probe:path) => {
+        test_probe_call!($call, @result $provider, $probe, )
+    };
+
+    ($call:expr, @error $error_msg:expr) => {
+        TestProbeCall {
+            call: quote! { $call },
+            expected: Err($error_msg)
+        }
+    };
+}
+
+pub(crate) fn get_test_probe_calls() -> Vec<TestProbeCall> {
+    vec![
+        //test cases for a valid probe call
+        test_probe_call!(MyProvider::my_probe(), @result MyProvider, my_probe),
+        test_probe_call!(MyProvider::my_probe(arg0), @result MyProvider, my_probe, arg0),
+        test_probe_call!(MyProvider::my_probe(&arg0), @result MyProvider, my_probe, &arg0),
+        test_probe_call!(MyProvider::my_probe(someobj.callsomething().callsomethingelse(foo).unwrap()), @result MyProvider, my_probe, someobj.callsomething().callsomethingelse(foo).unwrap()),
+        test_probe_call!(MyProvider::my_probe(somefunc(arg1, arg2, arg3)), @result MyProvider, my_probe, somefunc(arg1, arg2, arg3)),
+        test_probe_call!(MyProvider::my_probe(arg0, arg1, arg3), @result MyProvider, my_probe, arg0, arg1, arg3),
+        test_probe_call!(my_module::my_othermodule::my_foomodule::MyProvider::my_probe(arg0), @result my_module::my_othermodule::my_foomodule::MyProvider, my_probe, arg0),
+        //various kinds of errors
+        test_probe_call!(not_even_a_function_call, @error "requires the name of a provider trait and its probe method"),
+        test_probe_call!(missing_provider(), @error "is missing the name of the provider trait"),
+        test_probe_call!(MyProvider::not_even_a_function_call, @error "requires the name of a provider trait and its probe method"),
+        test_probe_call!({ MyProvider::my_probe() }, @error "requires the name of a provider trait and its probe method"),
+    ]
 }
 
 lazy_static! {

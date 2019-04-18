@@ -29,7 +29,7 @@ experimental = []
 [dependencies.syn]
 # We need some optional features of syn in order to implement the macro
 version = "0.15"
-features = ["full", "visit"]
+features = ["full", "visit", "parsing", "extra-traits"]
 
 [dev-dependencies]
 quickcheck = "0.8"

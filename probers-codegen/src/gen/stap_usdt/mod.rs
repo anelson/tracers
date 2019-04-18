@@ -2,6 +2,7 @@
 //! uses libstapstd under the covers to generate SystemTap user space probes at runtime.  It's not
 //! a great solution because tools like `bpftrace` and the `bcc` family don't work very well with
 //! these kinds of probes, but it's a beginning
+use crate::probe_call::ProbeCall;
 use crate::provider::ProviderSpecification;
 use crate::{CodeGenerator, ProberResult};
 use proc_macro2::TokenStream;
@@ -20,7 +21,7 @@ impl CodeGenerator for StapUsdtGenerator {
         generator.generate()
     }
 
-    fn handle_probe_call(call: &syn::Expr) -> ProberResult<TokenStream> {
+    fn handle_probe_call(call: ProbeCall) -> ProberResult<TokenStream> {
         probe_call::generate_probe_call(call)
     }
 

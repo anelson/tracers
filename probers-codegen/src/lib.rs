@@ -3,6 +3,7 @@
 #![allow(unused_imports)] //Also temporary
 #![recursion_limit = "256"]
 
+use crate::probe_call::ProbeCall;
 use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -17,6 +18,7 @@ mod gen;
 mod hashing;
 mod probe;
 mod probe_arg;
+mod probe_call;
 pub mod proc_macros;
 mod provider;
 mod syn_helpers;
@@ -58,7 +60,7 @@ pub trait CodeGenerator {
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
     /// TODO: Create a -Spec structure for probe calls and use that instead
-    fn handle_probe_call(call: &syn::Expr) -> ProberResult<TokenStream>;
+    fn handle_probe_call(call: ProbeCall) -> ProberResult<TokenStream>;
 
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will

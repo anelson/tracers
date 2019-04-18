@@ -12,9 +12,7 @@ use syn::{parse_macro_input, ItemTrait};
 
 #[proc_macro_hack]
 pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
-    let input = parse_macro_input!(input as syn::Expr);
-
-    match probe_impl(input) {
+    match probe_impl(TokenStream::from(input)) {
         Ok(stream) => stream,
         Err(err) => report_error(&err.message, err.span),
     }

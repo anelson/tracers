@@ -4,6 +4,7 @@
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
 use crate::probe;
+use crate::probe_call::ProbeCall;
 use crate::provider;
 use crate::provider::ProviderSpecification;
 use crate::{ProberError, ProberResult};
@@ -53,8 +54,8 @@ pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> T
 ///
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
-pub fn probe_impl(call: syn::Expr) -> ProberResult<TokenStream> {
-    Generator::handle_probe_call(&call)
+pub fn probe_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
+    Generator::handle_probe_call(ProbeCall::from_token_stream(tokens)?)
 }
 
 pub fn init_provider_impl(typ: syn::TypePath) -> ProberResult<TokenStream> {

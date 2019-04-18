@@ -14,7 +14,7 @@ use syn::{ItemTrait, TraitItem};
 
 use crate::{ProberError, ProberResult};
 
-pub(crate) struct ProviderSpecification {
+pub struct ProviderSpecification {
     name: String,
     hash: crate::hashing::HashCode,
     item_trait: ItemTrait,
@@ -41,7 +41,7 @@ impl fmt::Debug for ProviderSpecification {
 }
 
 impl ProviderSpecification {
-    pub(crate) fn from_trait(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
+    pub fn from_trait(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
         let probes = find_probes(item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash_token_stream(&token_stream);
@@ -61,27 +61,27 @@ impl ProviderSpecification {
         })
     }
 
-    pub(crate) fn name_with_hash(&self) -> String {
+    pub fn name_with_hash(&self) -> String {
         format!("{}-{:x}", self.name, self.hash)
     }
 
-    pub(crate) fn native_provider_source_filename(&self) -> PathBuf {
+    pub fn native_provider_source_filename(&self) -> PathBuf {
         PathBuf::from(format!("{}.cpp", self.name_with_hash()))
     }
 
-    pub(crate) fn native_provider_lib_filename(&self) -> PathBuf {
+    pub fn native_provider_lib_filename(&self) -> PathBuf {
         PathBuf::from(format!("{}.a", self.name_with_hash()))
     }
 
-    pub(crate) fn name(&self) -> &str {
+    pub fn name(&self) -> &str {
         &self.name
     }
 
-    pub(crate) fn item_trait(&self) -> &syn::ItemTrait {
+    pub fn item_trait(&self) -> &syn::ItemTrait {
         &self.item_trait
     }
 
-    pub(crate) fn probes(&self) -> &Vec<ProbeSpecification> {
+    pub fn probes(&self) -> &Vec<ProbeSpecification> {
         &self.probes
     }
 }
