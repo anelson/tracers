@@ -93,6 +93,7 @@ pub(crate) struct ArgTypeInfo {
     rust_type_str: &'static str,
 }
 
+#[allow(dead_code)] //TODO: temporary
 impl ArgTypeInfo {
     pub fn new<T: ProbeArgType<T>>() -> ArgTypeInfo {
         ArgTypeInfo {

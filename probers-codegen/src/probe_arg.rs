@@ -9,12 +9,15 @@ use syn::spanned::Spanned;
 
 pub struct ProbeArgSpecification {
     name: String,
+    #[allow(dead_code)] //TODO: Temporary
     probe_name: String,
+    #[allow(dead_code)] //TODO: Temporary
     ordinal: usize,
     ident: syn::PatIdent,
     syn_typ: syn::Type,
     syn_typ_with_lifetimes: syn::Type,
-    art_type_info: ArgTypeInfo,
+    #[allow(dead_code)] //TODO: Temporary
+    arg_type_info: ArgTypeInfo,
 }
 
 impl fmt::Debug for ProbeArgSpecification {
@@ -62,7 +65,7 @@ impl ProbeArgSpecification {
     ) -> ProberResult<ProbeArgSpecification> {
         //Note the type is annotated right here with the added lifetime information.  It's easier
         //and faster then to compute the annotations on the fly
-        if let Some(art_type_info) = argtypes::from_syn_type(typ) {
+        if let Some(arg_type_info) = argtypes::from_syn_type(typ) {
             let name = ident.ident.to_string();
             let probe_name = probe_method.sig.ident.to_string();
             let syn_typ = typ.clone();
@@ -74,7 +77,7 @@ impl ProbeArgSpecification {
                 ident: ident.clone(),
                 syn_typ,
                 syn_typ_with_lifetimes,
-                art_type_info: art_type_info,
+                arg_type_info: arg_type_info,
             })
         } else {
             Err(ProberError::new(

@@ -5,7 +5,6 @@
 //! and avoid the possibility of mistakenly re-using a cached result when something has changed, a
 //! fast hashing algorithm is used.  This doesn't need to be cryptographically secure but it does
 //! need to be very fast.
-#![allow(dead_code)] //TODO: Only temporary
 
 use fasthash::xx::hash64;
 use proc_macro2::TokenStream;

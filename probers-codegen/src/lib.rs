@@ -1,5 +1,4 @@
 #![deny(warnings)]
-#![allow(dead_code)] //TODO: temporary
 #![recursion_limit = "256"]
 
 use crate::probe_call::ProbeCall;

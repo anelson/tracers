@@ -2,7 +2,6 @@
 //! source files.  By "dependent" is meant source file dependencies within the crate, primarily
 //! `mod` statements incorporating submodules, but this will also at some point try to follow
 //! `include!` macros where possible.
-#![allow(dead_code)] //TODO: Only temporary
 use failure::{bail, Fallible};
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
@@ -14,6 +13,7 @@ pub(crate) enum SourceDependency {
 }
 
 /// Scans an already-parsed AST and finds the source dependencies within the file
+#[allow(dead_code)] //TODO: Temporary
 pub(crate) fn get_dependencies<'ast>(contents: &'ast syn::File) -> Vec<SourceDependency> {
     let mut visitor = Visitor::new();
 
@@ -24,6 +24,7 @@ pub(crate) fn get_dependencies<'ast>(contents: &'ast syn::File) -> Vec<SourceDep
 
 /// Given the path to a source file and a previously-discovered dependency, attempts to resolve
 /// that dependency to an existing source file.
+#[allow(dead_code)] //TODO: Temporary
 pub(crate) fn resolve_dependency(source_path: &Path, dep: &SourceDependency) -> Fallible<PathBuf> {
     match dep {
         SourceDependency::Mod(module_name) => find_module(source_path, &module_name),
