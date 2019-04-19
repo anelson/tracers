@@ -4,7 +4,7 @@
 //! However other implementations using DTrace's equivalent library are also possible.
 //!
 //! This "dynamic" style was the first tracing mode supported in this library, but if I were to
-//! write this crate over again I would never implement this mode.  The `static` style of probing
+//! write this crate over again I would never implement this mode.  The `native` style of probing
 //! does more work at compile time and fits much better in the SystemTap/DTrace/ETW style of
 //! tracing.  However, this remains in case a use for it emerges, perhaps on another platform with
 //! more intrinsic support for dynamic style tracing.
@@ -36,10 +36,12 @@ impl CodeGenerator for DynamicGenerator {
         provider_init::generate_provider_init(init)
     }
 
-    fn generate_native_code<WOut: Write, WErr: Write>(
-        _stdout: &mut WOut,
-        _stderr: &mut WErr,
-    ) -> ProberResult<TokenStream> {
-        unimplemented!()
+    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, _stderr: &mut WErr) {
+        // The nice thing about this implementation is that no build-time code generation is
+        // required
+        let _ = write!(
+            stdout,
+            "dynamic generator doesn't require any build.rs code generation\n"
+        );
     }
 }
