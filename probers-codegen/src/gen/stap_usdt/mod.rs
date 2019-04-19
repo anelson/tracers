@@ -4,11 +4,13 @@
 //! these kinds of probes, but it's a beginning
 use crate::probe_call::ProbeCall;
 use crate::provider::ProviderSpecification;
+use crate::provider_init::ProviderInitSpecification;
 use crate::{CodeGenerator, ProberResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 
 mod probe_call;
+mod provider_init;
 mod provider_trait;
 
 pub struct StapUsdtGenerator {}
@@ -24,8 +26,8 @@ impl CodeGenerator for StapUsdtGenerator {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(_typ: &syn::TypePath) -> ProberResult<TokenStream> {
-        unimplemented!()
+    fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream> {
+        provider_init::generate_provider_init(init)
     }
 
     fn generate_native_code<WOut: Write, WErr: Write>(

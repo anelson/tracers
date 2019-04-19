@@ -8,7 +8,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro_hack::proc_macro_hack;
 use quote::quote_spanned;
-use syn::parse_macro_input;
 
 #[proc_macro_hack]
 pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
@@ -21,9 +20,7 @@ pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
 
 #[proc_macro_hack]
 pub fn init_provider(input: CompilerTokenStream) -> CompilerTokenStream {
-    let input = parse_macro_input!(input as syn::TypePath);
-
-    match init_provider_impl(input) {
+    match init_provider_impl(TokenStream::from(input)) {
         Ok(stream) => stream,
         Err(err) => report_error(&err.message, err.span),
     }

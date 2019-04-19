@@ -5,6 +5,7 @@
 
 use crate::probe_call::ProbeCall;
 use crate::provider::ProviderSpecification;
+use crate::provider_init::ProviderInitSpecification;
 use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -22,6 +23,7 @@ mod probe_arg;
 mod probe_call;
 pub mod proc_macros;
 mod provider;
+mod provider_init;
 mod syn_helpers;
 
 #[cfg(test)]
@@ -60,14 +62,13 @@ pub trait CodeGenerator {
     fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream>;
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
-    /// TODO: Create a -Spec structure for probe calls and use that instead
     fn handle_probe_call(call: ProbeCall) -> ProberResult<TokenStream>;
 
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will
     /// be done lazily on first use.
     /// TODO: Create a -Spec structure for provider init and use that instead
-    fn handle_provider_init(typ: &syn::TypePath) -> ProberResult<TokenStream>;
+    fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream>;
 
     /// This is invoked from within `build.rs` of the crate which is dependent upon `probers`.  It
     /// doesn't take much arguments because it interacts directly with cargo via environment

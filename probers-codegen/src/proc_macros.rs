@@ -7,6 +7,7 @@ use crate::probe;
 use crate::probe_call::ProbeCall;
 use crate::provider;
 use crate::provider::ProviderSpecification;
+use crate::provider_init::ProviderInitSpecification;
 use crate::{ProberError, ProberResult};
 use heck::{ShoutySnakeCase, SnakeCase};
 use proc_macro2::TokenStream;
@@ -58,11 +59,8 @@ pub fn probe_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
     Generator::handle_probe_call(ProbeCall::from_token_stream(tokens)?)
 }
 
-pub fn init_provider_impl(typ: syn::TypePath) -> ProberResult<TokenStream> {
-    let span = typ.span();
-    Ok(quote_spanned! {span=>
-        #typ::__try_init_provider()
-    })
+pub fn init_provider_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
+    Generator::handle_provider_init(ProviderInitSpecification::from_token_stream(tokens)?)
 }
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
