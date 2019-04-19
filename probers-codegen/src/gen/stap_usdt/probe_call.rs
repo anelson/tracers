@@ -2,7 +2,7 @@
 //! It's rather simple, because it assumes the Rust bindings on the `libstapsdt` API are already a
 //! dependency and exposed via the `SystemTracer` type alias.
 
-use crate::probe_call::ProbeCall;
+use crate::spec::ProbeCallSpecification;
 use crate::ProberResult;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
@@ -33,9 +33,9 @@ use syn::spanned::Spanned;
 ///
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
-pub(super) fn generate_probe_call(call: ProbeCall) -> ProberResult<TokenStream> {
+pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
     match call {
-        ProbeCall::FireOnly(details) => {
+        ProbeCallSpecification::FireOnly(details) => {
             //Easy one.  This call is already set up like a Rust method call on the probe method of
             //the provider trait.  Just need to rewrite the name of the function from `(probename)`
             //to `get_(probename)_probe` and then make the call
@@ -65,6 +65,6 @@ pub(super) fn generate_probe_call(call: ProbeCall) -> ProberResult<TokenStream> 
                 }
             })
         }
-        ProbeCall::FireWithCode { .. } => unimplemented!(),
+        ProbeCallSpecification::FireWithCode { .. } => unimplemented!(),
     }
 }

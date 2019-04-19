@@ -3,9 +3,9 @@
 //! macros and nothing else.  That's an inconvenient restriction, especially since there's quite a
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
-use crate::probe_call::ProbeCall;
-use crate::provider::ProviderSpecification;
-use crate::provider_init::ProviderInitSpecification;
+use crate::spec::ProviderSpecification;
+use crate::spec::ProviderInitSpecification;
+use crate::spec::ProbeCallSpecification;
 use crate::ProberResult;
 use proc_macro2::TokenStream;
 use std::fmt::Display;
@@ -48,7 +48,7 @@ pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> T
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
 pub fn probe_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
-    Generator::handle_probe_call(ProbeCall::from_token_stream(tokens)?)
+    Generator::handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
 }
 
 pub fn init_provider_impl(tokens: TokenStream) -> ProberResult<TokenStream> {

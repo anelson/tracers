@@ -1,6 +1,6 @@
 //! Generates code to explicitly initialize a provider at runtime
 
-use crate::provider_init::ProviderInitSpecification;
+use crate::spec::ProviderInitSpecification;
 use crate::ProberResult;
 use proc_macro2::TokenStream;
 use quote::quote_spanned;

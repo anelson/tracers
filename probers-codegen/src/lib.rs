@@ -1,9 +1,9 @@
 #![deny(warnings)]
 #![recursion_limit = "256"]
 
-use crate::probe_call::ProbeCall;
-use crate::provider::ProviderSpecification;
-use crate::provider_init::ProviderInitSpecification;
+use crate::spec::ProviderSpecification;
+use crate::spec::ProviderInitSpecification;
+use crate::spec::ProbeCallSpecification;
 use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -16,12 +16,8 @@ mod cargo;
 mod deps;
 mod gen;
 mod hashing;
-mod probe;
-mod probe_arg;
-mod probe_call;
 pub mod proc_macros;
-mod provider;
-mod provider_init;
+mod spec;
 mod syn_helpers;
 
 #[cfg(test)]
@@ -60,7 +56,7 @@ pub trait CodeGenerator {
     fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream>;
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
-    fn handle_probe_call(call: ProbeCall) -> ProberResult<TokenStream>;
+    fn handle_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream>;
 
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will

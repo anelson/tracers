@@ -35,7 +35,7 @@ use syn::spanned::Spanned;
 /// Either call can be made on a probe.  Probes are not explicitly one kind or the other; the
 /// difference is only in how they are fired.
 #[derive(Debug, PartialEq)]
-pub enum ProbeCall {
+pub enum ProbeCallSpecification {
     FireOnly(ProbeCallDetails),
     FireWithCode {
         call: ProbeCallDetails,
@@ -43,12 +43,12 @@ pub enum ProbeCall {
     },
 }
 
-impl ProbeCall {
-    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCall> {
+impl ProbeCallSpecification {
+    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCallSpecification> {
         //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
         match syn::parse2::<syn::Expr>(tokens) {
             Ok(call) => ProbeCallDetails::from_call_expression(call)
-                .map(|details| ProbeCall::FireOnly(details)),
+                .map(|details| ProbeCallSpecification::FireOnly(details)),
             Err(e) => Err(ProberError::new(e.to_string(), e.span())),
         }
     }
@@ -97,10 +97,12 @@ impl fmt::Debug for ProbeCallDetails {
 impl ProbeCallDetails {
     /// Parses a token stream directly from the compiler, decomposing it into the details of the
     /// call
-    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCall> {
+    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCallSpecification> {
         //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
         match syn::parse2::<syn::Expr>(tokens) {
-            Ok(call) => Self::from_call_expression(call).map(|c| ProbeCall::FireOnly(c)),
+            Ok(call) => {
+                Self::from_call_expression(call).map(|c| ProbeCallSpecification::FireOnly(c))
+            }
             Err(e) => Err(ProberError::new(
                 format!("Expected a function call expression: {}", e.to_string()),
                 e.span(),
@@ -183,12 +185,12 @@ mod test {
             match test_call.expected {
                 Ok(expected_call) => assert_eq!(
                     expected_call,
-                    ProbeCall::from_token_stream(test_call.call).expect(&format!(
+                    ProbeCallSpecification::from_token_stream(test_call.call).expect(&format!(
                         "Unexpected error parsing probe call: '{}'",
                         call_str
                     ))
                 ),
-                Err(error_msg) => match ProbeCall::from_token_stream(test_call.call) {
+                Err(error_msg) => match ProbeCallSpecification::from_token_stream(test_call.call) {
                     Ok(_) => panic!(
                         "Probe call '{}' should have failed to parse but instead it succeeded",
                         call_str

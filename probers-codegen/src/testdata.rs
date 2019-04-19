@@ -7,8 +7,8 @@
 //! what behavior to expect for each one.
 #![cfg(test)]
 
-use crate::probe_call::ProbeCall;
-use crate::probe_call::ProbeCallDetails;
+use crate::spec::ProbeCallDetails;
+use crate::spec::ProbeCallSpecification;
 use lazy_static::lazy_static;
 use probers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
 
@@ -161,7 +161,7 @@ pub(crate) struct TestProbeCall {
     pub call: TokenStream,
     //The expected probe call if this token stream is valid, or a substring expected to be found in
     //the error if it's not valid
-    pub expected: Result<ProbeCall, &'static str>,
+    pub expected: Result<ProbeCallSpecification, &'static str>,
 }
 
 /// Helper macro allows us to express the details of a probe arg with a minimum of verbiage and
@@ -428,7 +428,7 @@ macro_rules! test_probe_call {
         TestProbeCall {
             call: quote! { $call },
             expected: Ok(
-                ProbeCall::FireOnly(
+                ProbeCallSpecification::FireOnly(
                     ProbeCallDetails {
                         call: {
                             match ::syn::parse2::<syn::Expr>(quote! { $provider::$probe($($arg),*) }).unwrap(){

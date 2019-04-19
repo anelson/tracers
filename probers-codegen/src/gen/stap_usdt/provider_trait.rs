@@ -1,7 +1,7 @@
 //!Code in this module processes the provider trait decorated with the `probers` attribute, and
 //!replaces it with an implementation using libstapsdt.
-use crate::probe::ProbeSpecification;
-use crate::provider::ProviderSpecification;
+use crate::spec::ProbeSpecification;
+use crate::spec::ProviderSpecification;
 use crate::syn_helpers;
 use crate::ProberResult;
 use heck::{ShoutySnakeCase, SnakeCase};
