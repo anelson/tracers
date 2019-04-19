@@ -1,9 +1,9 @@
 #![deny(warnings)]
 #![recursion_limit = "256"]
 
-use crate::spec::ProviderSpecification;
-use crate::spec::ProviderInitSpecification;
 use crate::spec::ProbeCallSpecification;
+use crate::spec::ProviderInitSpecification;
+use crate::spec::ProviderSpecification;
 use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -79,7 +79,7 @@ pub trait CodeGenerator {
 
 //On x86_04 linux, use the system tap tracer
 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-pub type Generator = gen::stap_usdt::StapUsdtGenerator;
+pub type Generator = gen::dynamic::DynamicGenerator;
 
 //On all other targets, use the no-op tracer
 #[cfg(not(any(all(target_arch = "x86_64", target_os = "linux"))))]

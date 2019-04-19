@@ -3,5 +3,4 @@
 //! these generators for the various tracing implementations, though only one can be active at
 //! compile time, via conditonal compilation
 //mod c;
-#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-pub mod stap_usdt;
+pub mod dynamic;
