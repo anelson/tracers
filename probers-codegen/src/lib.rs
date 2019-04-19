@@ -71,10 +71,7 @@ pub trait CodeGenerator {
     /// It is designed not to panic; if there is a hard stop that should cause the dependent crate
     /// to fail, then it returns an error.  Most errors won't be hard stops, but merely warnings
     /// that cause the probing system to switch to a no-nop implementation
-    fn generate_native_code<WOut: Write, WErr: Write>(
-        stdout: &mut WOut,
-        stderr: &mut WErr,
-    ) -> ProberResult<TokenStream>;
+    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, stderr: &mut WErr);
 }
 
 //On x86_04 linux, use the system tap tracer
