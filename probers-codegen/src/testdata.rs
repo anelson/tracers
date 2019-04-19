@@ -16,7 +16,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
 use std::path::PathBuf;
-use syn::parse2;
 
 pub(crate) struct Target {
     pub name: &'static str,

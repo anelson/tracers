@@ -2,19 +2,11 @@
 //! It's rather simple, because it assumes the Rust bindings on the `libstapsdt` API are already a
 //! dependency and exposed via the `SystemTracer` type alias.
 
-use crate::probe;
 use crate::probe_call::ProbeCall;
-use crate::provider;
-use crate::provider::ProviderSpecification;
-use crate::{ProberError, ProberResult};
-use heck::{ShoutySnakeCase, SnakeCase};
+use crate::ProberResult;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
-use std::borrow::BorrowMut;
-use std::fmt::Display;
-use syn::parse_quote;
 use syn::spanned::Spanned;
-use syn::{Ident, ItemTrait};
 
 /// Translates what looks to be an explicit call to the associated function corresponding to a
 /// probe on a provider trait, into something which at runtime will most efficiently attempt to
@@ -47,7 +39,7 @@ pub(super) fn generate_probe_call(call: ProbeCall) -> ProberResult<TokenStream> 
             //Easy one.  This call is already set up like a Rust method call on the probe method of
             //the provider trait.  Just need to rewrite the name of the function from `(probename)`
             //to `get_(probename)_probe` and then make the call
-            let probe_func_name = Ident::new(
+            let probe_func_name = syn::Ident::new(
                 &format!("get_{}_probe", details.probe.ident),
                 details.probe.ident.span(),
             );

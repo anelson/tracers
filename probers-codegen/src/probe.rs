@@ -5,16 +5,13 @@
 //! This module encapsulates most of the messy details of translating a simple trait method into
 //! the definition of a probe.
 
-use crate::argtypes::{from_syn_type, ArgTypeInfo};
 use crate::probe_arg::ProbeArgSpecification;
-use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
+use proc_macro2::Span;
 use std::fmt;
 use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
 
-use super::syn_helpers;
 use super::{ProberError, ProberResult};
 
 pub struct ProbeSpecification {
@@ -120,6 +117,7 @@ impl ProbeSpecification {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::syn_helpers;
     use crate::testdata::*;
     use quote::quote;
     use syn::{parse_quote, TraitItemMethod};

@@ -2,17 +2,8 @@
 //! represents the tokens in a form that generators can easily make use of
 use crate::syn_helpers;
 use crate::{ProberError, ProberResult};
-use heck::{ShoutySnakeCase, SnakeCase};
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
-use std::borrow::BorrowMut;
 use std::fmt;
-use std::fmt::Display;
-use syn::parse2;
-use syn::parse_quote;
-use syn::spanned::Spanned;
-use syn::{Ident, ItemTrait};
 
 /// This is probably the simplest of the probers specs.  Callers use the `init_provider!` macro to
 /// perform initialization of the provider at some explicit point.  This isn't required, and

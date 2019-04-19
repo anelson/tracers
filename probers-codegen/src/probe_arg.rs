@@ -1,16 +1,11 @@
 //! This module is concerned with parsing and interpreting the arguments to a probe
 
-use crate::argtypes::{from_syn_type, ArgTypeInfo};
-use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned};
-use std::fmt;
-use syn::spanned::Spanned;
-use syn::Visibility;
-use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
-
 use crate::argtypes;
+use crate::argtypes::ArgTypeInfo;
 use crate::syn_helpers;
 use crate::{ProberError, ProberResult};
+use std::fmt;
+use syn::spanned::Spanned;
 
 pub struct ProbeArgSpecification {
     name: String,
@@ -42,7 +37,7 @@ impl ProbeArgSpecification {
         //Apologies for the crazy match expression.  Rust's AST is a complicated beast
         //Many things can be function arguments in Rust; we only support the very basic form of:
         //`arg_name: some_type`
-        if let FnArg::Captured(syn::ArgCaptured {
+        if let syn::FnArg::Captured(syn::ArgCaptured {
             pat: syn::Pat::Ident(pat_ident),
             ty,
             ..

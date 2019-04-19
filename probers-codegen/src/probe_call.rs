@@ -2,17 +2,9 @@
 //! them into the discrete components, and validating the call is syntactically valid.
 use crate::syn_helpers;
 use crate::{ProberError, ProberResult};
-use heck::{ShoutySnakeCase, SnakeCase};
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
-use std::borrow::BorrowMut;
 use std::fmt;
-use std::fmt::Display;
-use syn::parse2;
-use syn::parse_quote;
 use syn::spanned::Spanned;
-use syn::{Ident, ItemTrait};
 
 /// There are two kinds of probe calls:
 ///

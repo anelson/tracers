@@ -3,15 +3,12 @@
 use crate::probe::ProbeSpecification;
 use crate::provider::ProviderSpecification;
 use crate::syn_helpers;
-use crate::{ProberError, ProberResult};
+use crate::ProberResult;
 use heck::{ShoutySnakeCase, SnakeCase};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
-use std::borrow::BorrowMut;
-use std::fmt::Display;
 use syn::parse_quote;
 use syn::spanned::Spanned;
-use syn::{Ident, ItemTrait};
 
 pub(super) struct ProviderTraitGenerator {
     spec: ProviderSpecification,
@@ -384,7 +381,7 @@ impl ProbeGenerator {
 
     /// The name of the variable in the implementation struct which will hold this particular
     /// probe's `ProviderProbe` wrapper object
-    pub(crate) fn probe_var_name(&self) -> &Ident {
+    pub(crate) fn probe_var_name(&self) -> &syn::Ident {
         &self.spec.method_name
     }
 
@@ -427,7 +424,7 @@ impl ProbeGenerator {
 
         //Generate an (probe)_probe method which returns the raw Option<ProviderProbe>
         let mut probe_method = original_method.clone();
-        probe_method.ident = Ident::new(
+        probe_method.ident = syn::Ident::new(
             &format!("get_{}_probe", probe_method.ident),
             probe_method.ident.span(),
         );
@@ -557,7 +554,7 @@ TODO: No other platforms supported yet
     /// When building a provider, individual probes are added by calling `add_probe` on the
     /// `ProviderBuilder` implementation.  This method generates that call for this probe.  In this
     /// usage the lifetime parameters are not needed.
-    pub(crate) fn generate_add_probe_call(&self, builder: &Ident) -> TokenStream {
+    pub(crate) fn generate_add_probe_call(&self, builder: &syn::Ident) -> TokenStream {
         //The `add_probe` method takes one type parameter, which should be the tuple form of the
         //arguments for this probe.
         let args_type = self.args_as_tuple_type_with_lifetimes();
@@ -621,7 +618,10 @@ TODO: No other platforms supported yet
     /// ```
     ///
     /// This method generates just the line corresponding to this probe, without a trailing comma.
-    pub(crate) fn generate_struct_member_initialization(&self, provider: &Ident) -> TokenStream {
+    pub(crate) fn generate_struct_member_initialization(
+        &self,
+        provider: &syn::Ident,
+    ) -> TokenStream {
         let name_literal = &self.spec.name;
         let name_ident = &self.spec.method_name;
         let args_tuple = self.args_as_tuple_type_without_lifetimes();
