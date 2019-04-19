@@ -67,8 +67,8 @@ pub fn init_provider_impl(typ: syn::TypePath) -> ProberResult<TokenStream> {
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
 /// more testable
-pub fn prober_impl(item: ItemTrait) -> ProberResult<TokenStream> {
-    Generator::handle_provider_trait(&item)
+pub fn prober_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
+    Generator::handle_provider_trait(ProviderSpecification::from_token_stream(tokens)?)
 }
 
 #[cfg(test)]

@@ -14,9 +14,8 @@ mod provider_trait;
 pub struct StapUsdtGenerator {}
 
 impl CodeGenerator for StapUsdtGenerator {
-    fn handle_provider_trait(trait_item: &syn::ItemTrait) -> ProberResult<TokenStream> {
-        let spec = ProviderSpecification::from_trait(trait_item)?;
-        let generator = provider_trait::ProviderTraitGenerator::new(&spec);
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream> {
+        let generator = provider_trait::ProviderTraitGenerator::new(provider);
 
         generator.generate()
     }

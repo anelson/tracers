@@ -4,6 +4,7 @@
 #![recursion_limit = "256"]
 
 use crate::probe_call::ProbeCall;
+use crate::provider::ProviderSpecification;
 use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -56,7 +57,7 @@ pub type ProberResult<T> = std::result::Result<T, ProberError>;
 pub trait CodeGenerator {
     /// Invoked by the `prober` attribute macro to process a probing provider declaration and
     /// generate whatever code is required there.
-    fn handle_provider_trait(trait_item: &syn::ItemTrait) -> ProberResult<TokenStream>;
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream>;
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
     /// TODO: Create a -Spec structure for probe calls and use that instead

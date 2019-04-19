@@ -8,7 +8,7 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro_hack::proc_macro_hack;
 use quote::quote_spanned;
-use syn::{parse_macro_input, ItemTrait};
+use syn::parse_macro_input;
 
 #[proc_macro_hack]
 pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
@@ -32,11 +32,7 @@ pub fn init_provider(input: CompilerTokenStream) -> CompilerTokenStream {
 
 #[proc_macro_attribute]
 pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> CompilerTokenStream {
-    // In our case this attribute can only be applied to a trait.  If it's not a trait, this line
-    // will cause what looks to the user like a compile error complaining that it expected a trait.
-    let input = parse_macro_input!(item as ItemTrait);
-
-    match prober_impl(input) {
+    match prober_impl(TokenStream::from(item)) {
         Ok(stream) => stream,
         Err(err) => report_error(&err.message, err.span),
     }

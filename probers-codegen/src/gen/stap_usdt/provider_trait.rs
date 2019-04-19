@@ -13,16 +13,18 @@ use syn::parse_quote;
 use syn::spanned::Spanned;
 use syn::{Ident, ItemTrait};
 
-pub(super) struct ProviderTraitGenerator<'spec> {
-    spec: &'spec ProviderSpecification,
-    probes: Vec<ProbeGenerator<'spec>>,
+pub(super) struct ProviderTraitGenerator {
+    spec: ProviderSpecification,
+    probes: Vec<ProbeGenerator>,
 }
 
-impl<'spec> ProviderTraitGenerator<'spec> {
-    pub fn new(spec: &'spec ProviderSpecification) -> ProviderTraitGenerator<'spec> {
-        let probes: Vec<_> = spec
-            .probes()
-            .iter()
+impl ProviderTraitGenerator {
+    pub fn new(spec: ProviderSpecification) -> ProviderTraitGenerator {
+        //Consume this provider spec and separate out the probe specs, each of which we want to
+        //wrap in our own ProbeGenerator
+        let (spec, probes) = spec.separate_probes();
+        let probes: Vec<_> = probes
+            .into_iter()
             .map(|pspec| ProbeGenerator::new(pspec))
             .collect();
         ProviderTraitGenerator { spec, probes }
@@ -371,12 +373,12 @@ TODO: No other platforms supported yet
     }
 }
 
-pub(super) struct ProbeGenerator<'spec> {
-    spec: &'spec ProbeSpecification,
+pub(super) struct ProbeGenerator {
+    spec: ProbeSpecification,
 }
 
-impl<'spec> ProbeGenerator<'spec> {
-    pub fn new(spec: &'spec ProbeSpecification) -> ProbeGenerator<'spec> {
+impl ProbeGenerator {
+    pub fn new(spec: ProbeSpecification) -> ProbeGenerator {
         ProbeGenerator { spec }
     }
 
@@ -734,7 +736,7 @@ mod test {
                 test_case.description
             ));
 
-            let generator = ProviderTraitGenerator::new(&spec);
+            let generator = ProviderTraitGenerator::new(spec);
             generator.generate().expect(&format!(
                 "Failed to generate test trait '{}'",
                 test_case.description

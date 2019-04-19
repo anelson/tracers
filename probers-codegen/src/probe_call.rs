@@ -105,9 +105,9 @@ impl fmt::Debug for ProbeCallDetails {
 impl ProbeCallDetails {
     /// Parses a token stream directly from the compiler, decomposing it into the details of the
     /// call
-    pub fn from_token_stream(tokenstream: TokenStream) -> ProberResult<ProbeCall> {
+    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCall> {
         //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
-        match syn::parse2::<syn::Expr>(tokenstream) {
+        match syn::parse2::<syn::Expr>(tokens) {
             Ok(call) => Self::from_call_expression(call).map(|c| ProbeCall::FireOnly(c)),
             Err(e) => Err(ProberError::new(
                 format!("Expected a function call expression: {}", e.to_string()),

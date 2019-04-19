@@ -41,6 +41,13 @@ impl fmt::Debug for ProviderSpecification {
 }
 
 impl ProviderSpecification {
+    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProviderSpecification> {
+        match syn::parse2::<syn::ItemTrait>(tokens) {
+            Ok(item_trait) => Self::from_trait(&item_trait),
+            Err(e) => Err(ProberError::new(e.to_string(), e.span())),
+        }
+    }
+
     pub fn from_trait(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
         let probes = find_probes(item_trait)?;
         let token_stream = quote! { #item_trait };
@@ -83,6 +90,24 @@ impl ProviderSpecification {
 
     pub fn probes(&self) -> &Vec<ProbeSpecification> {
         &self.probes
+    }
+
+    /// Consumes this spec and returns the same spec with all probes removed, and instead the
+    /// probes vector is returned separately.  This is a convenient way to wrap
+    /// ProviderSpecification in something else (in truth its designed for the
+    /// `ProviderTraitGenerator` implementation classes)
+    pub(crate) fn separate_probes(self) -> (ProviderSpecification, Vec<ProbeSpecification>) {
+        let probes = self.probes;
+        (
+            ProviderSpecification {
+                name: self.name,
+                hash: self.hash,
+                item_trait: self.item_trait,
+                token_stream: self.token_stream,
+                probes: Vec::new(),
+            },
+            probes,
+        )
     }
 }
 
