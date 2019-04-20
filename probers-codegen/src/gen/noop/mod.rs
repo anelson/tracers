@@ -9,3 +9,38 @@
 //!
 //! Thus this mode uses somme creative Rust trickery to generate code that ensures the compiler
 //! does its usual type checks, but at runtime nothing actually happens.
+use crate::spec::ProbeCallSpecification;
+use crate::spec::ProviderInitSpecification;
+use crate::spec::ProviderSpecification;
+use crate::{CodeGenerator, ProberResult};
+use proc_macro2::TokenStream;
+use std::io::Write;
+
+mod probe_call;
+mod provider_trait;
+
+#[allow(dead_code)]
+pub struct NoOpGenerator {}
+
+impl CodeGenerator for NoOpGenerator {
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream> {
+        provider_trait::ProviderTraitGenerator::new(provider).generate()
+    }
+
+    fn handle_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
+        probe_call::generate_probe_call(call)
+    }
+
+    fn handle_provider_init(_init: ProviderInitSpecification) -> ProberResult<TokenStream> {
+        unimplemented!()
+    }
+
+    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, _stderr: &mut WErr) {
+        // The nice thing about this implementation is that no build-time code generation is
+        // required
+        let _ = write!(
+            stdout,
+            "no-op generator doesn't require any build.rs code generation\n"
+        );
+    }
+}

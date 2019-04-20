@@ -4,7 +4,7 @@ use proc_macro_hack::proc_macro_hack;
 
 // Re-export some types from child crates which callers will need to be able to use.  Ergonomically
 // it makes more sense to a caller to deal with, for example, `probers::Provider`
-pub use probers_core::{Provider, ProviderBuilder, ProviderProbe, Tracer};
+pub use probers_core::*;
 pub use probers_macros::prober;
 
 #[proc_macro_hack]

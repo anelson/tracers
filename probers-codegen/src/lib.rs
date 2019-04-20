@@ -14,10 +14,10 @@ mod argtypes;
 mod cache;
 mod cargo;
 mod deps;
-mod gen;
+pub mod gen;
 mod hashing;
 pub mod proc_macros;
-mod spec;
+pub mod spec;
 mod syn_helpers;
 
 #[cfg(test)]
@@ -80,7 +80,7 @@ pub type Generator = gen::dynamic::DynamicGenerator;
 
 //On all other targets, use the no-op tracer
 #[cfg(not(any(all(target_arch = "x86_64", target_os = "linux"))))]
-compile_error!("Not yet implemented");
+pub type Generator = gen::noop::NoOpGenerator;
 
 pub fn generate() -> Fallible<()> {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").map_err(|_| {
