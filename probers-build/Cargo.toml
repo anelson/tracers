@@ -1,16 +1,18 @@
 [package]
-name = "probers-codegen"
+name = "probers-build"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
+description = """
+This is actually the exact same crate as `probers-codegen`, with the same code and the same dependencies.  It is exposed in duplicate form
+here as a workaround to Cargo bug #4866 (https://github.com/rust-lang/cargo/issues/4866).  Due to this bug, it's not possible to have one crate
+as both a dependency and build-dependency with different features.  That makes it impossible to support `no_std` at runtime because the compile-time
+code generation code is heavily dependent upon the standard library.
 
-#### WARNING ####
-#################
-#
-# It's critical that any changes made here are also made to `probers-build/Cargo.toml`
-# which is maintained as an exact duplicate of this crate as a workaround for a Cargo
-# bug
+The workaround is to use probers-build for the build dependency, and let probers-codegen remain a regular dependency.
+"""
+
 [dependencies]
 quote = "0.6.11"
 failure = "0.1.5"

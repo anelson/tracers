@@ -9,7 +9,7 @@ license = "MIT/Apache-2.0"
 maintenance = { status = "experimental" }
 
 [workspace]
-exclude = ["probers-stap", "libstapsdt-sys", "libelf-sys", "probers-codegen/testdata"]
+exclude = ["probers-stap", "libstapsdt-sys", "libelf-sys", "probers-codegen", "probers-build"]
 
 [features]
 default = []
@@ -24,8 +24,15 @@ path = "src/bin/testfire.rs"
 required-features = [ "binaries" ]
 
 [dependencies]
+failure = "0.1.5"
+once_cell = "0.1.8"
+proc-macro-hack = "0.5"
+
 probers-core = { path = "probers-core", version = "0.1.0" }
 probers-macros = { path = "probers-macros", version = "0.1.0" }
+
+[build-dependencies]
+probers-build = { path = "probers-build", version = "0.1.0" }
 
 # This is only a fallback; not always used
 probers-noop = { path = "probers-noop", version = "0.1.0" }
