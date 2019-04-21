@@ -6,10 +6,11 @@
 //! fast hashing algorithm is used.  This doesn't need to be cryptographically secure but it does
 //! need to be very fast.
 
-use fasthash::xx::hash64;
 use proc_macro2::TokenStream;
 use std::ffi::OsStr;
+use std::hash::Hasher;
 use std::path::{Path, PathBuf};
+use twox_hash::XxHash;
 
 pub(crate) type HashCode = u64;
 
@@ -18,7 +19,9 @@ pub(crate) fn hash_string(string: &str) -> HashCode {
 }
 
 pub(crate) fn hash_buf(buf: &[u8]) -> HashCode {
-    hash64(buf)
+    let mut hasher = XxHash::with_seed(42);
+    hasher.write(buf);
+    hasher.finish()
 }
 
 pub(crate) fn hash_token_stream(stream: &TokenStream) -> HashCode {
