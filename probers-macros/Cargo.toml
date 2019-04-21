@@ -25,7 +25,7 @@ quickcheck = "0.8"
 quickcheck_macros = "0.8"
 # The integration tests use the macro to generate probe impls so they need access to the type aliases in the top level
 # crate
-probers= { path = "..", version = "0.1.0" }
+#probers= { path = "..", version = "0.1.0" }
 
 [lib]
 proc-macro=true
