@@ -3,8 +3,10 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+#[cfg(enabled)] //Only include the bindings if build.rs says to enabled them
 include!("libstapsdt.rs");
 
+#[cfg(enabled)]
 #[cfg(test)]
 mod tests {
     use super::*;

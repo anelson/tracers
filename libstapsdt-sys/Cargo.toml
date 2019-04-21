@@ -6,13 +6,29 @@ edition = "2018"
 license = "MIT"
 links = "stapsdt"
 
+[features]
+# by default, building libstapsdt is disabled.  It must be explicitly enabled
+default = []
+
+# if this feature is enabled, then the build.rs will try to build the libstapsdt binaries.
+# if the build fails, this crate's build will still succeed
+#
+# The success or failure of the build will be communicated via a variable in cargo,
+# which dependent crates can resolve with DEP_LIBELF_SYS_SUCCEEDED
+enabled = ["libelf-sys/enabled", "libc"]
+
+# If this feature is enabled, it implies `enabled`, and also will cause the build to fail if
+# libstapsdt cannot be built
+required = ["libelf-sys/required", "libc"]
+
 [dependencies]
-libc = "0.2"
-libelf-sys = { path = "../libelf-sys", version = "0.1.0" }
+libc = { version = "0.2", optional = true }
+libelf-sys = { path = "../libelf-sys", version = "0.1.0", optional = true }
 
 [build-dependencies]
 pkg-config = "0.3.14"
 cc = "1.0"
 glob = "0.2.11"
+failure = "0.1"
 
 

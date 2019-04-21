@@ -1,21 +1,17 @@
 #![deny(warnings)]
 
-pub mod tracer;
-pub mod provider;
+//Only include any of this if stap is enabled for this build
+
+#[cfg(enabled)]
 pub mod probe;
+#[cfg(enabled)]
+pub mod provider;
+#[cfg(enabled)]
+pub mod tracer;
 
-pub use tracer::*;
-pub use provider::*;
+#[cfg(enabled)]
 pub use probe::*;
-
-//#[cfg(test)]
-//#[macro_use(quickcheck)]
-//extern crate quickcheck_macros;
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+#[cfg(enabled)]
+pub use provider::*;
+#[cfg(enabled)]
+pub use tracer::*;

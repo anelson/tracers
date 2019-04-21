@@ -6,11 +6,27 @@ edition = "2018"
 license = "LGPL-3.0-or-later"
 links = "elf"
 
+[features]
+# by default, building libelf is disabled.  It must be explicitly enabled
+default = []
+
+# if this feature is enabled, then the build.rs will try to build the libelf binaries.
+# if the build fails, this crate's build will still succeed
+#
+# The success or failure of the build will be communicated via a variable in cargo,
+# which dependent crates can resolve with DEP_LIBELF_SYS_SUCCEEDED
+enabled = ["libz-sys", "libc"]
+
+# If this feature is enabled, it implies `enabled`, and also will cause the build to fail if
+# libelf cannot be built
+required = ["libz-sys", "libc"]
+
 [dependencies]
-libz-sys = ">= 0.1.2"
-libc = "0.2"
+libz-sys = { version = ">= 0.1.2", optional = true }
+libc = { version = "0.2", optional = true }
 
 [build-dependencies]
 pkg-config = "0.3.2"
 cc = "1.0"
+failure = "0.1"
 

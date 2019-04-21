@@ -3,9 +3,11 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+// Only include the implementation if the build.rs script reported successful build
+#[cfg(enabled)]
 include!("libelf.rs");
 
-#[cfg(test)]
+#[cfg(all(test, enabled))]
 mod tests {
     use super::{elf_version, EV_CURRENT, EV_NONE};
     #[test]

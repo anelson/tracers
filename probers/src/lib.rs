@@ -9,6 +9,10 @@
 /// version will be used and spare the user having to add these dependencies themselves.  A deeper
 /// discussion around this is ongoing right now at:
 /// https://github.com/rust-lang-nursery/api-guidelines/issues/176
+///
+/// The `build.rs` will set a feature to indicate if tracing is enabled at all.  If not then
+/// there's no reason to even include this runtime
+#[cfg(enabled)]
 pub mod runtime {
     pub use probers_core::*;
     pub extern crate failure;
@@ -24,10 +28,10 @@ pub mod runtime {
     //ensure the correct implementation crate is in fact a dependency.
     //
     //On x86_04 linux, use the system tap tracer
-    #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+    #[cfg(stap_enabled)]
     pub type SystemTracer = probers_stap::StapTracer;
     //On all other targets, use the no-op tracer
-    #[cfg(not(any(all(target_arch = "x86_64", target_os = "linux"))))]
+    #[cfg(noop_enabled)]
     pub type SystemTracer = probers_noop::NoOpTracer;
 
     pub type SystemProvider = <SystemTracer as Tracer>::ProviderType;

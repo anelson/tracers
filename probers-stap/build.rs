@@ -1,6 +1,6 @@
 //! Custom build logic that auto generates the UnsafeProviderProbeNativeImpl for SystemTap, one method for
 //! each possible arg count from 0 to 12.
-use failure::Fallible;
+use failure::{bail, Fallible};
 use std::env;
 use std::fs::File;
 use std::io::Write;
@@ -9,8 +9,49 @@ use std::path::Path;
 const MAX_ARITY: usize = 12; //AFAIK Rust itself only allows tuples up to this arity
 const STAP_MAX_ARITY: usize = 6; //any more than this number of probe arguments are allowed but are ignored
 
-fn main() -> Fallible<()> {
-    let out_dir = env::var("OUT_DIR").unwrap();
+fn is_enabled() -> bool {
+    env::var("CARGO_FEATURE_ENABLED").is_ok() || is_required()
+}
+
+fn is_required() -> bool {
+    env::var("CARGO_FEATURE_REQUIRED").is_ok()
+}
+
+fn main() {
+    //by default we don't do anything here unless this lib is explicitly enabled
+    if !is_enabled() {
+        println!("probers-stap is not enabled; build skipped");
+        return;
+    }
+
+    let fail_on_error = is_required();
+
+    match try_build() {
+        Ok(_) => {
+            //Build succeeded, which means the Rust bindings should be enabled and
+            //dependent crates should be signaled that this lib is available
+            println!("cargo:rustc-cfg=enabled");
+            println!("cargo:succeeded=1"); //this will set DEP_(PKGNAME)_SUCCEEDED in dependent builds
+        }
+        Err(e) => {
+            if fail_on_error {
+                panic!("probers-stap build failed: {}", e);
+            } else {
+                println!("cargo:WARNING=probers-stap build failed: {}", e);
+                println!(
+                    "cargo:WARNING=the probers-stap bindings will not be included in the crate"
+                );
+            }
+        }
+    }
+}
+
+fn try_build() -> Fallible<()> {
+    if env::var("DEP_STAPSDT_SUCCEEDED").is_err() {
+        bail!("probers-stap is not available because libstapsdt-sys did not build successfully")
+    }
+
+    let out_dir = env::var("OUT_DIR")?;
     let dest_path = Path::new(&out_dir).join("probe_unsafe_impl.rs");
     let mut f = File::create(&dest_path)?;
 

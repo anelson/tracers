@@ -8,6 +8,7 @@
 //! build directly from source.
 extern crate cc;
 
+use failure::{bail, format_err, Fallible};
 use std::env;
 use std::ffi::OsString;
 use std::fs;
@@ -15,7 +16,51 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+fn is_enabled() -> bool {
+    env::var("CARGO_FEATURE_ENABLED").is_ok() || is_required()
+}
+
+fn is_required() -> bool {
+    env::var("CARGO_FEATURE_REQUIRED").is_ok()
+}
+
 fn main() {
+    //by default we don't do anything here unless this lib is explicitly enabled
+    if !is_enabled() {
+        println!("libelf-sys is not enabled; build skipped");
+        return;
+    }
+
+    let fail_on_error = is_required();
+
+    match try_build() {
+        Ok(_) => {
+            //Build succeeded, which means the Rust bindings should be enabled and
+            //dependent crates should be signaled that this lib is available
+            println!("cargo:rustc-cfg=enabled");
+            println!("cargo:succeeded=1"); //this will set DEP_ELF_SUCCEEDED in dependent builds
+        }
+        Err(e) => {
+            if fail_on_error {
+                panic!("libelf-sys build failed: {}", e);
+            } else {
+                println!("cargo:WARNING=libelf-sys build failed: {}", e);
+                println!("cargo:WARNING=the libelf-sys bindings will not be included in the crate");
+            }
+        }
+    }
+}
+
+fn try_build() -> Fallible<()> {
+    //Though undocumented, cargo exposes all the info we need about the target
+    //see https://kazlauskas.me/entries/writing-proper-buildrs-scripts.html
+
+    if env::var("CARGO_CFG_TARGET_OS")? != "linux" {
+        bail!("libelf-sys is only supported on Linux")
+    } else if env::var("CARGO_CFG_TARGET_ARCH")? != "x86_64" {
+        bail!("libelf-sys is only supported on x86_64 architectures")
+    }
+
     // The build for elfutils is pretty standard autotools and GNU make, with some mild trickery to
     // get an -fPIC compiled static lib
     let dst = PathBuf::from(env::var_os("OUT_DIR").unwrap());
@@ -23,11 +68,11 @@ fn main() {
     let include = root.join("include");
     let build = root.join("build");
     let lib = root.join("lib");
-    fs::create_dir_all(&build).unwrap();
-    fs::create_dir_all(&include).unwrap();
-    fs::create_dir_all(&lib).unwrap();
+    fs::create_dir_all(&build)?;
+    fs::create_dir_all(&include)?;
+    fs::create_dir_all(&lib)?;
 
-    let src_path = fs::canonicalize(Path::new("vendor/libelf")).unwrap();
+    let src_path = fs::canonicalize(Path::new("vendor/libelf"))?;
 
     //Based on a technique used in `curl-rust`'s `build.rs`, invoke the `./configure` script with
     //`sh`, using the `cc` crate to get the build-related environment variables
@@ -47,14 +92,14 @@ fn main() {
         .current_dir(&build)
         .arg(&src_path.join("configure"))
         .arg(&format!("--prefix={}", root.display()));
-    run(&mut config, "configure");
+    run(&mut config, "configure")?;
 
     //now make the elfutils.  TODO: Someday see if there's a reliable way to only build `libelf`
     //and its dependencies
     let mut make = Command::new("make");
     make.current_dir(&build);
     make.arg("install");
-    run(&mut make, "make install");
+    run(&mut make, "make install")?;
 
     //because we ran `make install`, libs and headers were copied to the `root` directory.  For
     //reasons I don't understand, the makefiles build a static version of `libelf` with `-fPIC`,
@@ -73,28 +118,23 @@ fn main() {
     println!("cargo:include={}", include.display());
     println!("cargo:rustc-link-lib=static={}", "elf");
     println!("cargo:rustc-link-search=native={}", lib.display());
+
+    Ok(())
 }
 
-fn run(cmd: &mut Command, program: &str) {
+fn run(cmd: &mut Command, program: &str) -> Fallible<()> {
     println!("running: {:?}", cmd);
-    let status = match cmd.status() {
-        Ok(status) => status,
-        Err(ref e) if e.kind() == ErrorKind::NotFound => {
-            fail(&format!(
-                "failed to execute command: {}\nis `{}` not installed?",
-                e, program
-            ));
-        }
-        Err(e) => fail(&format!("failed to execute command: {}", e)),
-    };
-    if !status.success() {
-        fail(&format!(
-            "command did not execute successfully, got: {}",
+    match cmd.status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(status) => Err(format_err!(
+            "'{}' failed with status code {}",
+            program,
             status
-        ));
+        )),
+        Err(ref e) if e.kind() == ErrorKind::NotFound => Err(format_err!(
+            "failed to execute command [{}] because the command was not found",
+            program
+        )),
+        Err(e) => Err(format_err!("failed to execute command: {}", e)),
     }
-}
-
-fn fail(s: &str) -> ! {
-    panic!("\n{}\n\nbuild script failed, must exit now", s)
 }
