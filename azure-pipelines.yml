@@ -43,26 +43,37 @@ jobs:
           echo "##vso[task.setvariable variable=PATH;]$PATH:$HOME/.cargo/bin"
         displayName: Install rust (non-Windows)
         condition: ne( variables['Agent.OS'], 'Windows_NT' )
+
       - script: |
             curl -sSf -o rustup-init.exe https://win.rustup.rs
             rustup-init.exe -y --default-toolchain %RUSTUP_TOOLCHAIN%
             echo "##vso[task.setvariable variable=PATH;]%PATH%;%USERPROFILE%\.cargo\bin"
         displayName: Install rust (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
+
       - script: sudo apt-get update && sudo apt-get install build-essential m4
         displayName: install Ubuntu dependencies
         condition: eq( variables['Agent.OS'], 'Linux' )
-      - script: cargo build --all --release -vv
-        displayName: Cargo build
-      - script: PROBERS_EXPECTED_IMPL=stap cargo test --all -vv
+
+      - script: scripts/build.sh --release -vv
+        displayName: Cargo build (non-Windows)
+        condition: ne( variables['Agent.OS'], 'Windows_NT' )
+
+      - script: scripts\build.bat --release -vv
+        displayName: Cargo build (Windows)
+        condition: eq( variables['Agent.OS'], 'Windows_NT' )
+
+      - script: PROBERS_EXPECTED_IMPL=stap scripts/test.sh -vv
         displayName: Cargo test SystemTap implementation
         condition: eq( variables['Agent.OS'], 'Linux' )
-      - script: PROBERS_EXPECTED_IMPL=no-op cargo test --all -vv
+
+      - script: PROBERS_EXPECTED_IMPL=no-op scripts/test.sh -vv
         displayName: Cargo test NoOp implementation (non-Windows)
         condition: and(ne( variables['Agent.OS'], 'Windows_NT' ), ne( variables['Agent.OS'], 'Linux' ))
+
       - script: |
           echo "##vso[task.setvariable variable=PROBERS_EXPECTED_IMPL;]no-op"
-          cargo test --all -vv
+          scripts\test.bat
         displayName: Cargo test NoOp implementation (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
