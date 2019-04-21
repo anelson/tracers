@@ -13,6 +13,9 @@ code generation code is heavily dependent upon the standard library.
 The workaround is to use probers-build for the build dependency, and let probers-codegen remain a regular dependency.
 """
 
+[lib]
+path = "../probers-codegen/src/lib.rs"
+
 [dependencies]
 quote = "0.6.11"
 failure = "0.1.5"
