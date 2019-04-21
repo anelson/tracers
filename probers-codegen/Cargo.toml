@@ -40,3 +40,5 @@ features = ["full", "visit", "parsing", "extra-traits"]
 [dev-dependencies]
 quickcheck = "0.8"
 quickcheck_macros = "0.8"
+tempfile = "3"
+fs_extra = "1"

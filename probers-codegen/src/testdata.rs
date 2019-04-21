@@ -9,13 +9,14 @@
 
 use crate::spec::ProbeCallDetails;
 use crate::spec::ProbeCallSpecification;
+use fs_extra::{copy_items, dir};
 use lazy_static::lazy_static;
 use probers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
-
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
 use std::path::PathBuf;
+use tempfile::tempdir;
 
 pub(crate) struct Target {
     pub name: &'static str,
@@ -484,8 +485,43 @@ pub(crate) fn get_test_probe_calls() -> Vec<TestProbeCall> {
 }
 
 lazy_static! {
-    pub(crate) static ref TEST_CRATE_DIR: PathBuf =
-        PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/testdata"));
+    pub(crate) static ref TEST_CRATE_DIR: PathBuf = {
+        //NB: this will be invoked sometimes as part of the `probers-build` crate, such that
+        //`file!()` will have some path components like "../probers-codegen/...".  That messes up
+        //the tests which assume a literal path.  Thus, need to canonicalize
+        let src_file = file!(); //This will be a path relative to the
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+
+        //the src_file includes the name of the crate, like 'mycrate/src/lib.rs'.  Or, if this is
+        //in probers-build, where the path to the source file is in another crate, src_file will be
+        //something like 'probers-build/../probers-codegen/src/lib.rs'.
+        //
+        //manifest_dir will be the path to the crate, like '/home/foo/probers/probers-build'
+        //
+        //So the parent of manifest_dir gets us the path to the workspace, which we can combine
+        //with the src file's relative path to get the absolute path, then canonicalize
+        let workspace_dir = manifest_dir.parent().expect("Manifest dir has no parent that's not possible");
+        let src_path = workspace_dir.join(src_file);
+        let mut src_dir = std::fs::canonicalize(&src_path).expect(&format!("Failed to canonicalize source path: {}", &src_path.display()));
+        src_dir.pop();
+
+        let testdata_dir = src_dir.join("../testdata");
+
+        //At this point, `testdata_dir` is the fully qualified path on the filesystem to the
+        //`testdata` directory in `probers-codegen`.  The problem is that our test data include
+        //complete crates with their own `Cargo.toml`.  When we run `cargo metadata` on those, it
+        //will fail because Cargo will assume these are part of the `probe-rs` workspace.
+        //
+        //The only workaround is to create a temp directory OUTSIDE of the probe-rs source tree,
+        //copy the data there, and use that.  it's...not pretty
+        let temp_dir = tempdir().expect("Failed to create temporary directory").into_path();
+
+        copy_items(&vec![testdata_dir.as_path()],
+            temp_dir.as_path(),
+            &dir::CopyOptions::new()).expect(&format!("Failed to copy {} to {}", testdata_dir.display(), temp_dir.display()));
+
+        temp_dir.join("testdata").to_owned()
+    };
     pub(crate) static ref TEST_CRATES: Vec<TestCrate> = vec![
         TestCrate {
             root_directory: TEST_CRATE_DIR.join("simplelib"),

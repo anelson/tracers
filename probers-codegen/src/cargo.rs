@@ -33,12 +33,12 @@ mod test {
     #[test]
     fn gets_correct_targets() {
         for case in TEST_CRATES.iter() {
-            let expected_targets: Vec<_> = case
+            let mut expected_targets: Vec<_> = case
                 .targets
                 .iter()
                 .map(|t| case.root_directory.join(t.entrypoint))
                 .collect();
-            let targets = get_targets(
+            let mut targets = get_targets(
                 case.root_directory
                     .join(PathBuf::from("Cargo.toml"))
                     .to_str()
@@ -46,6 +46,10 @@ mod test {
                 case.package_name,
             )
             .unwrap();
+
+            expected_targets.sort();
+            targets.sort();
+
             assert_eq!(expected_targets, targets);
         }
     }
