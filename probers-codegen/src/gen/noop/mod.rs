@@ -13,6 +13,7 @@ use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
 use crate::{CodeGenerator, ProberResult};
+use failure::Fallible;
 use proc_macro2::TokenStream;
 use std::io::Write;
 
@@ -35,12 +36,17 @@ impl CodeGenerator for NoOpGenerator {
         unimplemented!()
     }
 
-    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, _stderr: &mut WErr) {
+    fn generate_native_code<WOut: Write, WErr: Write>(
+        stdout: &mut WOut,
+        _stderr: &mut WErr,
+    ) -> Fallible<()> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
         let _ = write!(
             stdout,
             "no-op generator doesn't require any build.rs code generation\n"
         );
+
+        Ok(())
     }
 }

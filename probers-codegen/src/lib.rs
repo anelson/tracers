@@ -61,7 +61,6 @@ pub trait CodeGenerator {
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will
     /// be done lazily on first use.
-    /// TODO: Create a -Spec structure for provider init and use that instead
     fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream>;
 
     /// This is invoked from within `build.rs` of the crate which is dependent upon `probers`.  It
@@ -71,7 +70,7 @@ pub trait CodeGenerator {
     /// It is designed not to panic; if there is a hard stop that should cause the dependent crate
     /// to fail, then it returns an error.  Most errors won't be hard stops, but merely warnings
     /// that cause the probing system to switch to a no-nop implementation
-    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, stderr: &mut WErr);
+    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, stderr: &mut WErr) -> Fallible<()>;
 }
 
 //On x86_04 linux, use the system tap tracer
