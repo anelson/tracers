@@ -9,6 +9,8 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use std::env;
 use std::io::Write;
+use std::io::{stderr, stdout};
+use std::path::{Path, PathBuf};
 
 mod argtypes;
 mod cache;
@@ -70,7 +72,13 @@ pub trait CodeGenerator {
     /// It is designed not to panic; if there is a hard stop that should cause the dependent crate
     /// to fail, then it returns an error.  Most errors won't be hard stops, but merely warnings
     /// that cause the probing system to switch to a no-nop implementation
-    fn generate_native_code<WOut: Write, WErr: Write>(stdout: &mut WOut, stderr: &mut WErr) -> Fallible<()>;
+    fn generate_native_code<WOut: Write, WErr: Write>(
+        stdout: &mut WOut,
+        stderr: &mut WErr,
+        manifest_dir: &Path,
+        package_name: &str,
+        targets: Vec<PathBuf>,
+    ) -> Fallible<()>;
 }
 
 //On x86_04 linux, use the system tap tracer
@@ -81,16 +89,35 @@ pub type Generator = gen::dynamic::DynamicGenerator;
 #[cfg(not(any(all(target_arch = "x86_64", target_os = "linux"))))]
 pub type Generator = gen::noop::NoOpGenerator;
 
-pub fn generate() -> Fallible<()> {
+pub fn build() {
+    match build_internal() {
+        Ok(_) => println!("probes build succeeded"),
+        Err(e) => eprintln!("Error building probes: {}", e),
+    }
+}
+
+pub fn build_internal() -> Fallible<()> {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").map_err(|_| {
         format_err!(
             "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?"
         )
     })?;
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
-    let _targets = cargo::get_targets(&manifest_path, &package_name)?;
+    let targets = cargo::get_targets(&manifest_path, &package_name)?;
 
-    unimplemented!();
+    let stdout = stdout();
+    let stderr = stderr();
+
+    let mut outhandle = stdout.lock();
+    let mut errhandle = stderr.lock();
+
+    Generator::generate_native_code(
+        &mut outhandle,
+        &mut errhandle,
+        &Path::new(&manifest_path),
+        &package_name,
+        targets,
+    )
 }
 
 #[cfg(test)]

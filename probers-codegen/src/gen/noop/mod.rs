@@ -16,6 +16,7 @@ use crate::{CodeGenerator, ProberResult};
 use failure::Fallible;
 use proc_macro2::TokenStream;
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 mod probe_call;
 mod provider_trait;
@@ -39,6 +40,9 @@ impl CodeGenerator for NoOpGenerator {
     fn generate_native_code<WOut: Write, WErr: Write>(
         stdout: &mut WOut,
         _stderr: &mut WErr,
+        _manifest_dir: &Path,
+        _package_name: &str,
+        _targets: Vec<PathBuf>,
     ) -> Fallible<()> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
