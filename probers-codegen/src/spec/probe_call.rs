@@ -47,8 +47,9 @@ impl ProbeCallSpecification {
     pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCallSpecification> {
         //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
         match syn::parse2::<syn::Expr>(tokens) {
-            Ok(call) => ProbeCallDetails::from_call_expression(call)
-                .map(|details| ProbeCallSpecification::FireOnly(details)),
+            Ok(call) => {
+                ProbeCallDetails::from_call_expression(call).map(ProbeCallSpecification::FireOnly)
+            }
             Err(e) => Err(ProberError::new(e.to_string(), e.span())),
         }
     }
@@ -100,9 +101,7 @@ impl ProbeCallDetails {
     pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCallSpecification> {
         //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
         match syn::parse2::<syn::Expr>(tokens) {
-            Ok(call) => {
-                Self::from_call_expression(call).map(|c| ProbeCallSpecification::FireOnly(c))
-            }
+            Ok(call) => Self::from_call_expression(call).map(ProbeCallSpecification::FireOnly),
             Err(e) => Err(ProberError::new(
                 format!("Expected a function call expression: {}", e.to_string()),
                 e.span(),
@@ -145,12 +144,12 @@ impl ProbeCallDetails {
                         }
                     }
 
-                    let args: Vec<_> = call.args.iter().map(|arg| arg.clone()).collect();
+                    let args: Vec<_> = call.args.iter().cloned().collect();
                     Ok(ProbeCallDetails {
                         call,
                         probe_fq_path: func.path,
                         provider,
-                        probe: probe,
+                        probe,
                         args,
                     })
                 } else {
@@ -164,10 +163,10 @@ impl ProbeCallDetails {
                 }
             }
             _ => {
-                return Err(ProberError::new(
+                Err(ProberError::new(
                     "The probe! macro requires the name of a provider trait and its probe method, e.g. MyProvider::myprobe(...)",
                     call.span(),
-                    ));
+                    ))
             }
         }
     }

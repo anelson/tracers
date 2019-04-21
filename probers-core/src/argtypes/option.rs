@@ -40,7 +40,7 @@ where
     type CType = <T as ProbeArgWrapper>::CType;
 
     fn as_c_type(&self) -> Self::CType {
-        let wrapped = self.as_ref().map(|x| x.as_c_type());
+        let wrapped = self.as_ref().map(ProbeArgWrapper::as_c_type);
         let default: Self::CType =
             <Self::CType as ProbeArgNativeType<Self::CType>>::get_default_value();
 

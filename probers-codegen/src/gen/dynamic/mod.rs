@@ -47,9 +47,9 @@ impl CodeGenerator for DynamicGenerator {
     ) -> Fallible<()> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
-        let _ = write!(
+        let _ = writeln!(
             stdout,
-            "dynamic generator doesn't require any build.rs code generation\n"
+            "dynamic generator doesn't require any build.rs code generation"
         );
         Ok(())
     }

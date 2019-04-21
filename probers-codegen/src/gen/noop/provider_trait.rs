@@ -22,10 +22,7 @@ impl ProviderTraitGenerator {
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
-        let probes: Vec<_> = probes
-            .into_iter()
-            .map(|pspec| ProbeGenerator::new(pspec))
-            .collect();
+        let probes: Vec<_> = probes.into_iter().map(ProbeGenerator::new).collect();
         ProviderTraitGenerator { spec, probes }
     }
 

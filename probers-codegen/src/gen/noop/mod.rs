@@ -46,9 +46,9 @@ impl CodeGenerator for NoOpGenerator {
     ) -> Fallible<()> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
-        let _ = write!(
+        let _ = writeln!(
             stdout,
-            "no-op generator doesn't require any build.rs code generation\n"
+            "no-op generator doesn't require any build.rs code generation"
         );
 
         Ok(())

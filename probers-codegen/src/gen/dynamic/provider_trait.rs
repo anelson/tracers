@@ -1,6 +1,7 @@
 //!Code in this module processes the provider trait decorated with the `probers` attribute, and
 //!replaces it with an implementation using libstapsdt.
 use crate::gen::common;
+use crate::spec::ProbeArgSpecification;
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::syn_helpers;
@@ -21,10 +22,7 @@ impl ProviderTraitGenerator {
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
-        let probes: Vec<_> = probes
-            .into_iter()
-            .map(|pspec| ProbeGenerator::new(pspec))
-            .collect();
+        let probes: Vec<_> = probes.into_iter().map(ProbeGenerator::new).collect();
         ProviderTraitGenerator { spec, probes }
     }
 
@@ -120,7 +118,7 @@ impl ProviderTraitGenerator {
         let struct_members: Vec<_> = self
             .probes
             .iter()
-            .map(|probe| probe.generate_struct_member_declaration())
+            .map(ProbeGenerator::generate_struct_member_declaration)
             .collect();
 
         let struct_initializers: Vec<_> = self
@@ -247,7 +245,7 @@ impl ProviderTraitGenerator {
         let probe_lifetimes: Vec<syn::Lifetime> = self
             .probes
             .iter()
-            .map(|p| p.args_lifetime_parameters())
+            .map(ProbeGenerator::args_lifetime_parameters)
             .flatten()
             .collect();
 
@@ -525,7 +523,7 @@ impl ProbeGenerator {
         self.spec
             .args
             .iter()
-            .map(|arg| arg.lifetimes())
+            .map(ProbeArgSpecification::lifetimes)
             .flatten()
             .collect::<Vec<syn::Lifetime>>()
     }
@@ -537,7 +535,7 @@ impl ProbeGenerator {
     /// fn probe(arg0: &str, arg1: usize); //results in tuple: (arg0, arg1,)
     /// ```
     pub(crate) fn args_as_tuple_value(&self) -> TokenStream {
-        let names = self.spec.args.iter().map(|arg| arg.ident());
+        let names = self.spec.args.iter().map(ProbeArgSpecification::ident);
 
         if self.spec.args.is_empty() {
             quote! { () }
@@ -560,7 +558,7 @@ impl ProbeGenerator {
             quote_spanned! {span=> () }
         } else {
             // Build alist of all of the arg types, but use the version without lifetimes
-            let args = self.spec.args.iter().map(|arg| arg.syn_typ());
+            let args = self.spec.args.iter().map(ProbeArgSpecification::syn_typ);
 
             //Now make a tuple type with the types
             let span = self.spec.span;
@@ -579,7 +577,7 @@ impl ProbeGenerator {
             .spec
             .args
             .iter()
-            .map(|arg| arg.syn_typ_with_lifetimes());
+            .map(ProbeArgSpecification::syn_typ_with_lifetimes);
 
         if self.spec.args.is_empty() {
             quote! { () }

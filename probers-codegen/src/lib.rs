@@ -41,7 +41,7 @@ impl ProberError {
     fn new<M: ToString>(message: M, span: Span) -> ProberError {
         ProberError {
             message: message.to_string(),
-            span: span,
+            span,
         }
     }
 }

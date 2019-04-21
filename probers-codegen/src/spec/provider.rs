@@ -24,16 +24,16 @@ pub struct ProviderSpecification {
 
 impl fmt::Debug for ProviderSpecification {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
+        writeln!(
             f,
             "ProviderSpecification(
     name='{}',
-    probes:\n",
+    probes:",
             self.name
         )?;
 
         for probe in self.probes.iter() {
-            write!(f, "        {:?},\n", probe)?;
+            writeln!(f, "        {:?},", probe)?;
         }
 
         write!(f, ")")
@@ -135,7 +135,7 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
             if i.attrs
                 .iter()
                 .any(|attr| match attr.path.segments.iter().last() {
-                    Some(syn::PathSegment { ident, .. }) if ident.to_string() == "prober" => true,
+                    Some(syn::PathSegment { ident, .. }) if *ident == "prober" => true,
                     _ => false,
                 })
             {

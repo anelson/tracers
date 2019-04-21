@@ -125,11 +125,11 @@ pub(crate) fn cache_generated_file<F: FnOnce(PathBuf) -> Fallible<(PathBuf)>>(
 pub(crate) fn get_cache_path(root: &Path) -> PathBuf {
     let mut root = root.to_owned();
     root.push("cache");
-    root.push(format!(concat!(
+    root.push(concat!(
         env!("CARGO_PKG_NAME"),
         "-",
         env!("CARGO_PKG_VERSION")
-    )));
+    ));
     root
 }
 
@@ -137,7 +137,7 @@ fn load_cached_results<T: Serialize + DeserializeOwned>(results_path: &Path) -> 
     let file = File::open(results_path)?;
     let reader = BufReader::new(file);
 
-    serde_json::from_reader(reader).map_err(|e| e.into())
+    serde_json::from_reader(reader).map_err(std::convert::Into::into) //convert the error to a failure-compatible type
 }
 
 fn save_results<T: Serialize + DeserializeOwned>(results_path: &Path, results: &T) -> Fallible<()> {

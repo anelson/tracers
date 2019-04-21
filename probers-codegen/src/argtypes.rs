@@ -70,6 +70,10 @@ macro_rules! maybe_types {
 
 /// Given a type expression from a Rust AST, tries to get the type information for that type.
 /// If it can't be resolved, returns `None`
+///
+/// This function has a massive cyclomatic complexity due to all of the macro-generated code, but
+/// in this case it's safe to ignore the clippy lint.
+#[allow(clippy::cyclomatic_complexity)]
 pub(crate) fn from_syn_type(ty: &syn::Type) -> Option<ArgTypeInfo> {
     //TODO: There HAS to be a better and more performant way to do this, but working with the syn
     //type hierarchy directly is just agony

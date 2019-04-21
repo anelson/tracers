@@ -14,7 +14,7 @@ pub(crate) enum SourceDependency {
 
 /// Scans an already-parsed AST and finds the source dependencies within the file
 #[allow(dead_code)] //TODO: Temporary
-pub(crate) fn get_dependencies<'ast>(contents: &'ast syn::File) -> Vec<SourceDependency> {
+pub(crate) fn get_dependencies(contents: &syn::File) -> Vec<SourceDependency> {
     let mut visitor = Visitor::new();
 
     visitor.visit_file(contents);

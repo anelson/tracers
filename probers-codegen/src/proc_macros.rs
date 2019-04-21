@@ -3,9 +3,9 @@
 //! macros and nothing else.  That's an inconvenient restriction, especially since there's quite a
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
-use crate::spec::ProviderSpecification;
-use crate::spec::ProviderInitSpecification;
 use crate::spec::ProbeCallSpecification;
+use crate::spec::ProviderInitSpecification;
+use crate::spec::ProviderSpecification;
 use crate::ProberResult;
 use proc_macro2::TokenStream;
 use std::fmt::Display;
@@ -19,7 +19,7 @@ use crate::{CodeGenerator, Generator};
 /// The span of this error corresponds to the `tokens` parameter, so the user gets the relevant
 /// context for the error
 pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> TokenStream {
-    syn::Error::new_spanned(tokens.clone(), message).to_compile_error()
+    syn::Error::new_spanned(tokens, message).to_compile_error()
 }
 
 /// Translates what looks to be an explicit call to the associated function corresponding to a

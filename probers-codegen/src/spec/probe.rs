@@ -28,7 +28,7 @@ impl fmt::Debug for ProbeSpecification {
         write!(f, "ProbeSpecification(name={}, args=(", self.name)?;
 
         for arg in self.args.iter() {
-            write!(f, "{:?}\n", arg)?;
+            writeln!(f, "{:?}", arg)?;
         }
 
         write!(f, ")")
@@ -107,7 +107,7 @@ impl ProbeSpecification {
             original_method: method.clone(),
             vis: item.vis.clone(),
             span: method.span(),
-            args: args,
+            args,
         };
 
         Ok(spec)

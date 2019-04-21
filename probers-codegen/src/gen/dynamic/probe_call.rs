@@ -49,7 +49,7 @@ pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> ProberResult<
             //the `fire` method on the probe object takes a single argument, which is a tuple of
             //all of the probe args.  Build that here, though note there's a different syntax for
             //an empty tuple
-            let args = if details.args.len() == 0 {
+            let args = if details.args.is_empty() {
                 quote! { () }
             } else {
                 let args = details.args;

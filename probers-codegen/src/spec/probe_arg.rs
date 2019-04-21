@@ -77,7 +77,7 @@ impl ProbeArgSpecification {
                 ident: ident.clone(),
                 syn_typ,
                 syn_typ_with_lifetimes,
-                arg_type_info: arg_type_info,
+                arg_type_info,
             })
         } else {
             Err(ProberError::new(
