@@ -18,6 +18,8 @@ fn is_required() -> bool {
 }
 
 fn main() {
+    println!("building probers-stap if enabled");
+
     //by default we don't do anything here unless this lib is explicitly enabled
     if !is_enabled() {
         println!("probers-stap is not enabled; build skipped");

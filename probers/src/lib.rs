@@ -41,9 +41,11 @@ pub mod runtime {
 
 #[cfg(test)]
 mod test {
+    #[cfg(enabled)]
     use super::runtime::*;
 
     #[test]
+    #[cfg(enabled)]
     fn verify_expected_tracing_impl() {
         //This very simple test checks the PROBERS_EXPECTED_IMPL env var, and if set, asserts that
         //the tracing implementation compiled into this library matches the expected one.  In
@@ -51,6 +53,19 @@ mod test {
         //ends up with the expeced implementation on a variety of environments
         if let Ok(expected_impl) = std::env::var("PROBERS_EXPECTED_IMPL") {
             assert_eq!(expected_impl, SystemTracer::TRACING_IMPLEMENTATION);
+        }
+    }
+
+    #[test]
+    #[cfg(not(enabled))]
+    fn verify_expected_tracing_impl() {
+        //This very simple test checks the PROBERS_EXPECTED_IMPL env var, and if set, asserts that
+        //the tracing implementation compiled into this library matches the expected one.  In
+        //practice this is only used by the CI builds to verify that the compile-time magic always
+        //ends up with the expeced implementation on a variety of environments
+        if let Ok(expected_impl) = std::env::var("PROBERS_EXPECTED_IMPL") {
+            assert_eq!(expected_impl, "DISABLED",
+                       "the crate was compiled with tracing entirely disabled but apparently the expected implementation was '{}'", expected_impl);
         }
     }
 }

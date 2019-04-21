@@ -5,6 +5,7 @@ use std::env;
 
 /// Struct which captures the features that were set in the `Cargo.toml` file of the dependent
 /// crate
+#[derive(Debug)]
 struct Features {
     enable_tracing: bool,
     force_tracing: bool,
@@ -32,7 +33,13 @@ fn is_feature_enabled(name: &str) -> bool {
 }
 
 fn main() {
+    for (name, value) in std::env::vars() {
+        println!("{}={}", name, value);
+    }
+
     let features = Features::from_env();
+
+    println!("Detected features: \n{:?}", features);
 
     //by default we don't do anything here unless this lib is explicitly enabled
     if !features.enable_tracing {
@@ -50,7 +57,7 @@ fn main() {
         }
         Err(e) => {
             if features.force_tracing {
-                panic!("probers-stap build failed: {}", e);
+                panic!("probers build failed: {}", e);
             } else {
                 println!("cargo:WARNING=probers-stap build failed: {}", e);
                 println!(
