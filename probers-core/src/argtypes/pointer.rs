@@ -18,6 +18,7 @@ impl<T> ProbeArgWrapper for *const T {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::super::*;
     use std::ptr;
 

@@ -5,7 +5,7 @@
 extern crate quickcheck_macros;
 
 pub mod argtypes;
-pub use crate::argtypes::{wrap, ProbeArgType, ProbeArgWrapper, ProbeArgNativeType};
+pub use argtypes::{wrap, ProbeArgNativeType, ProbeArgType, ProbeArgWrapper};
 
 pub mod probes;
 pub use probes::*;

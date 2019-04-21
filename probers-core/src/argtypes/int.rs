@@ -1,5 +1,4 @@
 use super::{ProbeArgType, ProbeArgWrapper};
-use std::os::raw;
 
 #[cfg(test)]
 extern crate quickcheck;
@@ -34,7 +33,7 @@ macro_rules! impl_integer_arg_type {
             fn converts_to_c_type(x: $rust_type) {
                 let wrapper = wrap(x);
 
-                assert_eq!(size_of!($rust_type), size_of!($c_type));
+                assert_eq!(size_of::<$rust_type>(), size_of::<$c_type>());
                 assert_eq!(<$c_type>::from(x), wrapper.as_c_type());
             }
         }
@@ -43,11 +42,11 @@ macro_rules! impl_integer_arg_type {
 
 impl_integer_arg_type!(usize, libc::size_t, usize_test);
 impl_integer_arg_type!(isize, libc::ssize_t, isize_test);
-impl_integer_arg_type!(u64, raw::c_ulonglong, u64_test);
-impl_integer_arg_type!(i64, raw::c_longlong, i64_test);
-impl_integer_arg_type!(u32, raw::c_uint, u32_test);
-impl_integer_arg_type!(i32, raw::c_int, i32_test);
-impl_integer_arg_type!(u16, raw::c_ushort, u16_test);
-impl_integer_arg_type!(i16, raw::c_short, i16_test);
-impl_integer_arg_type!(u8, raw::c_uchar, u8_test);
-impl_integer_arg_type!(i8, raw::c_char, i8_test);
+impl_integer_arg_type!(u64, std::os::raw::c_ulonglong, u64_test);
+impl_integer_arg_type!(i64, std::os::raw::c_longlong, i64_test);
+impl_integer_arg_type!(u32, std::os::raw::c_uint, u32_test);
+impl_integer_arg_type!(i32, std::os::raw::c_int, i32_test);
+impl_integer_arg_type!(u16, std::os::raw::c_ushort, u16_test);
+impl_integer_arg_type!(i16, std::os::raw::c_short, i16_test);
+impl_integer_arg_type!(u8, std::os::raw::c_uchar, u8_test);
+impl_integer_arg_type!(i8, std::os::raw::c_char, i8_test);

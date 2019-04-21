@@ -6,26 +6,6 @@ edition = "2018"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-quote = "0.6.11"
-failure = "0.1.5"
-once_cell = "0.1.8"
-proc-macro2 = "0.4"
-heck = "0.3"
 proc-macro-hack = "0.5"
-probers-codegen = { path = "../probers-codegen", version = "0.1.0" }
-probers-core = { path = "../probers-core", version = "0.1.0" }
+probers-macros-hack = { path = "../probers-macros-hack", version = "0.1.0" }
 
-[dependencies.syn]
-# We need some optional features of syn in order to implement the macro
-version = "0.15.27"
-features = ["full"]
-
-[dev-dependencies]
-quickcheck = "0.8"
-quickcheck_macros = "0.8"
-# The integration tests use the macro to generate probe impls so they need access to the type aliases in the top level
-# crate
-#probers= { path = "..", version = "0.1.0" }
-
-[lib]
-proc-macro=true

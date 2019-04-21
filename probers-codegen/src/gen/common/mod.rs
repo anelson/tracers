@@ -41,7 +41,7 @@ TODO: No other platforms supported yet
 ///
 /// ```no_execute
 /// #[allow(dead_code)]
-/// #vis fn __try_init_provider() -> Option<&'static ::probers::failure::Error>
+/// #vis fn __try_init_provider() -> Option<&'static ::probers::runtime::failure::Error>
 /// ```
 ///
 /// The actual generator should insert this token stream in the generated trait/struct, followed by
@@ -74,7 +74,7 @@ pub(super) fn generate_try_init_decl(provider: &ProviderSpecification) -> TokenS
         /// # Example
         ///
         /// ```
-        /// use probers::{init_provider, prober, probe};
+        /// use probers_macros::{init_provider, prober, probe};
         ///
         /// #[prober]
         /// trait MyProbes {
@@ -92,7 +92,7 @@ pub(super) fn generate_try_init_decl(provider: &ProviderSpecification) -> TokenS
         /// probe!(MyProbes::probe0());
         /// ```
         #[allow(dead_code)]
-        #vis fn __try_init_provider() -> Option<&'static ::probers::failure::Error>
+        #vis fn __try_init_provider() -> Option<&'static ::probers::runtime::failure::Error>
     }
 }
 
@@ -102,7 +102,7 @@ pub(super) fn generate_try_init_decl(provider: &ProviderSpecification) -> TokenS
 ///
 /// ```no_execute
 /// #[allow(dead_code)]
-/// #vis fn __get_init_error() -> Option<&'static ::probers::failure::Error>
+/// #vis fn __get_init_error() -> Option<&'static ::probers::runtime::failure::Error>
 /// ```
 ///
 /// The actual generator should insert this token stream in the generated trait/struct, followed by
@@ -124,7 +124,7 @@ pub(super) fn generate_get_init_error_decl(provider: &ProviderSpecification) -> 
         /// only when the caller specifically wants to avoid triggering initialization of the
         /// provider, but merely to test if initialization was attempted and failed previously.
         #[allow(dead_code)]
-        #vis fn __get_init_error() -> Option<&'static ::probers::failure::Error>
+        #vis fn __get_init_error() -> Option<&'static ::probers::runtime::failure::Error>
     }
 }
 

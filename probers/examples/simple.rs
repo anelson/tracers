@@ -1,7 +1,7 @@
 extern crate probers;
 
-use probers::probe;
-use probers::prober;
+use probers_macros::probe;
+use probers_macros::prober;
 
 #[prober]
 trait TestProbes {

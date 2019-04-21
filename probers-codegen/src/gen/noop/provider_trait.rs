@@ -101,7 +101,7 @@ impl ProviderTraitGenerator {
         let span = self.spec.item_trait().span();
         quote_spanned! {span=>
             mod #mod_name {
-                use probers::ProbeArgType;
+                use probers::runtime::ProbeArgType;
 
                 pub(super) struct #struct_type_name<T: ProbeArgType<T>> {
                     _t: ::std::marker::PhantomData<T>,

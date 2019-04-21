@@ -1,8 +1,8 @@
-use probers::probe;
-
-extern crate probers;
-
+use probers_macros::probe;
 use probers_macros::prober;
+
+extern crate probers_macros;
+
 #[prober]
 pub trait TestProbes {
     fn probe0();

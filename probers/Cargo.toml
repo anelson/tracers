@@ -23,23 +23,17 @@ required-features = [ "binaries" ]
 [dependencies]
 failure = "0.1.5"
 once_cell = "0.1.8"
-proc-macro-hack = "0.5"
-
 probers-core = { path = "../probers-core", version = "0.1.0" }
-probers-macros = { path = "../probers-macros", version = "0.1.0" }
-#
+probers-noop = { path = "../probers-noop", version = "0.1.0" }
+
+nom = { version = "4.2.3", optional = true, features = ["verbose-errors"] }
+
 [build-dependencies]
 probers-build = { path = "../probers-build", version = "0.1.0" }
 
-## This is only a fallback; not always used
-probers-noop = { path = "../probers-noop", version = "0.1.0" }
-
-proc-macro-hack = "0.5"
-
-failure = "0.1.5"
-once_cell = "0.1.8"
-
-nom = { version = "4.2.3", optional = true, features = ["verbose-errors"] }
+[dev-dependencies]
+# Our integration tests and examples assume the probers-macros are available
+probers-macros = { path = "../probers-macros", version = "0.1.0" }
 
 [target.'cfg(all(target_arch = "x86_64", target_os = "linux"))'.dependencies]
 probers-stap = { path = "../probers-stap", version = "0.1.0" }

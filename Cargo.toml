@@ -6,6 +6,7 @@ members = [
     "probers-codegen",
     "probers-core",
     "probers-macros",
+    "probers-macros-hack",
     "probers-noop",
     "probers-stap",
     "probers"

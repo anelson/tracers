@@ -132,10 +132,10 @@ impl ProviderTraitGenerator {
         let span = self.spec.item_trait().span();
         quote_spanned! {span=>
             mod #mod_name {
-                use ::probers::failure::{bail, Fallible};
-                use ::probers::{SystemTracer,SystemProvider,Provider};
-                use ::probers::{ProviderBuilder,Tracer};
-                use ::probers::once_cell::sync::OnceCell;
+                use ::probers::runtime::failure::{bail, Fallible};
+                use ::probers::runtime::{SystemTracer,SystemProvider, Provider};
+                use ::probers::runtime::{ProviderBuilder,Tracer};
+                use ::probers::runtime::once_cell::sync::OnceCell;
 
                 #[allow(dead_code)]
                 pub(super) struct #struct_type_name<#struct_type_params> {
@@ -463,7 +463,7 @@ impl ProbeGenerator {
 
         let span = self.spec.span;
         quote_spanned! {span=>
-            ::probers::ProviderProbe<#a_lifetime, ::probers::SystemProbe, #arg_tuple>
+            ::probers::runtime::ProviderProbe<#a_lifetime, ::probers::runtime::SystemProbe, #arg_tuple>
         }
     }
 
