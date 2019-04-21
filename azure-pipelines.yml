@@ -64,7 +64,7 @@ jobs:
           echo "##vso[task.setvariable variable=PROBERS_EXPECTED_IMPL;]no-op"
           cargo test --all -vv
         displayName: Cargo test NoOp implementation (Windows)
-        condition: ne( variables['Agent.OS'], 'Windows_NT' )
+        condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       # NB: Currently running with `--all-targets` causes a ICE due to this issue:
       # https://github.com/rust-lang/rust-clippy/issues/3741
