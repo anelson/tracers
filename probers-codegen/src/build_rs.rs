@@ -94,9 +94,7 @@ pub struct BuildInfo {
 
 impl BuildInfo {
     pub fn new(implementation: TracingImplementation) -> BuildInfo {
-        BuildInfo {
-            implementation: implementation,
-        }
+        BuildInfo { implementation }
     }
 
     pub fn load() -> Fallible<BuildInfo> {

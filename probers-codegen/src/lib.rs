@@ -141,7 +141,7 @@ macro_rules! with_impl {
 }
 
 fn choose_impl() -> ProberResult<TracingImplementation> {
-    let bi = BuildInfo::load().map_err(|e| ProberError::from_error(e))?;
+    let bi = BuildInfo::load().map_err(ProberError::from_error)?;
 
     Ok(bi.implementation)
 }
