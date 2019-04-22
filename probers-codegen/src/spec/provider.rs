@@ -1,5 +1,5 @@
 //! This module provides functionality to scan the AST of a Rust source file and identify
-//! `probe-rs` provider traits therein, as well as analyze those traits and produce `ProbeSpec`s for
+//! `probers` provider traits therein, as well as analyze those traits and produce `ProbeSpec`s for
 //! each of the probes they contain.  Once the provider traits have been discovered, other modules
 //! in this crate can then process them in various ways
 use crate::spec::ProbeSpecification;

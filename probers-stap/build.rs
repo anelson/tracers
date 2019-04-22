@@ -86,7 +86,7 @@ fn generate_stap_native_impl() -> String {
     let mut decl= r#"
         /// Implementation of `UnsafeProviderProbeNativeImpl` for SystemTap.
         ///
-        /// NB: While the `probe-rs` API supports probes with from 0 to 12 arguments, the libstapsdt library (or maybe SystemTap itself)
+        /// NB: While the `probers` API supports probes with from 0 to 12 arguments, the libstapsdt library (or maybe SystemTap itself)
         /// support up to 6.  This implementation must provide all arities from 0 to 12, but only the first 6 parameters are used.
         impl UnsafeProviderProbeNativeImpl for StapProbe
         {

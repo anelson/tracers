@@ -510,9 +510,9 @@ lazy_static! {
         //At this point, `testdata_dir` is the fully qualified path on the filesystem to the
         //`testdata` directory in `probers-codegen`.  The problem is that our test data include
         //complete crates with their own `Cargo.toml`.  When we run `cargo metadata` on those, it
-        //will fail because Cargo will assume these are part of the `probe-rs` workspace.
+        //will fail because Cargo will assume these are part of the `probers` workspace.
         //
-        //The only workaround is to create a temp directory OUTSIDE of the probe-rs source tree,
+        //The only workaround is to create a temp directory OUTSIDE of the probers source tree,
         //copy the data there, and use that.  it's...not pretty
         let temp_dir = tempdir().expect("Failed to create temporary directory").into_path();
 

@@ -1,10 +1,10 @@
-# probe-rs - Rust instrumentation library
+# probers - Rust instrumentation library
 
-[![Build Status](https://dev.azure.com/anelson-open-source/probe-rs/_apis/build/status/anelson.probe-rs?branchName=master)](https://dev.azure.com/anelson-open-source/probe-rs/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/anelson-open-source/probers/_apis/build/status/anelson.probers?branchName=master)](https://dev.azure.com/anelson-open-source/probers/_build/latest?definitionId=1&branchName=master)
 
 # Summary
 
-`probe-rs` is intended to be an easy to use and cross-platform Rust crate which makes it easy to add high-performance
+`probers` is intended to be an easy to use and cross-platform Rust crate which makes it easy to add high-performance
 low-overhead probes to Rust programs.  Underneath it will use each platform's native probing mechanism, like System Tap
 on Linux, DTrace on BSD, and ETW on Windows.  Those platforms without a supported probing mechanism will fall back to
 a no-op implementation.
@@ -16,7 +16,7 @@ or two CPU instructions.
 
 # Status
 
-*IMPORTANT*: `probe-rs` is still in the early experimental stages.  The author hereby guarantees it will not work on
+*IMPORTANT*: `probers` is still in the early experimental stages.  The author hereby guarantees it will not work on
 your system, may cause data loss, and definitely contributes to premature hair loss.  Do not use it.
 
 # License
@@ -37,7 +37,7 @@ corresponding to the third-party code which they wrap:
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in `probe-rs` by you, as defined in the Apache-2.0 license, shall be
+for inclusion in `probers` by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
 

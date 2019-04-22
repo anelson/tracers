@@ -187,7 +187,7 @@ impl ProbeGenerator {
 /// tests exercise the code with various test cases, and verify that the generator doesn't fail or
 /// panic.  But they do not verify that the generated code will compile.
 ///
-/// The integration tests and examples in the `probe-rs` parent crate do that.
+/// The integration tests and examples in the `probers` parent crate do that.
 #[cfg(test)]
 mod test {
     use super::*;
