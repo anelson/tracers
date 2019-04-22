@@ -1,18 +1,22 @@
 #![deny(warnings)]
 #![recursion_limit = "256"]
 
+use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
 use failure::{format_err, Fallible};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::Write;
 use std::io::{stderr, stdout};
 use std::path::{Path, PathBuf};
+use strum_macros::AsRefStr;
 
 mod argtypes;
+pub mod build_rs;
 mod cache;
 mod cargo;
 mod deps;
@@ -44,9 +48,42 @@ impl ProberError {
             span,
         }
     }
+
+    fn from_error(e: failure::Error) -> ProberError {
+        ProberError {
+            message: e.to_string(),
+            span: Span::call_site(),
+        }
+    }
 }
 
 pub type ProberResult<T> = std::result::Result<T, ProberError>;
+
+/// The available tracing implementations
+#[derive(Debug, AsRefStr, Serialize, Deserialize)]
+pub enum TracingImplementation {
+    #[strum(serialize = "native_noop")]
+    NativeNoOp,
+
+    #[strum(serialize = "dyn_stap")]
+    DynamicStap,
+
+    #[strum(serialize = "dyn_noop")]
+    DynamicNoOp,
+}
+
+impl TracingImplementation {
+    pub fn is_dynamic(&self) -> bool {
+        match self {
+            TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => true,
+            TracingImplementation::NativeNoOp => false,
+        }
+    }
+
+    pub fn is_native(&self) -> bool {
+        !self.is_dynamic()
+    }
+}
 
 /// Each probing implementation must implement this trait, which has components which are called at
 /// build-time from `build.rs` and also components invoked by the macros at compile time.  Though
@@ -81,13 +118,67 @@ pub trait CodeGenerator {
     ) -> Fallible<()>;
 }
 
-//On x86_04 linux, use the system tap tracer
-#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
-pub type Generator = gen::dynamic::DynamicGenerator;
+/// Implementation of `CodeGenerator` which delegates to the actual generator which corresponds to
+/// the implementation selected at build time and saved to disk somewhere in `$OUT_DIR` using the
+/// `BuildInfo` struct
+pub struct GeneratorSwitcher {}
 
-//On all other targets, use the no-op tracer
-#[cfg(not(any(all(target_arch = "x86_64", target_os = "linux"))))]
-pub type Generator = gen::noop::NoOpGenerator;
+/// A little macro to avoid excessive repetition.  Evaluates to an expression which calls `$method`
+/// with `$args` on the `CodeGenerator` implementation which correponds to the implementation
+/// returned by `choose_impl`
+macro_rules! with_impl {
+    ($method:ident ( $($args:expr),* ) ) => {
+        with_impl!(choose_impl(), $method ( $($args),* ) )
+    };
+    ($choose_impl:expr, $method:ident ( $($args:expr),* ) ) => {
+        $choose_impl.and_then(|imp| {
+            match imp {
+                TracingImplementation::NativeNoOp => gen::noop::NoOpGenerator::$method($($args),*),
+                TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => gen::dynamic::DynamicGenerator::$method($($args),*),
+            }
+        })
+    };
+}
+
+fn choose_impl() -> ProberResult<TracingImplementation> {
+    let bi = BuildInfo::load().map_err(|e| ProberError::from_error(e))?;
+
+    Ok(bi.implementation)
+}
+
+impl CodeGenerator for GeneratorSwitcher {
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream> {
+        with_impl!(handle_provider_trait(provider))
+    }
+
+    fn handle_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
+        with_impl!(handle_probe_call(call))
+    }
+
+    fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream> {
+        with_impl!(handle_provider_init(init))
+    }
+
+    fn generate_native_code<WOut: Write, WErr: Write>(
+        stdout: &mut WOut,
+        stderr: &mut WErr,
+        manifest_dir: &Path,
+        package_name: &str,
+        targets: Vec<PathBuf>,
+    ) -> Fallible<()> {
+        // Until we refactor ProberError to be compatible with `failure`-based errors, we need this
+        // hackery
+        let chosen_impl = choose_impl().map_err(|e| format_err!("{}", e.message));
+        with_impl!(
+            chosen_impl,
+            generate_native_code(stdout, stderr, manifest_dir, package_name, targets)
+        )
+    }
+}
+
+// Any other code that needs to refer to the current code generator impl does so through this type
+// alias.
+pub type Generator = GeneratorSwitcher;
 
 pub fn build() {
     match build_internal() {

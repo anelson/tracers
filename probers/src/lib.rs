@@ -21,31 +21,29 @@ pub mod runtime {
     // Re-export some types from child crates which callers will need to be able to use.  Ergonomically
     // it makes more sense to a caller to deal with, for example, `probers::Provider`
 
-    //Alias `SystemTracer` to the appropriate implementation based on the target OS
-    //This is messy and I wish cargo offered us something more elegant.
-    //
-    //Note that the dependencies in `Cargo.toml` must perfectly align with these conditionals to
-    //ensure the correct implementation crate is in fact a dependency.
-    //
-    //On x86_04 linux, use the system tap tracer
+    //Alias `SystemTracer` to the appropriate implementation based on the determination made in
+    //`build.rs`
     #[cfg(dyn_stap_enabled)]
     pub type SystemTracer = probers_dyn_stap::StapTracer;
-    //On all other targets, use the no-op tracer
-    #[cfg(noop_enabled)]
+
+    #[cfg(dyn_noop_enabled)]
     pub type SystemTracer = probers_noop::NoOpTracer;
 
+    #[cfg(dynamic_enabled)]
     pub type SystemProvider = <SystemTracer as Tracer>::ProviderType;
+
+    #[cfg(dynamic_enabled)]
     pub type SystemProbe = <SystemTracer as Tracer>::ProbeType;
 
 }
 
 #[cfg(test)]
 mod test {
-    #[cfg(enabled)]
+    #[cfg(dynamic_enabled)]
     use super::runtime::*;
 
     #[test]
-    #[cfg(enabled)]
+    #[cfg(dynamic_enabled)]
     fn verify_expected_tracing_impl() {
         //This very simple test checks the PROBERS_EXPECTED_IMPL env var, and if set, asserts that
         //the tracing implementation compiled into this library matches the expected one.  In

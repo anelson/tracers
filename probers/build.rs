@@ -1,48 +1,17 @@
 //! Custom build logic that uses the features enabled by the dependent crate to determine which
 //! tracing implementation to compile with
 use failure::{bail, Fallible};
+use probers_build::build_rs::FeatureFlags;
+use probers_build::TracingImplementation;
 use std::env;
 
-/// Struct which captures the features that were set in the `Cargo.toml` file of the dependent
-/// crate
-#[derive(Debug)]
-struct Features {
-    enable_tracing: bool,
-    force_tracing: bool,
-    force_dyn_stap: bool,
-    force_noop: bool,
-}
-
-impl Features {
-    pub fn from_env() -> Features {
-        Features {
-            enable_tracing: is_feature_enabled("enable_tracing"),
-            force_tracing: is_feature_enabled("force_tracing"),
-            force_dyn_stap: is_feature_enabled("force_dyn_stap"),
-            force_noop: is_feature_enabled("force_noop"),
-        }
-    }
-}
-
-fn is_feature_enabled(name: &str) -> bool {
-    env::var(&format!(
-        "CARGO_FEATURE_{}",
-        name.to_uppercase().replace("-", "_")
-    ))
-    .is_ok()
-}
-
 fn main() {
-    for (name, value) in std::env::vars() {
-        println!("{}={}", name, value);
-    }
-
-    let features = Features::from_env();
+    let features = FeatureFlags::from_env().unwrap();
 
     println!("Detected features: \n{:?}", features);
 
     //by default we don't do anything here unless this lib is explicitly enabled
-    if !features.enable_tracing {
+    if !features.enable_tracing() {
         println!("probers is not enabled; build skipped");
         return;
     }
@@ -51,42 +20,64 @@ fn main() {
         Ok(implementation) => {
             //Build succeeded, which means the Rust bindings should be enabled and
             //dependent crates should be signaled that this lib is available
-            println!("cargo:rustc-cfg=enabled");
-            println!("cargo:rustc-cfg={}_enabled", implementation);
+            println!("cargo:rustc-cfg=enabled"); // tracing is enabled generally
+            println!(
+                "cargo:rustc-cfg={}_enabled",
+                if implementation.is_native() {
+                    "native"
+                } else {
+                    "dynamic"
+                }
+            ); //this category of tracing is enabled
+            println!("cargo:rustc-cfg={}_enabled", implementation.as_ref()); //this specific impl is enabled
             println!("cargo:succeeded=1"); //this will set DEP_(PKGNAME)_SUCCEEDED in dependent builds
+
+            //All downstream creates from `probers` will just call `probers_build::build`, but this
+            //is a special case because we've already decided above which implementation to use.
+            //
+            //This decision needs to be saved to the OUT_DIR somewhere, so that all of our tests,
+            //examples, binaries, and benchmarks which use the proc macros will be able to generate
+            //the correct runtime tracing code to match the implementation we've chosen here
+            let build_info = probers_build::build_rs::BuildInfo::new(implementation);
+            if let Err(e) = build_info.save() {
+                println!("cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e);
+            }
         }
         Err(e) => {
-            if features.force_tracing {
-                panic!("probers build failed: {}", e);
-            } else {
-                println!("cargo:WARNING=probers-dyn-stap build failed: {}", e);
-                println!(
-                    "cargo:WARNING=the probers-dyn-stap bindings will not be included in the crate"
-                );
-            }
+            //failure here doesn't just mean one of the tracing impls failed to compile; when that
+            //happens we can always fall back to the no-op impl.  This means something happened
+            //which prevents us from proceeding with the build
+            eprintln!("{}", e);
+            panic!("probers build failed: {}", e);
         }
     }
 }
 
-fn select_implementation(features: &Features) -> Fallible<&'static str> {
+fn select_implementation(features: &FeatureFlags) -> Fallible<TracingImplementation> {
     //If any implementation is forced, then see if it's available and if so then accept it
-    if features.force_dyn_stap {
-        if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_err() {
-            bail!("force-dyn-stap is enabled but the dyn_stap library is not available")
-        } else {
-            return Ok("dyn_stap");
+    if features.enable_dynamic() {
+        // Pick some dynamic tracing impl
+        if features.force_dyn_stap() {
+            if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_err() {
+                bail!("force-dyn-stap is enabled but the dyn_stap library is not available")
+            } else {
+                return Ok(TracingImplementation::DynamicStap);
+            }
+        } else if features.force_dyn_noop() {
+            //no-op is always available on all platforms
+            return Ok(TracingImplementation::DynamicNoOp);
         }
-    } else if features.force_noop {
-        //no-op is always available on all platforms
-        return Ok("native_noop");
-    }
 
-    //Else no tracing impl has been forced so we get to decide
-    if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_ok() {
-        //use dyn_stap when it savailable
-        return Ok("dyn_stap");
+        //Else no tracing impl has been forced so we get to decide
+        if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_ok() {
+            //use dyn_stap when it savailable
+            return Ok(TracingImplementation::DynamicStap);
+        } else {
+            //else, fall back to noop
+            return Ok(TracingImplementation::DynamicNoOp);
+        }
     } else {
-        //else, fall back to noop
-        return Ok("native_noop");
+        // Pick some static tracing impl
+        Ok(TracingImplementation::NativeNoOp)
     }
 }
