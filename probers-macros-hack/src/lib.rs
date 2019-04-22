@@ -11,7 +11,7 @@ use proc_macro_hack::proc_macro_hack;
 pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
     match probe_impl(TokenStream::from(input)) {
         Ok(stream) => stream,
-        Err(err) => err.to_compiler_error(),
+        Err(err) => err.into_compiler_error(),
     }
     .into()
 }
@@ -20,7 +20,7 @@ pub fn probe(input: CompilerTokenStream) -> CompilerTokenStream {
 pub fn init_provider(input: CompilerTokenStream) -> CompilerTokenStream {
     match init_provider_impl(TokenStream::from(input)) {
         Ok(stream) => stream,
-        Err(err) => err.to_compiler_error(),
+        Err(err) => err.into_compiler_error(),
     }
     .into()
 }
@@ -29,7 +29,7 @@ pub fn init_provider(input: CompilerTokenStream) -> CompilerTokenStream {
 pub fn prober(_attr: CompilerTokenStream, item: CompilerTokenStream) -> CompilerTokenStream {
     match prober_impl(TokenStream::from(item)) {
         Ok(stream) => stream,
-        Err(err) => err.to_compiler_error(),
+        Err(err) => err.into_compiler_error(),
     }
     .into()
 }

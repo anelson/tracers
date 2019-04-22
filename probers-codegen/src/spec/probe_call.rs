@@ -149,9 +149,7 @@ impl ProbeCallDetails {
                 }
             },
             _ => {
-                            Err(ProbersError::invalid_call_expression(format!(
-                    "The probe! macro requires the name of a provider trait and its probe method, e.g. MyProvider::myprobe(...)"),
-                                    call))
+                Err(ProbersError::invalid_call_expression( "The probe! macro requires the name of a provider trait and its probe method, e.g. MyProvider::myprobe(...)", call))
             }
         }
     }

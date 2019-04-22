@@ -91,10 +91,13 @@ impl ProbersError {
         }
     }
 
-    pub fn invalid_call_expression<T: ToTokens>(message: String, element: T) -> ProbersError {
+    pub fn invalid_call_expression<T: ToTokens>(
+        message: impl AsRef<str>,
+        element: T,
+    ) -> ProbersError {
         ProbersError::InvalidCallExpression {
-            message: message.clone(),
-            syn_error: Self::new_syn_error(message, element),
+            message: message.as_ref().to_owned(),
+            syn_error: Self::new_syn_error(message.as_ref(), element),
         }
     }
 
@@ -125,7 +128,7 @@ impl ProbersError {
 
     /// Converts this error type into a `syn::Error`, preserving context from spans and elements if
     /// any were given
-    pub fn to_syn_error(self) -> syn::Error {
+    pub fn into_syn_error(self) -> syn::Error {
         match self {
             ProbersError::InvalidProvider { syn_error, .. } => Self::unwrap_syn_error(syn_error),
             ProbersError::SynError { syn_error, .. } => Self::unwrap_syn_error(syn_error),
@@ -143,8 +146,8 @@ impl ProbersError {
     /// stream it will evaluate to a compile error, with the span corresponding to whatever element
     /// was used to report the error.  For those error types that don't have a corresponding
     /// element, the call site of the macro will be used
-    pub fn to_compiler_error(self) -> TokenStream {
-        self.to_syn_error().to_compile_error()
+    pub fn into_compiler_error(self) -> TokenStream {
+        self.into_syn_error().to_compile_error()
     }
 
     fn new_syn_error<T: ToTokens, U: Display>(message: U, tokens: T) -> SynError {
