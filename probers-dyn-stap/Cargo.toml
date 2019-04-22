@@ -1,9 +1,15 @@
 [package]
-name = "probers-stap"
+name = "probers-dyn-stap"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
+description = """
+Implements the dynamic probing API using `libstapsdt`, which in turn uses Linux SystemTap underneath.
+
+Do not use this crate directly.  Always use the `probers` crate and let it auto-detect which implementation
+to use.
+"""
 
 # This is a hack.  Or maybe a workaround for a bug.
 #
@@ -13,7 +19,7 @@ license = "MIT/Apache-2.0"
 # can query the variables produced by this `build.rs` to detect if stap is available for us or not
 #
 # This will be unnecessary once https://github.com/rust-lang/cargo/issues/3544 is implemented
-links = "probers-stap"
+links = "probers-dyn-stap"
 
 [features]
 # by default, building the stap provider is disabled.  It must be explicitly enabled

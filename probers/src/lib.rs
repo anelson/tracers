@@ -28,8 +28,8 @@ pub mod runtime {
     //ensure the correct implementation crate is in fact a dependency.
     //
     //On x86_04 linux, use the system tap tracer
-    #[cfg(stap_enabled)]
-    pub type SystemTracer = probers_stap::StapTracer;
+    #[cfg(dyn_stap_enabled)]
+    pub type SystemTracer = probers_dyn_stap::StapTracer;
     //On all other targets, use the no-op tracer
     #[cfg(noop_enabled)]
     pub type SystemTracer = probers_noop::NoOpTracer;

@@ -9,7 +9,7 @@ use std::env;
 struct Features {
     enable_tracing: bool,
     force_tracing: bool,
-    force_stap: bool,
+    force_dyn_stap: bool,
     force_noop: bool,
 }
 
@@ -18,7 +18,7 @@ impl Features {
         Features {
             enable_tracing: is_feature_enabled("enable_tracing"),
             force_tracing: is_feature_enabled("force_tracing"),
-            force_stap: is_feature_enabled("force_stap"),
+            force_dyn_stap: is_feature_enabled("force_dyn_stap"),
             force_noop: is_feature_enabled("force_noop"),
         }
     }
@@ -59,9 +59,9 @@ fn main() {
             if features.force_tracing {
                 panic!("probers build failed: {}", e);
             } else {
-                println!("cargo:WARNING=probers-stap build failed: {}", e);
+                println!("cargo:WARNING=probers-dyn-stap build failed: {}", e);
                 println!(
-                    "cargo:WARNING=the probers-stap bindings will not be included in the crate"
+                    "cargo:WARNING=the probers-dyn-stap bindings will not be included in the crate"
                 );
             }
         }
@@ -70,23 +70,23 @@ fn main() {
 
 fn select_implementation(features: &Features) -> Fallible<&'static str> {
     //If any implementation is forced, then see if it's available and if so then accept it
-    if features.force_stap {
-        if env::var("DEP_PROBERS_STAP_SUCCEEDED").is_err() {
-            bail!("force-stap is enabled but the stap library is not available")
+    if features.force_dyn_stap {
+        if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_err() {
+            bail!("force-dyn-stap is enabled but the dyn_stap library is not available")
         } else {
-            return Ok("stap");
+            return Ok("dyn_stap");
         }
     } else if features.force_noop {
         //no-op is always available on all platforms
-        return Ok("noop");
+        return Ok("native_noop");
     }
 
     //Else no tracing impl has been forced so we get to decide
-    if env::var("DEP_PROBERS_STAP_SUCCEEDED").is_ok() {
-        //use stap when it savailable
-        return Ok("stap");
+    if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_ok() {
+        //use dyn_stap when it savailable
+        return Ok("dyn_stap");
     } else {
         //else, fall back to noop
-        return Ok("noop");
+        return Ok("native_noop");
     }
 }

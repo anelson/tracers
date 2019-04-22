@@ -18,11 +18,11 @@ fn is_required() -> bool {
 }
 
 fn main() {
-    println!("building probers-stap if enabled");
+    println!("building probers-dyn-stap if enabled");
 
     //by default we don't do anything here unless this lib is explicitly enabled
     if !is_enabled() {
-        println!("probers-stap is not enabled; build skipped");
+        println!("probers-dyn-stap is not enabled; build skipped");
         return;
     }
 
@@ -37,11 +37,11 @@ fn main() {
         }
         Err(e) => {
             if fail_on_error {
-                panic!("probers-stap build failed: {}", e);
+                panic!("probers-dyn-stap build failed: {}", e);
             } else {
-                println!("cargo:WARNING=probers-stap build failed: {}", e);
+                println!("cargo:WARNING=probers-dyn-stap build failed: {}", e);
                 println!(
-                    "cargo:WARNING=the probers-stap bindings will not be included in the crate"
+                    "cargo:WARNING=the probers-dyn-stap bindings will not be included in the crate"
                 );
             }
         }
@@ -50,7 +50,7 @@ fn main() {
 
 fn try_build() -> Fallible<()> {
     if env::var("DEP_STAPSDT_SUCCEEDED").is_err() {
-        bail!("probers-stap is not available because libstapsdt-sys did not build successfully")
+        bail!("probers-dyn-stap is not available because libstapsdt-sys did not build successfully")
     }
 
     let out_dir = env::var("OUT_DIR")?;
