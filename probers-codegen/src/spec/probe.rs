@@ -6,13 +6,12 @@
 //! the definition of a probe.
 
 use crate::spec::ProbeArgSpecification;
+use crate::{ProbersError, ProbersResult};
 use proc_macro2::Span;
 use std::fmt;
 use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
-
-use crate::{ProberError, ProberResult};
 
 pub struct ProbeSpecification {
     pub name: String,
@@ -51,48 +50,48 @@ impl ProbeSpecification {
     pub(crate) fn from_method(
         item: &ItemTrait,
         method: &TraitItemMethod,
-    ) -> ProberResult<ProbeSpecification> {
+    ) -> ProbersResult<ProbeSpecification> {
         if method.default != None {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
                 "Probe methods must NOT have a default implementation",
-                method.span(),
+                method,
             ));
         } else if method.sig.constness != None
             || method.sig.unsafety != None
             || method.sig.asyncness != None
             || method.sig.abi != None
         {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
                 "Probe methods cannot be `const`, `unsafe`, `async`, or `extern \"C\"`",
-                method.span(),
+                method,
             ));
         } else if method.sig.decl.generics.type_params().next() != None {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
             "Probe methods must not take any type parameters; generics are not supported in probes",
-            method.span(),
+            method,
         ));
         } else if method.sig.decl.variadic != None {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
                 "Probe methods cannot have variadic arguments",
-                method.span(),
+                method,
             ));
         } else if method.sig.decl.output != ReturnType::Default {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
                 "Probe methods must not have an explicit return type (they return `()` implicitly)",
-                method.span(),
+                method,
             ));
         };
 
         let first_arg = method.sig.decl.inputs.iter().next();
         if let Some(FnArg::SelfRef(_)) = first_arg {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
                 "Probe methods must not have any `&self` args",
-                method.span(),
+                method,
             ));
         } else if let Some(FnArg::SelfValue(_)) = first_arg {
-            return Err(ProberError::new(
+            return Err(ProbersError::invalid_provider(
                 "Probe methods must not have any `self` args",
-                method.span(),
+                method,
             ));
         }
 

@@ -1,5 +1,6 @@
 //! This module contains the code that is used within a dependent crate's `build.rs` file to select
 //! the suitable tracing implementation at build time.
+use crate::error::{ProbersError, ProbersResult};
 use crate::TracingImplementation;
 use failure::{bail, format_err, Fallible};
 use serde::{Deserialize, Serialize};
@@ -97,19 +98,18 @@ impl BuildInfo {
         BuildInfo { implementation }
     }
 
-    pub fn load() -> Fallible<BuildInfo> {
+    pub fn load() -> ProbersResult<BuildInfo> {
         let path = Self::get_build_path()?;
         let file = File::open(&path).map_err(|e| {
             //Create a more helpful message here
-            format_err!("Unable to read build info from '{}'.\nAre you sure you're calling `probers_build::build()` in your `build.rs`?\nError cause: {}",
-            path.display(), e)
+            ProbersError::build_info_read_error(path, e.into())
         })?;
         let reader = BufReader::new(file);
 
-        serde_json::from_reader(reader).map_err(std::convert::Into::into) //convert the error to a failure-compatible type
+        serde_json::from_reader(reader).map_err(ProbersError::other_error) //convert the error to a failure-compatible type
     }
 
-    pub fn save(&self) -> Fallible<()> {
+    pub fn save(&self) -> ProbersResult<()> {
         let path = Self::get_build_path()?;
 
         //Make sure the directory exists
@@ -122,10 +122,10 @@ impl BuildInfo {
             .unwrap_or(Ok(()))?;
 
         let file = File::create(&path)
-            .map_err(|e| format_err!("Error creating build info file {}: {}", path.display(), e))?;
+            .map_err(|e| ProbersError::build_info_write_error(path.clone(), e.into()))?;
         let writer = BufWriter::new(file);
         serde_json::to_writer(writer, self)
-            .map_err(|e| format_err!("Error saving cached results to {}: {}", path.display(), e))
+            .map_err(|e| ProbersError::build_info_write_error(path.clone(), e.into()))
     }
 
     fn get_build_path() -> Fallible<PathBuf> {

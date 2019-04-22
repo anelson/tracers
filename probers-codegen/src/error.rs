@@ -6,36 +6,19 @@
 
 use failure::Fail;
 use proc_macro2::Span;
+use proc_macro2::TokenStream;
 use quote::ToTokens;
 use std::fmt::Display;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-//use syn::spanned::Spanned;
 
 type SynError = Arc<Mutex<syn::Error>>;
-
-fn new_syn_error<T: ToTokens, U: Display>(message: U, tokens: T) -> SynError {
-    wrap_syn_error(syn::Error::new_spanned(tokens, message))
-}
-
-fn new_syn_error_span<U: Display>(message: U, element: Span) -> SynError {
-    wrap_syn_error(syn::Error::new(element, message))
-}
-
-fn wrap_syn_error(e: syn::Error) -> SynError {
-    Arc::new(Mutex::new(e))
-}
 
 #[derive(Debug, Fail)]
 pub enum ProbersError {
     #[fail(display = "There's a problem with this provider trait: {}", details)]
     InvalidProvider {
         details: String,
-        syn_error: SynError,
-    },
-
-    #[fail(display = "Legacy ProberError: {}", message)]
-    LegacyProberError {
-        message: String,
         syn_error: SynError,
     },
 
@@ -51,38 +34,135 @@ pub enum ProbersError {
         message: String,
         syn_error: SynError,
     },
+
+    #[fail(display = "{}", message)]
+    OtherError {
+        message: String,
+        #[fail(cause)]
+        error: failure::Error,
+    },
+
+    #[fail(
+        display = "Unable to read build info from '{}'.\nAre you sure you're calling `probers_build::build()` in your `build.rs`?\nError cause: {}",
+        build_info_path, message
+    )]
+    BuildInfoReadError {
+        message: String,
+        build_info_path: String,
+        #[fail(cause)]
+        error: failure::Error,
+    },
+
+    #[fail(
+        display = "Unable to write build info from '{}'.\nAre you sure you're calling `probers_build::build()` in your `build.rs`?\nError cause: {}",
+        build_info_path, message
+    )]
+    BuildInfoWriteError {
+        message: String,
+        build_info_path: String,
+        #[fail(cause)]
+        error: failure::Error,
+    },
 }
 
 unsafe impl Send for ProbersError {}
 unsafe impl Sync for ProbersError {}
 
-impl ProbersError {
-    pub fn invalid_provider<T: ToTokens>(message: &'static str, element: T) -> ProbersError {
-        ProbersError::InvalidProvider {
-            details: message.to_owned(),
-            syn_error: new_syn_error(message, element),
-        }
+impl PartialEq<ProbersError> for ProbersError {
+    fn eq(&self, other: &ProbersError) -> bool {
+        //There are a lot of types that don't support equality.  To keep it easy, just compare the
+        //display version
+        self.to_string() == other.to_string()
     }
+}
 
-    pub fn legacy_prober_error(e: crate::ProberError) -> ProbersError {
-        ProbersError::LegacyProberError {
-            message: e.message.clone(),
-            syn_error: new_syn_error_span(e.message, e.span),
+impl ProbersError {
+    pub fn invalid_provider<T: ToTokens>(message: impl AsRef<str>, element: T) -> ProbersError {
+        ProbersError::InvalidProvider {
+            details: message.as_ref().to_owned(),
+            syn_error: Self::new_syn_error(message.as_ref(), element),
         }
     }
 
     pub fn syn_error(message: impl AsRef<str>, e: syn::Error) -> ProbersError {
         ProbersError::SynError {
-            message: message.as_ref().to_owned(),
-            syn_error: wrap_syn_error(e),
+            message: format!("{}: {}", message.as_ref(), e),
+            syn_error: Self::wrap_syn_error(e),
         }
     }
 
     pub fn invalid_call_expression<T: ToTokens>(message: String, element: T) -> ProbersError {
         ProbersError::InvalidCallExpression {
             message: message.clone(),
-            syn_error: new_syn_error(message, element),
+            syn_error: Self::new_syn_error(message, element),
         }
+    }
+
+    pub fn other_error<E: Into<failure::Error>>(e: E) -> ProbersError {
+        let e = e.into();
+
+        ProbersError::OtherError {
+            message: e.to_string(),
+            error: e,
+        }
+    }
+
+    pub fn build_info_read_error(build_info_path: PathBuf, e: failure::Error) -> ProbersError {
+        ProbersError::BuildInfoReadError {
+            message: e.to_string(),
+            build_info_path: build_info_path.display().to_string(),
+            error: e,
+        }
+    }
+
+    pub fn build_info_write_error(build_info_path: PathBuf, e: failure::Error) -> ProbersError {
+        ProbersError::BuildInfoWriteError {
+            message: e.to_string(),
+            build_info_path: build_info_path.display().to_string(),
+            error: e,
+        }
+    }
+
+    /// Converts this error type into a `syn::Error`, preserving context from spans and elements if
+    /// any were given
+    pub fn to_syn_error(self) -> syn::Error {
+        match self {
+            ProbersError::InvalidProvider { syn_error, .. } => Self::unwrap_syn_error(syn_error),
+            ProbersError::SynError { syn_error, .. } => Self::unwrap_syn_error(syn_error),
+            ProbersError::InvalidCallExpression { syn_error, .. } => {
+                Self::unwrap_syn_error(syn_error)
+            }
+            ProbersError::OtherError { message, error } => {
+                syn::Error::new(Span::call_site(), format!("{}: {}", message, error))
+            }
+            others => syn::Error::new(Span::call_site(), others.to_string()),
+        }
+    }
+
+    /// Convert this error into a `TokenStream` such that when the compiler consumes the token
+    /// stream it will evaluate to a compile error, with the span corresponding to whatever element
+    /// was used to report the error.  For those error types that don't have a corresponding
+    /// element, the call site of the macro will be used
+    pub fn to_compiler_error(self) -> TokenStream {
+        self.to_syn_error().to_compile_error()
+    }
+
+    fn new_syn_error<T: ToTokens, U: Display>(message: U, tokens: T) -> SynError {
+        Self::wrap_syn_error(syn::Error::new_spanned(tokens, message))
+    }
+
+    fn wrap_syn_error(e: syn::Error) -> SynError {
+        Arc::new(Mutex::new(e))
+    }
+
+    fn unwrap_syn_error(e: SynError) -> syn::Error {
+        e.lock().unwrap().clone()
+    }
+}
+
+impl From<failure::Error> for ProbersError {
+    fn from(failure: failure::Error) -> ProbersError {
+        ProbersError::other_error(failure)
     }
 }
 

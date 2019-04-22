@@ -5,7 +5,7 @@
 use crate::gen::common;
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
-use crate::ProberResult;
+use crate::ProbersResult;
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote_spanned;
@@ -26,7 +26,7 @@ impl ProviderTraitGenerator {
         ProviderTraitGenerator { spec, probes }
     }
 
-    pub fn generate(&self) -> ProberResult<TokenStream> {
+    pub fn generate(&self) -> ProbersResult<TokenStream> {
         // Re-generate this trait as a struct with our probing implementation in it
         let prober_struct = self.generate_prober_struct()?;
 
@@ -45,7 +45,7 @@ impl ProviderTraitGenerator {
     /// However it's actually implemented as a `struct` with no member fields, with static methods
     /// implementing the probes.  Thus, given as input the `trait`, we produce a `struct` of the same
     /// name whose implementation actually performs the firing of the probes.
-    fn generate_prober_struct(&self) -> ProberResult<TokenStream> {
+    fn generate_prober_struct(&self) -> ProbersResult<TokenStream> {
         // From the probe specifications, generate the corresponding methods that will be on the probe
         // struct.
         let mod_name = self.get_provider_impl_mod_name();
@@ -139,7 +139,7 @@ impl ProbeGenerator {
         &self,
         provider: &ProviderTraitGenerator,
         struct_type_path: &syn::Path,
-    ) -> ProberResult<TokenStream> {
+    ) -> ProbersResult<TokenStream> {
         let vis = &self.spec.vis;
         let original_method = self.spec.original_method.sig.clone();
 

@@ -1,7 +1,7 @@
 //! This module parses the tokens passed to the `init_provider!` macro, validates them, and
 //! represents the tokens in a form that generators can easily make use of
 use crate::syn_helpers;
-use crate::{ProberError, ProberResult};
+use crate::{ProbersError, ProbersResult};
 use proc_macro2::TokenStream;
 use std::fmt;
 
@@ -42,14 +42,14 @@ impl fmt::Debug for ProviderInitSpecification {
 impl ProviderInitSpecification {
     /// Parses a token stream directly from the compiler, decomposing it into the details of the
     /// provider
-    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProviderInitSpecification> {
+    pub fn from_token_stream(tokens: TokenStream) -> ProbersResult<ProviderInitSpecification> {
         match syn::parse2::<syn::Path>(tokens) {
             Ok(path) => Self::from_path(path),
-            Err(e) => Err(ProberError::new(e.to_string(), e.span())),
+            Err(e) => Err(ProbersError::syn_error("Expected a type path", e)),
         }
     }
 
-    pub fn from_path(path: syn::Path) -> ProberResult<ProviderInitSpecification> {
+    pub fn from_path(path: syn::Path) -> ProbersResult<ProviderInitSpecification> {
         Ok(ProviderInitSpecification { provider: path })
     }
 }

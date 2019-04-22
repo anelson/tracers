@@ -8,11 +8,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
 use std::path::PathBuf;
-use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
 
-use crate::{ProberError, ProberResult};
+use crate::{ProbersError, ProbersResult};
 
 pub struct ProviderSpecification {
     name: String,
@@ -41,14 +40,14 @@ impl fmt::Debug for ProviderSpecification {
 }
 
 impl ProviderSpecification {
-    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProviderSpecification> {
+    pub fn from_token_stream(tokens: TokenStream) -> ProbersResult<ProviderSpecification> {
         match syn::parse2::<syn::ItemTrait>(tokens) {
             Ok(item_trait) => Self::from_trait(&item_trait),
-            Err(e) => Err(ProberError::new(e.to_string(), e.span())),
+            Err(e) => Err(ProbersError::syn_error("Expected a trait", e)),
         }
     }
 
-    pub fn from_trait(item_trait: &ItemTrait) -> ProberResult<ProviderSpecification> {
+    pub fn from_trait(item_trait: &ItemTrait) -> ProbersResult<ProviderSpecification> {
         let probes = find_probes(item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash_token_stream(&token_stream);
@@ -160,11 +159,11 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
 ///
 /// If the trait contains anything other than method declarations, or any of the declarations are
 /// not suitable as probes, an error is returned
-fn find_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
+fn find_probes(item: &ItemTrait) -> ProbersResult<Vec<ProbeSpecification>> {
     if item.generics.type_params().next() != None || item.generics.lifetimes().next() != None {
-        return Err(ProberError::new(
+        return Err(ProbersError::invalid_provider(
             "Probe traits must not take any lifetime or type parameters",
-            item.span(),
+            item,
         ));
     }
 
@@ -176,9 +175,9 @@ fn find_probes(item: &ItemTrait) -> ProberResult<Vec<ProbeSpecification>> {
                 specs.push(ProbeSpecification::from_method(item, m)?);
             }
             _ => {
-                return Err(ProberError::new(
+                return Err(ProbersError::invalid_provider(
                     "Probe traits must consist entirely of methods, no other contents",
-                    f.span(),
+                    f,
                 ));
             }
         }
@@ -271,7 +270,7 @@ mod test {
             );
 
             let expected_error_substring = test_trait.expected_error.unwrap();
-            let message = error.unwrap().message;
+            let message = error.unwrap().to_string();
             assert!(message.contains(expected_error_substring),
                 "The invalid trait '{}' should produce an error containing '{}' but instead it produced '{}'",
                 test_trait.description,

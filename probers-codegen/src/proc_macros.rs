@@ -6,7 +6,7 @@
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{ProberResult, ProbersResult};
+use crate::ProbersResult;
 use proc_macro2::TokenStream;
 use std::fmt::Display;
 
@@ -51,13 +51,13 @@ pub fn probe_impl(tokens: TokenStream) -> ProbersResult<TokenStream> {
     Generator::handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
 }
 
-pub fn init_provider_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
+pub fn init_provider_impl(tokens: TokenStream) -> ProbersResult<TokenStream> {
     Generator::handle_provider_init(ProviderInitSpecification::from_token_stream(tokens)?)
 }
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
 /// more testable
-pub fn prober_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
+pub fn prober_impl(tokens: TokenStream) -> ProbersResult<TokenStream> {
     Generator::handle_provider_trait(ProviderSpecification::from_token_stream(tokens)?)
 }
 

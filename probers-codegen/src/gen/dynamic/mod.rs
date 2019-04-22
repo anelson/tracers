@@ -11,8 +11,7 @@
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{CodeGenerator, ProberResult, ProbersResult};
-use failure::Fallible;
+use crate::{CodeGenerator, ProbersResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -24,7 +23,7 @@ mod provider_trait;
 pub struct DynamicGenerator {}
 
 impl CodeGenerator for DynamicGenerator {
-    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream> {
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProbersResult<TokenStream> {
         let generator = provider_trait::ProviderTraitGenerator::new(provider);
 
         generator.generate()
@@ -34,7 +33,7 @@ impl CodeGenerator for DynamicGenerator {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream> {
+    fn handle_provider_init(init: ProviderInitSpecification) -> ProbersResult<TokenStream> {
         provider_init::generate_provider_init(init)
     }
 
@@ -44,7 +43,7 @@ impl CodeGenerator for DynamicGenerator {
         _manifest_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,
-    ) -> Fallible<()> {
+    ) -> ProbersResult<()> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
         let _ = writeln!(

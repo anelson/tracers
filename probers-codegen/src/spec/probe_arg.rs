@@ -3,7 +3,7 @@
 use crate::argtypes;
 use crate::argtypes::ArgTypeInfo;
 use crate::syn_helpers;
-use crate::{ProberError, ProberResult};
+use crate::{ProbersError, ProbersResult};
 use std::fmt;
 use syn::spanned::Spanned;
 
@@ -36,7 +36,7 @@ impl ProbeArgSpecification {
         probe_method: &syn::TraitItemMethod,
         ordinal: usize,
         arg: &syn::FnArg,
-    ) -> ProberResult<ProbeArgSpecification> {
+    ) -> ProbersResult<ProbeArgSpecification> {
         //Apologies for the crazy match expression.  Rust's AST is a complicated beast
         //Many things can be function arguments in Rust; we only support the very basic form of:
         //`arg_name: some_type`
@@ -48,10 +48,10 @@ impl ProbeArgSpecification {
         {
             Self::from_ident_type_pair(probe_method, ordinal, pat_ident, ty)
         } else {
-            Err(ProberError::new(
-            &format!("Probe method arguments should be in the form `name: TypeName`; {} is not an expected argument", syn_helpers::convert_to_string(arg)),
-            arg.span(),
-        ))
+            return Err(ProbersError::invalid_provider(
+            format!("Probe method arguments should be in the form `name: TypeName`; {} is not an expected argument", syn_helpers::convert_to_string(arg)),
+            arg,
+        ));
         }
     }
 
@@ -62,7 +62,7 @@ impl ProbeArgSpecification {
         ordinal: usize,
         ident: &syn::PatIdent,
         typ: &syn::Type,
-    ) -> ProberResult<ProbeArgSpecification> {
+    ) -> ProbersResult<ProbeArgSpecification> {
         //Note the type is annotated right here with the added lifetime information.  It's easier
         //and faster then to compute the annotations on the fly
         if let Some(arg_type_info) = argtypes::from_syn_type(typ) {
@@ -80,13 +80,9 @@ impl ProbeArgSpecification {
                 arg_type_info,
             })
         } else {
-            Err(ProberError::new(
-                &format!("The argument type '{}' of argument '{}' on probe '{}' is not supported for probing.  Generally only the standard string, integer, and bool types, as well as references and Option's of the same, are supported",
-                         syn_helpers::convert_to_string(typ),
-                         ident.ident,
-                         probe_method.sig.ident),
-                typ.span(),
-            ))
+            return Err(ProbersError::invalid_provider(
+                    format!("The argument type '{}' of argument '{}' on probe '{}' is not supported for probing.  Generally only the standard string, integer, and bool types, as well as references and Option's of the same, are supported", syn_helpers::convert_to_string(typ), ident.ident, probe_method.sig.ident), typ,
+            ));
         }
     }
 
@@ -172,7 +168,7 @@ impl ProbeArgSpecification {
         probe_name: &str,
         arg_name: &str,
         syn_typ: &syn::Type,
-    ) -> ProberResult<syn::Type> {
+    ) -> ProbersResult<syn::Type> {
         fn generate_lifetime(
             probe_name: &str,
             arg_name: &str,
@@ -271,7 +267,7 @@ mod test {
         ]
     }
 
-    fn get_arg_from_test_case(case: &TestCase) -> ProberResult<ProbeArgSpecification> {
+    fn get_arg_from_test_case(case: &TestCase) -> ProbersResult<ProbeArgSpecification> {
         let tokens = &case.probe_method;
         let method: syn::TraitItemMethod = parse_quote! { #tokens };
         let arg = method

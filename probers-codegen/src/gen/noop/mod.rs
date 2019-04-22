@@ -12,8 +12,7 @@
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{CodeGenerator, ProberResult, ProbersResult};
-use failure::Fallible;
+use crate::{CodeGenerator, ProbersResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -25,7 +24,7 @@ mod provider_trait;
 pub struct NoOpGenerator {}
 
 impl CodeGenerator for NoOpGenerator {
-    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream> {
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProbersResult<TokenStream> {
         provider_trait::ProviderTraitGenerator::new(provider).generate()
     }
 
@@ -33,7 +32,7 @@ impl CodeGenerator for NoOpGenerator {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(_init: ProviderInitSpecification) -> ProberResult<TokenStream> {
+    fn handle_provider_init(_init: ProviderInitSpecification) -> ProbersResult<TokenStream> {
         unimplemented!()
     }
 
@@ -43,7 +42,7 @@ impl CodeGenerator for NoOpGenerator {
         _manifest_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,
-    ) -> Fallible<()> {
+    ) -> ProbersResult<()> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
         let _ = writeln!(

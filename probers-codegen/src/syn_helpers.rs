@@ -21,17 +21,17 @@ use syn::Ident;
 /// of transformation.  Originally I designed this so the closure would take a `&mut syn::Type`
 /// however I could not figure out how to make that work with a `FnMut` that is called recursively
 /// to the borrow checker's satisfaction.
-pub(super) fn transform_types<F: FnMut(&syn::Type) -> ProberResult<syn::Type>>(
+pub(super) fn transform_types<F: FnMut(&syn::Type) -> ProbersResult<syn::Type>>(
     typ: &syn::Type,
     mut f: F,
-) -> ProberResult<syn::Type> {
+) -> ProbersResult<syn::Type> {
     recurse_tree(&mut |t| f(t), typ)
 }
 
-fn recurse_tree<F: FnMut(&syn::Type) -> ProberResult<syn::Type>>(
+fn recurse_tree<F: FnMut(&syn::Type) -> ProbersResult<syn::Type>>(
     f: &mut F,
     typ: &syn::Type,
-) -> ProberResult<syn::Type> {
+) -> ProbersResult<syn::Type> {
     let mut new_typ = f(typ)?;
 
     //If this type itself takes type parameters, explore those recursively looking for
@@ -100,10 +100,10 @@ fn recurse_tree<F: FnMut(&syn::Type) -> ProberResult<syn::Type>>(
 
 /// `Path` is something of a special case that is complex enough to require its own
 /// function and which appears in multiple places.
-fn recurse_path<F: FnMut(&syn::Type) -> ProberResult<syn::Type>>(
+fn recurse_path<F: FnMut(&syn::Type) -> ProbersResult<syn::Type>>(
     f: &mut F,
     path: &syn::Path,
-) -> ProberResult<syn::Path> {
+) -> ProbersResult<syn::Path> {
     let mut path = path.clone();
     for seg in path.segments.iter_mut() {
         match seg.arguments {

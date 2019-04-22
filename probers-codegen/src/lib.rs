@@ -5,8 +5,7 @@ use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use failure::{format_err, Fallible};
-use proc_macro2::Span;
+use failure::format_err;
 use proc_macro2::TokenStream;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -27,40 +26,10 @@ pub mod proc_macros;
 pub mod spec;
 mod syn_helpers;
 
-pub use error::{ProbersError, ProbersResult};
+pub use error::*;
 
 #[cfg(test)]
 mod testdata;
-
-#[derive(Debug)]
-pub struct ProberError {
-    pub message: String,
-    pub span: Span,
-}
-
-impl PartialEq<ProberError> for ProberError {
-    fn eq(&self, other: &ProberError) -> bool {
-        self.message == other.message
-    }
-}
-
-impl ProberError {
-    fn new<M: ToString>(message: M, span: Span) -> ProberError {
-        ProberError {
-            message: message.to_string(),
-            span,
-        }
-    }
-
-    fn from_error(e: failure::Error) -> ProberError {
-        ProberError {
-            message: e.to_string(),
-            span: Span::call_site(),
-        }
-    }
-}
-
-pub type ProberResult<T> = std::result::Result<T, ProberError>;
 
 /// The available tracing implementations
 #[derive(Debug, AsRefStr, Serialize, Deserialize)]
@@ -95,7 +64,7 @@ impl TracingImplementation {
 pub trait CodeGenerator {
     /// Invoked by the `prober` attribute macro to process a probing provider declaration and
     /// generate whatever code is required there.
-    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream>;
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProbersResult<TokenStream>;
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
     fn handle_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream>;
@@ -103,7 +72,7 @@ pub trait CodeGenerator {
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will
     /// be done lazily on first use.
-    fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream>;
+    fn handle_provider_init(init: ProviderInitSpecification) -> ProbersResult<TokenStream>;
 
     /// This is invoked from within `build.rs` of the crate which is dependent upon `probers`.  It
     /// doesn't take much arguments because it interacts directly with cargo via environment
@@ -118,7 +87,7 @@ pub trait CodeGenerator {
         manifest_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
-    ) -> Fallible<()>;
+    ) -> ProbersResult<()>;
 }
 
 /// Implementation of `CodeGenerator` which delegates to the actual generator which corresponds to
@@ -143,24 +112,22 @@ macro_rules! with_impl {
     };
 }
 
-fn choose_impl() -> ProberResult<TracingImplementation> {
-    let bi = BuildInfo::load().map_err(ProberError::from_error)?;
+fn choose_impl() -> ProbersResult<TracingImplementation> {
+    let bi = BuildInfo::load()?;
 
     Ok(bi.implementation)
 }
 
 impl CodeGenerator for GeneratorSwitcher {
-    fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream> {
+    fn handle_provider_trait(provider: ProviderSpecification) -> ProbersResult<TokenStream> {
         with_impl!(handle_provider_trait(provider))
     }
 
     fn handle_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream> {
-        //TODO: remove once we get rid of ProberResult
-        let chosen_impl = choose_impl().map_err(ProbersError::legacy_prober_error);
-        with_impl!(chosen_impl, handle_probe_call(call))
+        with_impl!(handle_probe_call(call))
     }
 
-    fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream> {
+    fn handle_provider_init(init: ProviderInitSpecification) -> ProbersResult<TokenStream> {
         with_impl!(handle_provider_init(init))
     }
 
@@ -170,15 +137,16 @@ impl CodeGenerator for GeneratorSwitcher {
         manifest_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
-    ) -> Fallible<()> {
+    ) -> ProbersResult<()> {
         // Until we refactor ProberError to be compatible with `failure`-based errors, we need this
         // hackery
-        //TODO: remove once we get rid of ProberResult
-        let chosen_impl = choose_impl().map_err(|e| format_err!("{}", e.message));
-        with_impl!(
-            chosen_impl,
-            generate_native_code(stdout, stderr, manifest_dir, package_name, targets)
-        )
+        with_impl!(generate_native_code(
+            stdout,
+            stderr,
+            manifest_dir,
+            package_name,
+            targets
+        ))
     }
 }
 
@@ -193,7 +161,7 @@ pub fn build() {
     }
 }
 
-pub fn build_internal() -> Fallible<()> {
+pub fn build_internal() -> ProbersResult<()> {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").map_err(|_| {
         format_err!(
             "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?"
