@@ -3,12 +3,12 @@
 //! dependency and exposed via the `SystemTracer` type alias.
 
 use crate::spec::ProbeCallSpecification;
-use crate::ProberResult;
+use crate::ProbersResult;
 use proc_macro2::TokenStream;
 use quote::quote_spanned;
 use syn::spanned::Spanned;
 
-pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
+pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream> {
     match call {
         ProbeCallSpecification::FireOnly(details) => {
             //The no-op implementation doesn't permute the probe name at all, it's just called

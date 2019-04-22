@@ -1,10 +1,9 @@
 //! This module handles parsing calls to a probe made using the `probe!` proc macro, decomposing
 //! them into the discrete components, and validating the call is syntactically valid.
 use crate::syn_helpers;
-use crate::{ProberError, ProberResult};
+use crate::{ProbersError, ProbersResult};
 use proc_macro2::TokenStream;
 use std::fmt;
-use syn::spanned::Spanned;
 
 /// There are two kinds of probe calls:
 ///
@@ -44,13 +43,16 @@ pub enum ProbeCallSpecification {
 }
 
 impl ProbeCallSpecification {
-    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCallSpecification> {
+    pub fn from_token_stream(tokens: TokenStream) -> ProbersResult<ProbeCallSpecification> {
         //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
         match syn::parse2::<syn::Expr>(tokens) {
             Ok(call) => {
                 ProbeCallDetails::from_call_expression(call).map(ProbeCallSpecification::FireOnly)
             }
-            Err(e) => Err(ProberError::new(e.to_string(), e.span())),
+            Err(e) => Err(ProbersError::syn_error(
+                "Expecting a Rust function call expression",
+                e,
+            )),
         }
     }
 }
@@ -96,35 +98,22 @@ impl fmt::Debug for ProbeCallDetails {
 }
 
 impl ProbeCallDetails {
-    /// Parses a token stream directly from the compiler, decomposing it into the details of the
-    /// call
-    pub fn from_token_stream(tokens: TokenStream) -> ProberResult<ProbeCallSpecification> {
-        //TODO: Also try matching on a Block expression to support the `FireWithCode` variation
-        match syn::parse2::<syn::Expr>(tokens) {
-            Ok(call) => Self::from_call_expression(call).map(ProbeCallSpecification::FireOnly),
-            Err(e) => Err(ProberError::new(
-                format!("Expected a function call expression: {}", e.to_string()),
-                e.span(),
-            )),
-        }
-    }
-
     /// Parses a single expression which should be a call to the probe function.  This implies that
     /// the probe call is `FireOnly`, since a block of code would take a different form.
-    pub fn from_call_expression(call: syn::Expr) -> ProberResult<ProbeCallDetails> {
+    pub fn from_call_expression(call: syn::Expr) -> ProbersResult<ProbeCallDetails> {
         match call {
             syn::Expr::Call(call) => {
                 // Within this call is encoded all the information we need about the probe firing,
                 // we just have to extract it
-                let span = call.span();
                 let func = call.func.as_ref().clone();
 
                 if let syn::Expr::Path(func) = func {
                     if func.path.segments.len() < 2 {
-                        return Err(ProberError::new(format!(
+                        return Err(
+                            ProbersError::invalid_call_expression(format!(
                             "The expression '{0}' is missing the name of the provider trait, eg 'MyProviderTrait::{0}'",
-                            syn_helpers::convert_to_string(&call)
-                        ), span));
+                            syn_helpers::convert_to_string(&call)),
+                                    func));
                     }
 
                     let mut provider = func.path.clone();
@@ -153,20 +142,16 @@ impl ProbeCallDetails {
                         args,
                     })
                 } else {
-                    return Err(ProberError::new(
-                        format!(
+                            return Err(ProbersError::invalid_call_expression(format!(
                             "Unexpected expression for function call: {}",
-                            syn_helpers::convert_to_string(&func)
-                        ),
-                        span,
-                    ));
+                            syn_helpers::convert_to_string(&func)),
+                                    func));
                 }
-            }
+            },
             _ => {
-                Err(ProberError::new(
-                    "The probe! macro requires the name of a provider trait and its probe method, e.g. MyProvider::myprobe(...)",
-                    call.span(),
-                    ))
+                            Err(ProbersError::invalid_call_expression(format!(
+                    "The probe! macro requires the name of a provider trait and its probe method, e.g. MyProvider::myprobe(...)"),
+                                    call))
             }
         }
     }
@@ -195,10 +180,10 @@ mod test {
                         call_str
                     ),
                     Err(e) => assert!(
-                        e.message.contains(error_msg),
+                        e.to_string().contains(error_msg),
                         "Expected substring '{}' in error message '{}'",
                         error_msg,
-                        e.message
+                        e.to_string()
                     ),
                 },
             }

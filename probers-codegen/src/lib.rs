@@ -20,11 +20,14 @@ pub mod build_rs;
 mod cache;
 mod cargo;
 mod deps;
+mod error;
 pub mod gen;
 mod hashing;
 pub mod proc_macros;
 pub mod spec;
 mod syn_helpers;
+
+pub use error::{ProbersError, ProbersResult};
 
 #[cfg(test)]
 mod testdata;
@@ -95,7 +98,7 @@ pub trait CodeGenerator {
     fn handle_provider_trait(provider: ProviderSpecification) -> ProberResult<TokenStream>;
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
-    fn handle_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream>;
+    fn handle_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream>;
 
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will
@@ -151,8 +154,10 @@ impl CodeGenerator for GeneratorSwitcher {
         with_impl!(handle_provider_trait(provider))
     }
 
-    fn handle_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
-        with_impl!(handle_probe_call(call))
+    fn handle_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream> {
+        //TODO: remove once we get rid of ProberResult
+        let chosen_impl = choose_impl().map_err(ProbersError::legacy_prober_error);
+        with_impl!(chosen_impl, handle_probe_call(call))
     }
 
     fn handle_provider_init(init: ProviderInitSpecification) -> ProberResult<TokenStream> {
@@ -168,6 +173,7 @@ impl CodeGenerator for GeneratorSwitcher {
     ) -> Fallible<()> {
         // Until we refactor ProberError to be compatible with `failure`-based errors, we need this
         // hackery
+        //TODO: remove once we get rid of ProberResult
         let chosen_impl = choose_impl().map_err(|e| format_err!("{}", e.message));
         with_impl!(
             chosen_impl,

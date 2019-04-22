@@ -6,7 +6,7 @@
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::ProberResult;
+use crate::{ProberResult, ProbersResult};
 use proc_macro2::TokenStream;
 use std::fmt::Display;
 
@@ -47,7 +47,7 @@ pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> T
 ///
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
-pub fn probe_impl(tokens: TokenStream) -> ProberResult<TokenStream> {
+pub fn probe_impl(tokens: TokenStream) -> ProbersResult<TokenStream> {
     Generator::handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
 }
 

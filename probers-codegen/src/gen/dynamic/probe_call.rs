@@ -3,7 +3,7 @@
 //! dependency and exposed via the `SystemTracer` type alias.
 
 use crate::spec::ProbeCallSpecification;
-use crate::ProberResult;
+use crate::ProbersResult;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
@@ -33,7 +33,7 @@ use syn::spanned::Spanned;
 ///
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
-pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
+pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream> {
     match call {
         ProbeCallSpecification::FireOnly(details) => {
             //Easy one.  This call is already set up like a Rust method call on the probe method of

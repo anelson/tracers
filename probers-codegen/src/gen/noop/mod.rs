@@ -12,7 +12,7 @@
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{CodeGenerator, ProberResult};
+use crate::{CodeGenerator, ProberResult, ProbersResult};
 use failure::Fallible;
 use proc_macro2::TokenStream;
 use std::io::Write;
@@ -29,7 +29,7 @@ impl CodeGenerator for NoOpGenerator {
         provider_trait::ProviderTraitGenerator::new(provider).generate()
     }
 
-    fn handle_probe_call(call: ProbeCallSpecification) -> ProberResult<TokenStream> {
+    fn handle_probe_call(call: ProbeCallSpecification) -> ProbersResult<TokenStream> {
         probe_call::generate_probe_call(call)
     }
 
