@@ -107,7 +107,7 @@ impl ProviderTraitGenerator {
                 impl<T: ProbeArgType<T>> #struct_type_name<T> {
                     #[allow(dead_code)]
                     pub fn wrap(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
-                        ::probers::wrap::<T>(arg)
+                        ::probers::runtime::wrap::<T>(arg)
                     }
                 }
             }
