@@ -9,12 +9,16 @@
 
 use crate::spec::ProbeCallDetails;
 use crate::spec::ProbeCallSpecification;
+#[cfg(target_os = "windows")]
+use dunce::canonicalize; //on Windows the dunce implementation avoids UNC paths which break things
 use fs_extra::{copy_items, dir};
 use lazy_static::lazy_static;
 use probers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
+#[cfg(not(target_os = "windows"))]
+use std::fs::canonicalize; //on non-Windows just use the built-in function
 use std::path::PathBuf;
 use tempfile::tempdir;
 
@@ -502,16 +506,11 @@ lazy_static! {
         //with the src file's relative path to get the absolute path, then canonicalize
         let workspace_dir = manifest_dir.parent().expect("Manifest dir has no parent that's not possible");
         let src_path = workspace_dir.join(src_file);
-        let mut src_dir = std::fs::canonicalize(&src_path).expect(&format!("Failed to canonicalize source path: {}", &src_path.display()));
+        let mut src_dir = canonicalize(&src_path).expect(&format!("Failed to canonicalize source path: {}", &src_path.display()));
         src_dir.pop();
 
         let testdata_dir = src_dir.join("..").join("testdata");
-        let testdata_dir = std::fs::canonicalize(&testdata_dir).expect(&format!("Failed to canonicalize test data path: {}", &testdata_dir.display()));
-
-        //On windows there's a further canonicalization step necessary to produce a workable
-        //non-UNC path
-        #[cfg(target_os = "windows")]
-        let testdata_dir = dunce::simplified(&testdata_dir).to_owned();
+        let testdata_dir = canonicalize(&testdata_dir).expect(&format!("Failed to canonicalize test data path: {}", &testdata_dir.display()));
 
         //At this point, `testdata_dir` is the fully qualified path on the filesystem to the
         //`testdata` directory in `probers-codegen`.  The problem is that our test data include
