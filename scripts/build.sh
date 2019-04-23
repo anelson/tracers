@@ -5,7 +5,5 @@ set -u
 set -e
 
 cargo build \
-    --package probers \
-    --package probers-macros \
     "$@"
 
