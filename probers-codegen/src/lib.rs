@@ -5,7 +5,7 @@ use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use failure::format_err;
+use failure::ResultExt;
 use proc_macro2::TokenStream;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -162,13 +162,11 @@ pub fn build() {
 }
 
 pub fn build_internal() -> ProbersResult<()> {
-    let manifest_path = env::var("CARGO_MANIFEST_DIR").map_err(|_| {
-        format_err!(
-            "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?"
-        )
-    })?;
+    let manifest_path = env::var("CARGO_MANIFEST_DIR").context(
+        "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?",
+    )?;
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
-    let targets = cargo::get_targets(&manifest_path, &package_name)?;
+    let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
     let stdout = stdout();
     let stderr = stderr();

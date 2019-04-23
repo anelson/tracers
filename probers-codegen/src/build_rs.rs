@@ -2,7 +2,8 @@
 //! the suitable tracing implementation at build time.
 use crate::error::{ProbersError, ProbersResult};
 use crate::TracingImplementation;
-use failure::{bail, format_err, Fallible};
+use failure::ResultExt;
+use failure::{bail, Fallible};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
@@ -99,25 +100,34 @@ impl BuildInfo {
     }
 
     pub fn load() -> ProbersResult<BuildInfo> {
-        let path = Self::get_build_path()?;
-        let file = File::open(&path).map_err(|e| {
-            //Create a more helpful message here
-            ProbersError::build_info_read_error(path, e.into())
+        let path = Self::get_build_path().map_err(|e| {
+            ProbersError::build_info_read_error(
+                PathBuf::from("[error getting build path]"),
+                e.into(),
+            )
         })?;
+
+        let file = File::open(&path)
+            .map_err(|e| ProbersError::build_info_read_error(path.clone(), e.into()))?;
         let reader = BufReader::new(file);
 
-        serde_json::from_reader(reader).map_err(ProbersError::other_error) //convert the error to a failure-compatible type
+        serde_json::from_reader(reader)
+            .map_err(|e| ProbersError::build_info_read_error(path.clone(), e.into()))
     }
 
-    pub fn save(&self) -> ProbersResult<()> {
-        let path = Self::get_build_path()?;
+    pub fn save(&self) -> ProbersResult<PathBuf> {
+        let path = Self::get_build_path().map_err(|e| {
+            ProbersError::build_info_write_error(
+                PathBuf::from("[error getting build path]"),
+                e.into(),
+            )
+        })?;
 
         //Make sure the directory exists
         path.parent()
             .map(|p| {
-                std::fs::create_dir_all(p).map_err(|e| {
-                    format_err!("Error creating output directory {}: {}", p.display(), e)
-                })
+                std::fs::create_dir_all(p)
+                    .map_err(|e| ProbersError::build_info_write_error(path.clone(), e.into()))
             })
             .unwrap_or(Ok(()))?;
 
@@ -125,15 +135,20 @@ impl BuildInfo {
             .map_err(|e| ProbersError::build_info_write_error(path.clone(), e.into()))?;
         let writer = BufWriter::new(file);
         serde_json::to_writer(writer, self)
-            .map_err(|e| ProbersError::build_info_write_error(path.clone(), e.into()))
+            .map_err(|e| ProbersError::build_info_write_error(path.clone(), e.into()))?;
+
+        Ok(path)
     }
 
-    fn get_build_path() -> Fallible<PathBuf> {
+    fn get_build_path() -> Result<PathBuf, failure::Context<&'static str>> {
+        for (key, value) in env::vars() {
+            println!("{}={}", key, value);
+        }
         let rel_path = PathBuf::from(&format!(
             "{}-{}/buildinfo.json",
-            env::var("CARGO_PKG_NAME")?,
-            env::var("CARGO_PKG_VERSION")?
+            env::var("CARGO_PKG_NAME").context("CARGO_PKG_NAME")?,
+            env::var("CARGO_PKG_VERSION").context("CARGO_PKG_VERSION")?
         ));
-        Ok(PathBuf::from(env::var("OUT_DIR")?).join(rel_path))
+        Ok(PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join(rel_path))
     }
 }
