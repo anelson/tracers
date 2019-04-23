@@ -53,6 +53,10 @@ pub enum ProbersError {
         #[fail(cause)]
         error: Error,
     },
+
+    CodeGenerationError {
+        message: String,
+    },
 }
 
 impl Display for ProbersError {
@@ -65,6 +69,7 @@ impl Display for ProbersError {
             ProbersError::MissingCallInBuildRs => write!(f, "Build environment is incomplete; make sure you are calling `probers_build::build()` in your `build.rs` build script"),
             ProbersError::BuildInfoReadError { message, .. } => write!(f, "{}", message),
             ProbersError::BuildInfoWriteError { message, .. } => write!(f, "{}", message),
+            ProbersError::CodeGenerationError { message } => write!(f, "Error generating probing code: {}", message)
         }
     }
 }
@@ -153,6 +158,12 @@ impl ProbersError {
             message,
             build_info_path: build_info_path.display().to_string(),
             error: e,
+        }
+    }
+
+    pub fn code_generation_error<S: AsRef<str>>(message: S) -> ProbersError {
+        ProbersError::CodeGenerationError {
+            message: message.as_ref().to_owned(),
         }
     }
 

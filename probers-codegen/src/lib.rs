@@ -31,7 +31,7 @@ pub use build_rs::build;
 mod testdata;
 
 /// The available tracing implementations
-#[derive(Debug, AsRefStr, Serialize, Deserialize)]
+#[derive(Debug, AsRefStr, Serialize, Deserialize, PartialEq)]
 pub enum TracingImplementation {
     #[strum(serialize = "native_noop")]
     NativeNoOp,

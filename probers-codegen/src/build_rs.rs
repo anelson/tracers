@@ -7,17 +7,16 @@ use crate::error::{ProbersError, ProbersResult};
 use crate::TracingImplementation;
 use crate::{CodeGenerator, Generator};
 use failure::ResultExt;
-use failure::{bail, Fallible};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::File;
-use std::io::{stderr, stdout};
+use std::io::Write;
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 
 /// Captures the features enabled for the build.  There are various combinations of them which
 /// influence the logic related to what implementation is preferred
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FeatureFlags {
     enable_dynamic_tracing: bool,
     enable_native_tracing: bool,
@@ -29,7 +28,7 @@ impl FeatureFlags {
     /// Read the feature flags from the environment variables set by Cargo at build time.
     ///
     /// Fails with an error if the combination of features is not valid
-    pub fn from_env() -> Fallible<FeatureFlags> {
+    pub fn from_env() -> ProbersResult<FeatureFlags> {
         Self::new(
             Self::is_feature_enabled("enable-dynamic-tracing"),
             Self::is_feature_enabled("enable-native-tracing"),
@@ -44,13 +43,13 @@ impl FeatureFlags {
         enable_native_tracing: bool,
         force_dyn_stap: bool,
         force_dyn_noop: bool,
-    ) -> Fallible<FeatureFlags> {
+    ) -> ProbersResult<FeatureFlags> {
         if enable_dynamic_tracing && enable_native_tracing {
-            bail!("The features `enable-dynamic-tracing` and `enable-native-tracing` are mutually exclusive; please choose one")
+            return Err(ProbersError::code_generation_error("The features `enable-dynamic-tracing` and `enable-native-tracing` are mutually exclusive; please choose one"));
         }
 
         if force_dyn_stap && force_dyn_noop {
-            bail!("The features `force-dyn-stap` and `force_dyn_noop` are mutually exclusive; please choose one")
+            return Err(ProbersError::code_generation_error("The features `force-dyn-stap` and `force_dyn_noop` are mutually exclusive; please choose one"));
         }
 
         Ok(FeatureFlags {
@@ -94,7 +93,7 @@ impl FeatureFlags {
 
 /// Serializable struct which is populated in `build.rs` to indicate to the proc macros which
 /// tracing implementation they should use.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BuildInfo {
     pub implementation: TracingImplementation,
 }
@@ -172,7 +171,7 @@ impl BuildInfo {
             ));
 
             Ok(PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join(rel_path))
-        } else if let Some(build_info_path) = env::var("DEP_PROBERS_INFO_PATH").ok() {
+        } else if let Some(build_info_path) = env::var("DEP_PROBERS_BUILD_INFO_PATH").ok() {
             //This is context #2 in the comment above
             Ok(PathBuf::from(build_info_path))
         } else if let Some(build_info_path) = env::var("PROBERS_BUILD_INFO_PATH").ok() {
@@ -196,7 +195,7 @@ impl BuildInfo {
 ///
 /// It should be the first line in the `main()` function, etc:
 ///
-/// ```
+/// ```no_execute
 /// // build.rs
 /// use probers_build::build;
 ///
@@ -207,32 +206,26 @@ impl BuildInfo {
 /// }
 /// ```
 pub fn build() {
-    match build_internal() {
-        Ok(_) => println!("probes build succeeded"),
-        Err(e) => eprintln!("Error building probes: {}", e),
-    }
+    let stdout = std::io::stdout();
+    let stderr = std::io::stderr();
+
+    let mut out_handle = stdout.lock();
+    let mut err_handle = stderr.lock();
+
+    match build_internal(&mut out_handle, &mut err_handle) {
+        Ok(_) => writeln!(out_handle, "probes build succeeded").unwrap(),
+        Err(e) => writeln!(err_handle, "Error building probes: {}", e).unwrap(),
+    };
 }
 
-fn build_internal() -> ProbersResult<()> {
+fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> ProbersResult<()> {
     let manifest_path = env::var("CARGO_MANIFEST_DIR").context(
         "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?",
     )?;
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
-    let stdout = stdout();
-    let stderr = stderr();
-
-    let mut outhandle = stdout.lock();
-    let mut errhandle = stderr.lock();
-
-    Generator::generate_native_code(
-        &mut outhandle,
-        &mut errhandle,
-        &Path::new(&manifest_path),
-        &package_name,
-        targets,
-    )
+    Generator::generate_native_code(out, err, &Path::new(&manifest_path), &package_name, targets)
 }
 
 /// This function is the counterpart to `build`, which is intended to be invoked in the `probers`
@@ -240,30 +233,41 @@ fn build_internal() -> ProbersResult<()> {
 /// other information about the target sytem and the local build environment selects an
 /// implementation to use, or panics if no suitable implementation is possible
 pub fn probers_build() {
-    let features = FeatureFlags::from_env().unwrap();
+    let stdout = std::io::stdout();
+    let stderr = std::io::stderr();
 
-    println!("Detected features: \n{:?}", features);
+    let mut out_handle = stdout.lock();
+    let mut err_handle = stderr.lock();
 
-    //by default we don't do anything here unless this lib is explicitly enabled
-    if !features.enable_tracing() {
-        println!("probers is not enabled; build skipped");
-        return;
+    let features = FeatureFlags::from_env().expect("Invalid feature flags");
+
+    match probers_build_internal(&mut out_handle, features) {
+        Ok(_) => {}
+        Err(e) => {
+            //failure here doesn't just mean one of the tracing impls failed to compile; when that
+            //happens we can always fall back to the no-op impl.  This means something happened
+            //which prevents us from proceeding with the build
+            writeln!(err_handle, "{}", e).unwrap();
+            panic!("probers build failed: {}", e);
+        }
     }
+}
 
-    match select_implementation(&features) {
-        Ok(implementation) => {
+fn probers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> ProbersResult<()> {
+    writeln!(out, "Detected features: \n{:?}", features).unwrap();
+
+    select_implementation(&features).map(|implementation| {
             //Build succeeded, which means the Rust bindings should be enabled and
             //dependent crates should be signaled that this lib is available
-            println!("cargo:rustc-cfg=enabled"); // tracing is enabled generally
-            println!(
+            writeln!(out,
                 "cargo:rustc-cfg={}_enabled",
                 if implementation.is_native() {
                     "native"
                 } else {
                     "dynamic"
                 }
-            ); //this category of tracing is enabled
-            println!("cargo:rustc-cfg={}_enabled", implementation.as_ref()); //this specific impl is enabled
+            ).unwrap(); //this category of tracing is enabled
+            writeln!(out, "cargo:rustc-cfg={}_enabled", implementation.as_ref()).unwrap(); //this specific impl is enabled
 
             //All downstream creates from `probers` will just call `probers_build::build`, but this
             //is a special case because we've already decided above which implementation to use.
@@ -280,31 +284,29 @@ pub fn probers_build() {
                     //
                     //The codegen stuff in `probers_build::build` will use this to determine what code
                     //generator to use
-                    println!("cargo:build-info-path={}", build_info_path.display());
+                    writeln!(out, "cargo:build-info-path={}", build_info_path.display()).unwrap();
                 }
                 Err(e) => {
-                    println!("cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e);
+                    writeln!(out, "cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e).unwrap();
                 }
             }
-        }
-        Err(e) => {
-            //failure here doesn't just mean one of the tracing impls failed to compile; when that
-            //happens we can always fall back to the no-op impl.  This means something happened
-            //which prevents us from proceeding with the build
-            eprintln!("{}", e);
-            panic!("probers build failed: {}", e);
-        }
-    }
+    })
 }
 
 /// Selects a `probers` implementation given a set of feature flags specified by the user
-fn select_implementation(features: &FeatureFlags) -> Fallible<TracingImplementation> {
+fn select_implementation(features: &FeatureFlags) -> ProbersResult<TracingImplementation> {
+    if !features.enable_tracing() {
+        return Ok(TracingImplementation::NativeNoOp);
+    }
+
     //If any implementation is forced, then see if it's available and if so then accept it
     if features.enable_dynamic() {
         // Pick some dynamic tracing impl
         if features.force_dyn_stap() {
             if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_err() {
-                bail!("force-dyn-stap is enabled but the dyn_stap library is not available")
+                return Err(ProbersError::code_generation_error(
+                    "force-dyn-stap is enabled but the dyn_stap library is not available",
+                ));
             } else {
                 return Ok(TracingImplementation::DynamicStap);
             }
@@ -324,5 +326,141 @@ fn select_implementation(features: &FeatureFlags) -> Fallible<TracingImplementat
     } else {
         // Pick some static tracing impl
         Ok(TracingImplementation::NativeNoOp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper that sets environment vars, then clears them when it goes out of scope
+    struct EnvVarsSetter {
+        vars: Vec<(String, String)>,
+    }
+
+    impl EnvVarsSetter {
+        fn new<K: AsRef<str>>(vars: Vec<K>) -> EnvVarsSetter {
+            let vars: Vec<_> = vars.into_iter().map(|k| (k, "1")).collect();
+
+            Self::new_with_values(vars)
+        }
+
+        fn new_with_values<K: AsRef<str>, V: AsRef<str>>(vars: Vec<(K, V)>) -> EnvVarsSetter {
+            let vars: Vec<_> = vars
+                .into_iter()
+                .map(|(k, v)| (k.as_ref().to_owned(), v.as_ref().to_owned()))
+                .collect();
+
+            for (key, value) in vars.iter() {
+                env::set_var(key, value);
+            }
+
+            EnvVarsSetter { vars }
+        }
+
+        fn unset(&mut self) {
+            for (key, _) in self.vars.iter() {
+                env::remove_var(key);
+            }
+
+            self.vars.clear();
+        }
+    }
+
+    impl Drop for EnvVarsSetter {
+        fn drop(&mut self) {
+            self.unset()
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn probers_build_panics_invalid_features() {
+        let mut _setter = EnvVarsSetter::new(vec![
+            "CARGO_FEATURE_ENABLE_NATIVE_TRACING",
+            "CARGO_FEATURE_ENABLE_DYNAMIC_TRACING",
+        ]);
+
+        probers_build();
+    }
+
+    #[test]
+    fn build_rs_workflow_tests() {
+        // Simulates the entire process, starting with `probers_build` choosing an implementation
+        // based on the selected feature flags, then the dependent crate calling `build` to query
+        // the build info generated by `probers_build` and to perform  perform
+        // pre-processing of its code, then the proc macros reading the build info persisted by
+        // `build` to generate the right implementation.
+        //
+        // This doesn't actually integrate all those systems in a test, but it simulates the
+        // relevant calls into the `build_rs` code
+        let test_cases = vec![
+            //features, expected_impl
+            (
+                FeatureFlags::new(false, false, false, false).unwrap(),
+                TracingImplementation::NativeNoOp,
+            ),
+        ];
+
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        let out_dir = temp_dir.path().join("out");
+
+        for (features, expected_impl) in test_cases.into_iter() {
+            //First let's present we're in `probers/build.rs`, and cargo has set the relevant env
+            //vars
+            let vars = EnvVarsSetter::new_with_values(vec![
+                ("CARGO_PKG_NAME", "probers"),
+                ("CARGO_PKG_VERSION", "1.2.3"),
+                ("OUT_DIR", out_dir.to_str().unwrap()),
+            ]);
+
+            let mut stdout = Vec::new();
+
+            probers_build_internal(&mut stdout, features.clone())
+                .expect(&format!("Unexpected failure with features: {:?}", features));
+
+            //That worked.  The resulting build info should have been written out
+            let build_info_path = BuildInfo::get_build_path().unwrap();
+
+            let step1_build_info = BuildInfo::load().expect(&format!(
+                "Failed to load build info for features: {:?}",
+                features
+            ));
+
+            assert_eq!(expected_impl, step1_build_info.implementation);
+
+            //Next, the user crate's `build.rs` will want to know what the selected impl was
+            drop(vars);
+            let vars = EnvVarsSetter::new_with_values(vec![(
+                "DEP_PROBERS_BUILD_INFO_PATH",
+                build_info_path.to_str().unwrap(),
+            )]);
+
+            let step2_build_info = BuildInfo::load().expect(&format!(
+                "Failed to load build info for features: {:?}",
+                features
+            ));
+
+            assert_eq!(step1_build_info, step2_build_info);
+
+            //That worked, next the proc macros will be run by `rustc` while it builds the user
+            //crate.
+            drop(vars);
+
+            let vars = EnvVarsSetter::new_with_values(vec![(
+                "PROBERS_BUILD_INFO_PATH",
+                build_info_path.to_str().unwrap(),
+            )]);
+
+            let step3_build_info = BuildInfo::load().expect(&format!(
+                "Failed to load build info for features: {:?}",
+                features
+            ));
+
+            assert_eq!(step1_build_info, step3_build_info);
+
+            drop(vars);
+        }
     }
 }

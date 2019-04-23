@@ -12,7 +12,6 @@
 ///
 /// The `build.rs` will set a feature to indicate if tracing is enabled at all.  If not then
 /// there's no reason to even include this runtime
-#[cfg(enabled)]
 pub mod runtime {
     pub use probers_core::*;
     pub extern crate failure;
@@ -55,7 +54,7 @@ mod test {
     }
 
     #[test]
-    #[cfg(not(enabled))]
+    #[cfg(not(dynamic_enabled))]
     fn verify_expected_tracing_impl() {
         //This very simple test checks the PROBERS_EXPECTED_IMPL env var, and if set, asserts that
         //the tracing implementation compiled into this library matches the expected one.  In
