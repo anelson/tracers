@@ -505,7 +505,7 @@ lazy_static! {
         let mut src_dir = std::fs::canonicalize(&src_path).expect(&format!("Failed to canonicalize source path: {}", &src_path.display()));
         src_dir.pop();
 
-        let testdata_dir = src_dir.join("../testdata");
+        let testdata_dir = src_dir.join("..").join("testdata");
 
         //At this point, `testdata_dir` is the fully qualified path on the filesystem to the
         //`testdata` directory in `probers-codegen`.  The problem is that our test data include
