@@ -214,7 +214,13 @@ pub fn build() {
 
     match build_internal(&mut out_handle, &mut err_handle) {
         Ok(_) => writeln!(out_handle, "probes build succeeded").unwrap(),
-        Err(e) => writeln!(err_handle, "Error building probes: {}", e).unwrap(),
+        Err(e) => {
+            //An error that propagates all the way up to here is serious enough that it means we
+            //cannot proceed.  Fail the build by exiting the process forcefully
+            writeln!(err_handle, "Error building probes: {}", e).unwrap();
+
+            std::process::exit(-1);
+        }
     };
 }
 
@@ -376,6 +382,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn probers_build_panics_invalid_features() {
+        //These two feature flags are mutually exclusive
         let mut _setter = EnvVarsSetter::new(vec![
             "CARGO_FEATURE_ENABLE_NATIVE_TRACING",
             "CARGO_FEATURE_ENABLE_DYNAMIC_TRACING",
