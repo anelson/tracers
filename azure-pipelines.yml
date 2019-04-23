@@ -63,18 +63,30 @@ jobs:
         displayName: Cargo build (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
-      - script: PROBERS_EXPECTED_IMPL=stap scripts/test.sh -vv
+      - script: scripts/test.sh --release -vv
+        displayName: Cargo test (non-Windows)
+        condition: ne( variables['Agent.OS'], 'Windows_NT' )
+
+      - script: scripts\test.bat --release -vv
+        displayName: Cargo test (Windows)
+        condition: eq( variables['Agent.OS'], 'Windows_NT' )
+
+      - script: PROBERS_EXPECTED_IMPL=dyn_stap scripts/test.sh --manifest-path probers/Cargo.toml --no-default-features --features=enable-dynamic-tracing -vv
         displayName: Cargo test SystemTap implementation
         condition: eq( variables['Agent.OS'], 'Linux' )
 
-      - script: PROBERS_EXPECTED_IMPL=no-op scripts/test.sh -vv
-        displayName: Cargo test NoOp implementation (non-Windows)
+      - script: PROBERS_EXPECTED_IMPL=DISABLED scripts/test.sh --manifest-path probers/Cargo.toml
+        displayName: Cargo test default Native NoOp implementation (Linux)
+        condition: eq( variables['Agent.OS'], 'Linux' )
+
+      - script: PROBERS_EXPECTED_IMPL=DISABLED scripts/test.sh -vv
+        displayName: Cargo test default Native NoOp implementation (non-Windows)
         condition: and(ne( variables['Agent.OS'], 'Windows_NT' ), ne( variables['Agent.OS'], 'Linux' ))
 
       - script: |
           echo "##vso[task.setvariable variable=PROBERS_EXPECTED_IMPL;]no-op"
-          scripts\test.bat
-        displayName: Cargo test NoOp implementation (Windows)
+          scripts\test.bat -vv
+        displayName: Cargo test default Native NoOp implementation (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       # NB: Currently running with `--all-targets` causes a ICE due to this issue:
