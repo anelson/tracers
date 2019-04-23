@@ -225,9 +225,21 @@ pub fn build() {
 }
 
 fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> ProbersResult<()> {
-    let manifest_path = env::var("CARGO_MANIFEST_DIR").context(
+    //First things first; get the BuildInfo from the `probers` build, and tell Cargo to make that
+    //available to the proc macros at compile time via an environment variable
+    let build_info_path = BuildInfo::get_build_path()?;
+    writeln!(
+        out,
+        "cargo:rustc-env=PROBERS_BUILD_INFO_PATH={}",
+        build_info_path.display()
+    )
+    .unwrap();
+
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").context(
         "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?",
     )?;
+
+    let manifest_path = PathBuf::from(manifest_dir).join("Cargo.toml");
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
@@ -338,6 +350,7 @@ fn select_implementation(features: &FeatureFlags) -> ProbersResult<TracingImplem
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testdata;
 
     /// Helper that sets environment vars, then clears them when it goes out of scope
     struct EnvVarsSetter {
@@ -407,6 +420,14 @@ mod tests {
                 FeatureFlags::new(false, false, false, false).unwrap(),
                 TracingImplementation::NativeNoOp,
             ),
+            (
+                FeatureFlags::new(true, false, false, false).unwrap(),
+                TracingImplementation::DynamicNoOp,
+            ),
+            (
+                FeatureFlags::new(false, true, false, false).unwrap(),
+                TracingImplementation::NativeNoOp,
+            ),
         ];
 
         let temp_dir = tempfile::tempdir().unwrap();
@@ -437,6 +458,14 @@ mod tests {
 
             assert_eq!(expected_impl, step1_build_info.implementation);
 
+            //And the path to this should have been written to stdout such that cargo will treat it
+            //as a variable that is passed to dependent crates' `build.rs`:
+            let output = String::from_utf8(stdout).unwrap();
+            assert!(output.contains(&format!(
+                "cargo:build-info-path={}",
+                build_info_path.display()
+            )));
+
             //Next, the user crate's `build.rs` will want to know what the selected impl was
             drop(vars);
             let vars = EnvVarsSetter::new_with_values(vec![(
@@ -450,6 +479,41 @@ mod tests {
             ));
 
             assert_eq!(step1_build_info, step2_build_info);
+
+            //At this point in the process if this were a real build, the `build.rs` code would be
+            //generating code for a real crate.  We're not going to simulate all of that here,
+            //however we can invoke the code gen for all of our test crates at this point, and the
+            //code gen should work using the currently selected implementatoin
+            for test_case in testdata::TEST_CRATES.iter() {
+                let context = format!(
+                    "features: {:?} test_case: {}",
+                    features,
+                    test_case.root_directory.display()
+                );
+
+                let mut stdout = Vec::new();
+                let mut stderr = Vec::new();
+
+                let vars = EnvVarsSetter::new_with_values(vec![
+                    ("CARGO_PKG_NAME", test_case.package_name),
+                    (
+                        "CARGO_MANIFEST_DIR",
+                        test_case.root_directory.to_str().unwrap(),
+                    ),
+                ]);
+
+                build_internal(&mut stdout, &mut stderr).expect(&context);
+
+                //After the build, it should output something on stdout to tell Cargo to set a
+                //compiler-visible env var telling the proc macros where the `BuildInfo` file is
+                let output = String::from_utf8(stdout).unwrap();
+                assert!(output.contains(&format!(
+                    "cargo:rustc-env=PROBERS_BUILD_INFO_PATH={}",
+                    build_info_path.display()
+                )));
+
+                drop(vars);
+            }
 
             //That worked, next the proc macros will be run by `rustc` while it builds the user
             //crate.

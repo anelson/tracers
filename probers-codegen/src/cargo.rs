@@ -1,5 +1,6 @@
 use cargo_metadata::MetadataCommand;
 use failure::{format_err, Fallible};
+use std::path::Path;
 use std::path::PathBuf;
 
 /// Given the path to a Cargo manifest and the name of a package, invokes `cargo metadata` and
@@ -7,7 +8,7 @@ use std::path::PathBuf;
 ///
 /// If successful, returns a `Vec` of `Path`s, each the entry point of one of the package's
 /// targets.
-pub(crate) fn get_targets(manifest_path: &str, package_name: &str) -> Fallible<Vec<PathBuf>> {
+pub(crate) fn get_targets(manifest_path: &Path, package_name: &str) -> Fallible<Vec<PathBuf>> {
     let mut cmd = MetadataCommand::new();
     let metadata = cmd
         .manifest_path(&manifest_path)
@@ -39,10 +40,7 @@ mod test {
                 .map(|t| case.root_directory.join(t.entrypoint))
                 .collect();
             let mut targets = get_targets(
-                case.root_directory
-                    .join(PathBuf::from("Cargo.toml"))
-                    .to_str()
-                    .unwrap(),
+                &case.root_directory.join(PathBuf::from("Cargo.toml")),
                 case.package_name,
             )
             .unwrap();
