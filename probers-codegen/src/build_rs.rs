@@ -171,10 +171,10 @@ impl BuildInfo {
             ));
 
             Ok(PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join(rel_path))
-        } else if let Some(build_info_path) = env::var("DEP_PROBERS_BUILD_INFO_PATH").ok() {
+        } else if let Ok(build_info_path) = env::var("DEP_PROBERS_BUILD_INFO_PATH") {
             //This is context #2 in the comment above
             Ok(PathBuf::from(build_info_path))
-        } else if let Some(build_info_path) = env::var("PROBERS_BUILD_INFO_PATH").ok() {
+        } else if let Ok(build_info_path) = env::var("PROBERS_BUILD_INFO_PATH") {
             //This is context #3 in the comment above
             Ok(PathBuf::from(build_info_path))
         } else {
@@ -336,10 +336,10 @@ fn select_implementation(features: &FeatureFlags) -> ProbersResult<TracingImplem
         //Else no tracing impl has been forced so we get to decide
         if env::var("DEP_PROBERS_DYN_STAP_SUCCEEDED").is_ok() {
             //use dyn_stap when it savailable
-            return Ok(TracingImplementation::DynamicStap);
+            Ok(TracingImplementation::DynamicStap)
         } else {
             //else, fall back to noop
-            return Ok(TracingImplementation::DynamicNoOp);
+            Ok(TracingImplementation::DynamicNoOp)
         }
     } else {
         // Pick some static tracing impl
