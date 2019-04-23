@@ -9,5 +9,7 @@ members = [
     "probers-macros-hack",
     "probers-dyn-noop",
     "probers-dyn-stap",
-    "probers"
+    "probers",
+
+    "examples/simple"
 ]
