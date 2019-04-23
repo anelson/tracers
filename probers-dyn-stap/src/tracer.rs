@@ -9,7 +9,7 @@ use super::{StapProbe, StapProvider, StapProviderBuilder};
 pub struct StapTracer {}
 
 impl Tracer for StapTracer {
-    const TRACING_IMPLEMENTATION: &'static str = "stap";
+    const TRACING_IMPLEMENTATION: &'static str = "dyn_stap";
 
     type ProviderBuilderType = StapProviderBuilder;
     type ProviderType = StapProvider;
