@@ -508,6 +508,11 @@ lazy_static! {
         let testdata_dir = src_dir.join("..").join("testdata");
         let testdata_dir = std::fs::canonicalize(&testdata_dir).expect(&format!("Failed to canonicalize test data path: {}", &testdata_dir.display()));
 
+        //On windows there's a further canonicalization step necessary to produce a workable
+        //non-UNC path
+        #[cfg(target_os = "windows")]
+        let testdata_dir = dunce::simplified(&testdata_dir).to_owned();
+
         //At this point, `testdata_dir` is the fully qualified path on the filesystem to the
         //`testdata` directory in `probers-codegen`.  The problem is that our test data include
         //complete crates with their own `Cargo.toml`.  When we run `cargo metadata` on those, it

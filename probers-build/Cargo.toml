@@ -49,3 +49,7 @@ quickcheck = "0.8"
 quickcheck_macros = "0.8"
 tempfile = "3"
 fs_extra = "1"
+
+[target.'cfg(windows)'.dev-dependencies]
+# Need to use Dunce to de-UNC the canonicalized paths on Windows
+dunce = "1.0.0"
