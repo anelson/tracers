@@ -38,6 +38,8 @@ pub enum ProbersError {
         error: Error,
     },
 
+    MissingCallInBuildRs,
+
     BuildInfoReadError {
         message: String,
         build_info_path: String,
@@ -60,6 +62,7 @@ impl Display for ProbersError {
             ProbersError::SynError { message, .. } => write!(f, "{}", message),
             ProbersError::InvalidCallExpression { message, .. } => write!(f, "{}", message),
             ProbersError::OtherError { message, .. } => write!(f, "{}", message),
+            ProbersError::MissingCallInBuildRs => write!(f, "Build environment is incomplete; make sure you are calling `probers_build::build()` in your `build.rs` build script"),
             ProbersError::BuildInfoReadError { message, .. } => write!(f, "{}", message),
             ProbersError::BuildInfoWriteError { message, .. } => write!(f, "{}", message),
         }
@@ -125,6 +128,10 @@ impl ProbersError {
             message: Self::fail_string(&e),
             error: e.into(),
         }
+    }
+
+    pub fn missing_call_in_build_rs() -> ProbersError {
+        ProbersError::MissingCallInBuildRs
     }
 
     pub fn build_info_read_error(build_info_path: PathBuf, e: Error) -> ProbersError {

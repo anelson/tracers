@@ -5,12 +5,9 @@ use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use failure::ResultExt;
 use proc_macro2::TokenStream;
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::io::Write;
-use std::io::{stderr, stdout};
 use std::path::{Path, PathBuf};
 use strum_macros::AsRefStr;
 
@@ -27,6 +24,8 @@ pub mod spec;
 mod syn_helpers;
 
 pub use error::*;
+
+pub use build_rs::build;
 
 #[cfg(test)]
 mod testdata;
@@ -153,40 +152,3 @@ impl CodeGenerator for GeneratorSwitcher {
 // Any other code that needs to refer to the current code generator impl does so through this type
 // alias.
 pub type Generator = GeneratorSwitcher;
-
-pub fn build() {
-    match build_internal() {
-        Ok(_) => println!("probes build succeeded"),
-        Err(e) => eprintln!("Error building probes: {}", e),
-    }
-}
-
-pub fn build_internal() -> ProbersResult<()> {
-    let manifest_path = env::var("CARGO_MANIFEST_DIR").context(
-        "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?",
-    )?;
-    let package_name = env::var("CARGO_PKG_NAME").unwrap();
-    let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
-
-    let stdout = stdout();
-    let stderr = stderr();
-
-    let mut outhandle = stdout.lock();
-    let mut errhandle = stderr.lock();
-
-    Generator::generate_native_code(
-        &mut outhandle,
-        &mut errhandle,
-        &Path::new(&manifest_path),
-        &package_name,
-        targets,
-    )
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
