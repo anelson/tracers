@@ -5,6 +5,16 @@ authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
 
+# This is a hack.  Or maybe a workaround for a bug.
+#
+# It seems that Cargo does not pass variables to dependent crates using the DEP_(PKGNAME)_(VARNAME)
+# env vars unless it thinks the crate is wrapping a native library.  This package is definitely not
+# doing that, but setting this in the manifest ensures that the downstream dependencies' build.rs
+# can query the variables produced by this `build.rs` to detect which prob impl was used at compile time
+#
+# This will be unnecessary once https://github.com/rust-lang/cargo/issues/3544 is implemented
+links = "probers"
+
 [badges]
 maintenance = { status = "experimental" }
 

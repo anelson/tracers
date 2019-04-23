@@ -30,7 +30,6 @@ fn main() {
                 }
             ); //this category of tracing is enabled
             println!("cargo:rustc-cfg={}_enabled", implementation.as_ref()); //this specific impl is enabled
-            println!("cargo:succeeded=1"); //this will set DEP_(PKGNAME)_SUCCEEDED in dependent builds
 
             //All downstream creates from `probers` will just call `probers_build::build`, but this
             //is a special case because we've already decided above which implementation to use.
@@ -39,8 +38,19 @@ fn main() {
             //examples, binaries, and benchmarks which use the proc macros will be able to generate
             //the correct runtime tracing code to match the implementation we've chosen here
             let build_info = probers_build::build_rs::BuildInfo::new(implementation);
-            if let Err(e) = build_info.save() {
-                println!("cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e);
+            match build_info.save() {
+                Ok(build_info_path) => {
+                    //The above statements set compile-time features to the compiler knows which modules to
+                    //include.  The below will set environment variables DEP_PROBERS_(VARNAME) in dependent
+                    //builds
+                    //
+                    //The codegen stuff in `probers_build::build` will use this to determine what code
+                    //generator to use
+                    println!("cargo:build-info-path={}", build_info_path.display());
+                }
+                Err(e) => {
+                    println!("cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e);
+                }
             }
         }
         Err(e) => {
