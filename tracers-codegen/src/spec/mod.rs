@@ -12,16 +12,16 @@
 //!
 //! Thus this can be seen as one side of the code generator implementation.  The other side, which
 //! actually generates probing code, is in the `gen` module.
+mod init_provider;
 mod probe;
 mod probe_arg;
 mod probe_call;
 mod provider;
-mod provider_init;
 
+pub(crate) use init_provider::ProviderInitSpecification;
 pub(crate) use probe::ProbeSpecification;
 pub(crate) use probe_arg::ProbeArgSpecification;
 #[cfg(test)]
 pub(crate) use probe_call::ProbeCallDetails;
 pub(crate) use probe_call::ProbeCallSpecification;
 pub(crate) use provider::ProviderSpecification;
-pub(crate) use provider_init::ProviderInitSpecification;

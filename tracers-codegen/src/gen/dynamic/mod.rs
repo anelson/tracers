@@ -17,25 +17,25 @@ use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod init_provider;
 mod probe_call;
-mod provider_init;
 mod provider_trait;
 
 pub(crate) struct DynamicGenerator {
-    _build_info: BuildInfo,
+    build_info: BuildInfo,
 }
 
 impl DynamicGenerator {
     pub fn new(build_info: BuildInfo) -> DynamicGenerator {
         DynamicGenerator {
-            _build_info: build_info,
+            build_info: build_info,
         }
     }
 }
 
 impl CodeGenerator for DynamicGenerator {
     fn handle_provider_trait(&self, provider: ProviderSpecification) -> TracersResult<TokenStream> {
-        let generator = provider_trait::ProviderTraitGenerator::new(provider);
+        let generator = provider_trait::ProviderTraitGenerator::new(&self.build_info, provider);
 
         generator.generate()
     }
@@ -44,8 +44,8 @@ impl CodeGenerator for DynamicGenerator {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
-        provider_init::generate_provider_init(init)
+    fn handle_init_provider(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+        init_provider::generate_init_provider(init)
     }
 
     fn generate_native_code(

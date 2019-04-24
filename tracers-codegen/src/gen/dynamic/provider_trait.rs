@@ -1,5 +1,6 @@
 //!Code in this module processes the provider trait decorated with the `tracers` attribute, and
 //!replaces it with an implementation using libstapsdt.
+use crate::build_rs::BuildInfo;
 use crate::gen::common;
 use crate::spec::ProbeArgSpecification;
 use crate::spec::ProbeSpecification;
@@ -12,18 +13,26 @@ use quote::{quote, quote_spanned};
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
-pub(super) struct ProviderTraitGenerator {
+pub(super) struct ProviderTraitGenerator<'bi> {
+    build_info: &'bi BuildInfo,
     spec: ProviderSpecification,
     probes: Vec<ProbeGenerator>,
 }
 
-impl ProviderTraitGenerator {
-    pub fn new(spec: ProviderSpecification) -> ProviderTraitGenerator {
+impl<'bi> ProviderTraitGenerator<'bi> {
+    pub fn new(
+        build_info: &'bi BuildInfo,
+        spec: ProviderSpecification,
+    ) -> ProviderTraitGenerator<'bi> {
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
         let probes: Vec<_> = probes.into_iter().map(ProbeGenerator::new).collect();
-        ProviderTraitGenerator { spec, probes }
+        ProviderTraitGenerator {
+            build_info,
+            spec,
+            probes,
+        }
     }
 
     pub fn generate(&self) -> TracersResult<TokenStream> {
@@ -73,7 +82,12 @@ impl ProviderTraitGenerator {
         let struct_type_name = self.get_provider_impl_struct_type_name();
         let trait_doc_comment = common::generate_trait_comment(&self.spec);
         let try_init_decl = common::generate_try_init_decl(&self.spec);
-        let get_init_error_decl = common::generate_get_init_error_decl(&self.spec);
+
+        //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
+        //a successful result, with a string containing some metadata about the generated provider
+        let provider_name = self.spec.name();
+        let implementation = format!("dynamic/{}", self.build_info.implementation.as_ref());
+        let version = env!("CARGO_PKG_VERSION");
 
         let result = quote_spanned! {span=>
             #(#attrs)*
@@ -84,12 +98,12 @@ impl ProviderTraitGenerator {
                 #(#probe_methods)*
 
                 #try_init_decl {
-                    #mod_name::#struct_type_name::get();
-                    #mod_name::#struct_type_name::get_init_error()
-                }
+                    let result = #mod_name::#struct_type_name::get();
 
-                #get_init_error_decl {
-                    #mod_name::#struct_type_name::get_init_error()
+                    // On success, translate from the probe struct to the informational message
+                    result.map(|_| {
+                        concat!(#provider_name, "::", #implementation, "::", #version)
+                    })
                 }
             }
         };
@@ -130,9 +144,14 @@ impl ProviderTraitGenerator {
         let span = self.spec.item_trait().span();
         quote_spanned! {span=>
             mod #mod_name {
-                use ::tracers::runtime::failure::{bail, Fallible, Error};
+                use ::tracers::runtime::failure::{format_err, Fallible};
                 use ::tracers::runtime::dynamic::once_cell::sync::OnceCell;
-                use ::tracers::runtime::dynamic::{SystemTracer,SystemProvider, Provider,ProviderBuilder,Tracer};
+                use ::tracers::runtime::dynamic::{SystemTracer,SystemProvider,ProviderBuilder,Tracer};
+
+                // Need the `Provider` trait in scope so we can access its methods on its
+                // implementors
+                use ::tracers::runtime::dynamic::Provider as _;
+                use ::core::result::Result;
 
                 #[allow(dead_code)]
                 pub(super) struct #struct_type_name<#struct_type_params> {
@@ -143,19 +162,14 @@ impl ProviderTraitGenerator {
                 unsafe impl<#struct_type_params> Sync for #struct_type_name <#struct_type_params>{}
 
                 static #instance_var_name: OnceCell<Fallible<SystemProvider>> = OnceCell::INIT;
-                static #struct_var_name: OnceCell<Fallible<#struct_type_name>> = OnceCell::INIT;
-                static IMPL_OPT: OnceCell<Option<&'static #struct_type_name>> = OnceCell::INIT;
+                static #struct_var_name: OnceCell<Result<#struct_type_name, String>> = OnceCell::INIT;
+                static IMPL_OPT: OnceCell<Result<&'static #struct_type_name, &'static str>> = OnceCell::INIT;
 
                 impl<#struct_type_params> #struct_type_name<#struct_type_params> {
-                   pub(super) fn get_init_error() -> Option<&'static Error> {
-                        //Don't do a whole re-init cycle again, but if the initialization has happened,
-                        //check for failure
-                        #struct_var_name.get().and_then(|fallible|  fallible.as_ref().err() )
-                   }
-
                    #[allow(dead_code)]
-                   pub(super) fn get() -> Option<&'static #struct_type_name<#struct_type_params>> {
-                       let imp: &'static Option<&'static #struct_type_name> = IMPL_OPT.get_or_init(|| {
+                   pub(super) fn get() -> Result<&'static #struct_type_name<#struct_type_params>, &'static str> {
+                       //let imp: &'static Result<&'static #struct_type_name, &'static str> = IMPL_OPT.get_or_init(|| {
+                       let imp: &'static Result<_,_> = IMPL_OPT.get_or_init(|| {
                            // The reason for this seemingly-excessive nesting is that it's possible for
                            // both the creation of `SystemProvider` or the subsequent initialization of
                            // #struct_type_name to fail with different and also relevant errors.  By
@@ -164,7 +178,7 @@ impl ProviderTraitGenerator {
                            // call of a method on an `Option<T>`.  I don't have any data to back this
                            // up but I suspect that allows for better optimizations, since we know an
                            // `Option<&T>` is implemented as a simple pointer where `None` is `NULL`.
-                           let imp = #struct_var_name.get_or_init(|| {
+                           let imp: &Result<#struct_type_name<#struct_type_params>, String> = #struct_var_name.get_or_init(|| {
                                // Initialzie the `SystemProvider`, capturing any initialization errors
                                let #provider_var_name: &Fallible<SystemProvider> = #instance_var_name.get_or_init(|| {
                                     #define_provider_call
@@ -174,7 +188,7 @@ impl ProviderTraitGenerator {
                                // references to `T` or `E`, since there's not much useful you can do
                                // with just a `&Result`.
                                match #provider_var_name.as_ref() {
-                                   Err(e) => bail!("Provider initialization failed: {}", e),
+                                   Err(e) => Err(format!("Provider initialization failed: {}", e)),
                                    Ok(#provider_var_name) => {
                                        // Proceed to create the struct containing each of the probes'
                                        // `ProviderProbe` instances
@@ -187,13 +201,14 @@ impl ProviderTraitGenerator {
                                }
                            });
 
-                           //Convert this &Fallible<..> into an Option<&T>
-                           imp.as_ref().ok()
+                           //Convert this &Fallible<..> into an Result<&T, &'static str>
+                           imp.as_ref().map_err(|e| e.as_ref())
                        });
 
-                       //Copy this `&Option<&T>` to a new `Option<&T>`.  Since that should be
+                       //Copy this `&Result<&T, &String>` to a new `Result<&T, &str>`.  Since that should be
                        //implemented as just a pointer, this should be effectively free
-                       *imp
+                       //*imp
+                       imp.map_err(|e| e.as_ref())
                    }
                 }
             }
@@ -403,7 +418,7 @@ impl ProbeGenerator {
             #deprecation_attribute
             #[allow(dead_code)]
             #vis #original_method {
-                if let Some(probes) = #struct_type_path::get() {
+                if let Ok(probes) = #struct_type_path::get() {
                     if probes.#probe_ident.is_enabled() {
                         probes.#probe_ident.fire(#probe_args_tuple)
                     }
@@ -413,7 +428,7 @@ impl ProbeGenerator {
             #[allow(dead_code)]
             #[doc(hidden)]
             #vis #enabled_method -> bool {
-                if let Some(probes) = #struct_type_path::get() {
+                if let Ok(probes) = #struct_type_path::get() {
                     probes.#probe_ident.is_enabled()
                 } else {
                     false
@@ -422,7 +437,7 @@ impl ProbeGenerator {
 
             #[doc(hidden)]
             #vis #probe_method -> Option<&'static #probe_method_ret_type> {
-                #struct_type_path::get().map(|probes| &probes.#probe_ident)
+                #struct_type_path::get().ok().map(|probes| &probes.#probe_ident)
             }
         })
     }
@@ -438,7 +453,8 @@ impl ProbeGenerator {
 
         let span = self.spec.original_method.span();
         quote_spanned! {span=>
-            #builder.add_probe::<#args_type>(#probe_name)?;
+            #builder.add_probe::<#args_type>(#probe_name)
+                .map_err(|e| format_err!(concat!("Error adding probe '", #probe_name, "': {}"), e))?;
         }
     }
 
@@ -504,7 +520,8 @@ impl ProbeGenerator {
 
         let span = self.spec.span;
         quote_spanned! {span=>
-            #name_ident: #provider.get_probe::<#args_tuple>(#name_literal)?
+            #name_ident: #provider.get_probe::<#args_tuple>(#name_literal)
+                .map_err(|e| format!(concat!("Error getting probe '", #name_literal, "': {}"), e))?
         }
     }
 
@@ -598,6 +615,7 @@ impl ProbeGenerator {
 mod test {
     use super::*;
     use crate::testdata;
+    use crate::TracingImplementation;
 
     #[test]
     fn generate_works_on_valid_traits() {
@@ -612,7 +630,8 @@ mod test {
                 test_case.description
             ));
 
-            let generator = ProviderTraitGenerator::new(spec);
+            let build_info = BuildInfo::new(TracingImplementation::DynamicStap);
+            let generator = ProviderTraitGenerator::new(&build_info, spec);
             generator.generate().expect(&format!(
                 "Failed to generate test trait '{}'",
                 test_case.description

@@ -52,7 +52,7 @@ pub fn probe_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
 
 pub fn init_provider_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
     gen::code_generator()?
-        .handle_provider_init(ProviderInitSpecification::from_token_stream(tokens)?)
+        .handle_init_provider(ProviderInitSpecification::from_token_stream(tokens)?)
 }
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's

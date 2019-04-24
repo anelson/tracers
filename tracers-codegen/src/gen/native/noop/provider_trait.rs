@@ -2,6 +2,7 @@
 //!replaces it with an implementation which has zero runtime footprint, but at compile-time still
 //!type-checks to ensure errors aren't introduced with the `noop` generator that only become
 //!noticeable with a real generator.
+use crate::build_rs::BuildInfo;
 use crate::gen::common;
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
@@ -12,27 +13,26 @@ use quote::{quote, quote_spanned};
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
-pub(crate) struct ProviderTraitGenerator {
-    /// true if the code generator can assume the `tracers` runtime code is available
-    /// when used with the `noop` implementation this is `true`, however this code is also used by
-    /// the `disabled` implementation which must work when there is no runtime dependency on
-    /// `tracers` at all
-    has_runtime: bool,
+pub(crate) struct ProviderTraitGenerator<'bi> {
+    build_info: &'bi BuildInfo,
     spec: ProviderSpecification,
-    probes: Vec<ProbeGenerator>,
+    probes: Vec<ProbeGenerator<'bi>>,
 }
 
-impl ProviderTraitGenerator {
-    pub fn new(has_runtime: bool, spec: ProviderSpecification) -> ProviderTraitGenerator {
+impl<'bi> ProviderTraitGenerator<'bi> {
+    pub fn new(
+        build_info: &'bi BuildInfo,
+        spec: ProviderSpecification,
+    ) -> ProviderTraitGenerator<'bi> {
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
         let probes: Vec<_> = probes
             .into_iter()
-            .map(|probe| ProbeGenerator::new(has_runtime, probe))
+            .map(|probe| ProbeGenerator::new(build_info, probe))
             .collect();
         ProviderTraitGenerator {
-            has_runtime,
+            build_info,
             spec,
             probes,
         }
@@ -80,26 +80,13 @@ impl ProviderTraitGenerator {
 
         let trait_doc_comment = common::generate_trait_comment(&self.spec);
 
-        let init_methods = if self.has_runtime {
-            //The init methods return a `failure::Error`, which we re-export as
-            //`::probers::runtime::failure::Error` because we can't assume the dependent crate has
-            //a dependency on `failure`.  This obviously only works if tracing is enabled
-            let try_init_decl = common::generate_try_init_decl(&self.spec);
-            let get_init_error_decl = common::generate_get_init_error_decl(&self.spec);
+        let try_init_decl = common::generate_try_init_decl(&self.spec);
 
-            quote_spanned! {span=>
-                #try_init_decl {
-                    None
-                }
-
-                #get_init_error_decl {
-                    None
-                }
-            }
-        } else {
-            //tracing is disable to don't generate the init methods at all
-            quote! {}
-        };
+        //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
+        //a successful result, with a string containing some metadata about the generated provider
+        let provider_name = self.spec.name();
+        let implementation = format!("native/{}", self.build_info.implementation.as_ref());
+        let version = env!("CARGO_PKG_VERSION");
 
         let result = quote_spanned! {span=>
             #(#attrs)*
@@ -109,7 +96,9 @@ impl ProviderTraitGenerator {
             impl #ident {
                 #(#probe_methods)*
 
-                #init_methods
+                #try_init_decl {
+                    Ok(concat!(#provider_name, "::", #implementation, "::", #version))
+                }
             }
         };
 
@@ -117,7 +106,7 @@ impl ProviderTraitGenerator {
     }
 
     fn generate_impl_mod(&self) -> TokenStream {
-        if self.has_runtime {
+        if self.build_info.implementation.is_enabled() {
             //Generate a module that has some code to use our `ProbeArgType` trait to verify at
             //compile time that every probe argument has a corresponding C representation.
             //Since that requires that the `tracers` runtime be available to the caller, it won't
@@ -160,14 +149,14 @@ impl ProviderTraitGenerator {
     }
 }
 
-pub(super) struct ProbeGenerator {
-    has_runtime: bool,
+pub(super) struct ProbeGenerator<'bi> {
+    build_info: &'bi BuildInfo,
     spec: ProbeSpecification,
 }
 
-impl ProbeGenerator {
-    pub fn new(has_runtime: bool, spec: ProbeSpecification) -> ProbeGenerator {
-        ProbeGenerator { has_runtime, spec }
+impl<'bi> ProbeGenerator<'bi> {
+    pub fn new(build_info: &'bi BuildInfo, spec: ProbeSpecification) -> ProbeGenerator<'bi> {
+        ProbeGenerator { build_info, spec }
     }
 
     pub fn generate_trait_methods(
@@ -187,7 +176,7 @@ impl ProbeGenerator {
             //If the runtime is available, then the type assertion method is available
             //If not, just generate an expression that will count as 'using' the argument so the
             //compiler doesn't complain
-            if self.has_runtime {
+            if self.build_info.implementation.is_enabled() {
                 quote_spanned! {span=>
                     #struct_type_path::wrap(#arg_name);
                 }
@@ -237,6 +226,7 @@ impl ProbeGenerator {
 mod test {
     use super::*;
     use crate::testdata;
+    use crate::TracingImplementation;
 
     #[test]
     fn generate_works_on_valid_traits() {
@@ -245,14 +235,19 @@ mod test {
         })
         .into_iter()
         {
-            for has_runtime in [false, true].into_iter() {
+            for is_enabled in [false, true].into_iter() {
                 let item_trait = test_case.get_item_trait();
                 let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
                     "Failed to create specification from test trait '{}'",
                     test_case.description
                 ));
 
-                let generator = ProviderTraitGenerator::new(*has_runtime, spec);
+                let build_info = if *is_enabled {
+                    BuildInfo::new(TracingImplementation::NativeNoOp)
+                } else {
+                    BuildInfo::new(TracingImplementation::Disabled)
+                };
+                let generator = ProviderTraitGenerator::new(&build_info, spec);
                 generator.generate().expect(&format!(
                     "Failed to generate test trait '{}'",
                     test_case.description

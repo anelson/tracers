@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::quote_spanned;
 use syn::spanned::Spanned;
 
-pub(super) fn generate_provider_init(
+pub(super) fn generate_init_provider(
     init: ProviderInitSpecification,
 ) -> TracersResult<TokenStream> {
     //This couldn't be simpler.  We must assume the caller provided a valid provider trait.  If

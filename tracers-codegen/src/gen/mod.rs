@@ -31,7 +31,7 @@ pub(crate) trait CodeGenerator {
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will
     /// be done lazily on first use.
-    fn handle_provider_init(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream>;
+    fn handle_init_provider(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream>;
 
     /// This is invoked from within `build.rs` of the crate which is dependent upon `tracers`.  It
     /// doesn't take much arguments because it interacts directly with cargo via environment

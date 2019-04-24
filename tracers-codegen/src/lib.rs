@@ -1,5 +1,5 @@
 #![deny(warnings)]
-#![recursion_limit = "256"]
+#![recursion_limit = "512"]
 
 use serde::{Deserialize, Serialize};
 use strum_macros::AsRefStr;

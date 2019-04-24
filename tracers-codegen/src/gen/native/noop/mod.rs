@@ -34,14 +34,14 @@ impl NoOpGenerator {
 
 impl CodeGenerator for NoOpGenerator {
     fn handle_provider_trait(&self, provider: ProviderSpecification) -> TracersResult<TokenStream> {
-        provider_trait::ProviderTraitGenerator::new(true, provider).generate()
+        provider_trait::ProviderTraitGenerator::new(&self.build_info, provider).generate()
     }
 
     fn handle_probe_call(&self, call: ProbeCallSpecification) -> TracersResult<TokenStream> {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(&self, _init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+    fn handle_init_provider(&self, _init: ProviderInitSpecification) -> TracersResult<TokenStream> {
         unimplemented!()
     }
 

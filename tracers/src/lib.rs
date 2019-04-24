@@ -51,26 +51,26 @@ mod test {
 
     #[test]
     #[cfg(dynamic_enabled)]
-    fn verify_expected_tracing_impl() {
-        //This very simple test checks the TRACERS_EXPECTED_IMPL env var, and if set, asserts that
+    fn verify_expected_dynamic_tracing_impl() {
+        //This very simple test checks the TRACERS_EXPECTED_DYNAMIC_IMPL env var, and if set, asserts that
         //the tracing implementation compiled into this library matches the expected one.  In
         //practice this is only used by the CI builds to verify that the compile-time magic always
         //ends up with the expeced implementation on a variety of environments
-        if let Ok(expected_impl) = std::env::var("TRACERS_EXPECTED_IMPL") {
+        if let Ok(expected_impl) = std::env::var("TRACERS_EXPECTED_DYNAMIC_IMPL") {
             assert_eq!(expected_impl, dynamic::SystemTracer::TRACING_IMPLEMENTATION);
         }
     }
 
     #[test]
     #[cfg(not(dynamic_enabled))]
-    fn verify_expected_tracing_impl() {
-        //This very simple test checks the TRACERS_EXPECTED_IMPL env var, and if set, asserts that
+    fn verify_expected_dynamic_tracing_impl() {
+        //This very simple test checks the TRACERS_EXPECTED_DYNAMIC_IMPL env var, and if set, asserts that
         //the tracing implementation compiled into this library matches the expected one.  In
         //practice this is only used by the CI builds to verify that the compile-time magic always
         //ends up with the expeced implementation on a variety of environments
-        if let Ok(expected_impl) = std::env::var("TRACERS_EXPECTED_IMPL") {
+        if let Ok(expected_impl) = std::env::var("TRACERS_EXPECTED_DYNAMIC_IMPL") {
             assert_eq!(expected_impl, "DISABLED",
-                       "the crate was compiled with tracing entirely disabled but apparently the expected implementation was '{}'", expected_impl);
+                       "the crate was compiled with dynamic tracing disabled but apparently the expected implementation was '{}'", expected_impl);
         }
     }
 }
