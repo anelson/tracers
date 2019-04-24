@@ -9,6 +9,7 @@
 //! tracing.  However, this remains in case a use for it emerges, perhaps on another platform with
 //! more intrinsic support for dynamic style tracing.
 use crate::build_rs::BuildInfo;
+use crate::gen::common;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
@@ -17,7 +18,6 @@ use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-mod init_provider;
 mod probe_call;
 mod provider_trait;
 
@@ -27,9 +27,7 @@ pub(crate) struct DynamicGenerator {
 
 impl DynamicGenerator {
     pub fn new(build_info: BuildInfo) -> DynamicGenerator {
-        DynamicGenerator {
-            build_info: build_info,
-        }
+        DynamicGenerator { build_info }
     }
 }
 
@@ -45,7 +43,7 @@ impl CodeGenerator for DynamicGenerator {
     }
 
     fn handle_init_provider(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
-        init_provider::generate_init_provider(init)
+        common::generate_init_provider(init)
     }
 
     fn generate_native_code(

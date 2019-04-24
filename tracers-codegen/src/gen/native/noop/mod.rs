@@ -10,6 +10,7 @@
 //! Thus this mode uses somme creative Rust trickery to generate code that ensures the compiler
 //! does its usual type checks, but at runtime nothing actually happens.
 use crate::build_rs::BuildInfo;
+use crate::gen::common;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
@@ -41,8 +42,8 @@ impl CodeGenerator for NoOpGenerator {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_init_provider(&self, _init: ProviderInitSpecification) -> TracersResult<TokenStream> {
-        unimplemented!()
+    fn handle_init_provider(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+        common::generate_init_provider(init)
     }
 
     fn generate_native_code(

@@ -63,40 +63,39 @@ jobs:
         displayName: Cargo build (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
-      - script: scripts/test.sh --release -vv
-        displayName: Cargo test (non-Windows)
+      - script: |
+          TRACERS_EXPECTED_DYNAMIC_IMPL=dyn_stap \
+          TRACERS_EXPECTED_PROVIDER=test_probes::dynamic/dyn_stap::0.1.0
+          scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing -vv
+        displayName: Cargo test dynamic SystemTap implementation (Linux)
+        condition: eq( variables['Agent.OS'], 'Linux' )
+
+      - script: |
+          TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
+          TRACERS_EXPECTED_PROVIDER=test_probes::native/native_noop::0.1.0
+          scripts/test.sh --manifest-path tracers/Cargo.toml -vv
+        displayName: Cargo test default Native NoOp implementation (non-Windows)
         condition: ne( variables['Agent.OS'], 'Windows_NT' )
 
-      - script: scripts\test.bat --release -vv
-        displayName: Cargo test (Windows)
-        condition: eq( variables['Agent.OS'], 'Windows_NT' )
-
-      - script: TRACERS_EXPECTED_IMPL=dyn_stap scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing -vv
-        displayName: Cargo test SystemTap implementation (Linux)
-        condition: eq( variables['Agent.OS'], 'Linux' )
-
-      - script: TRACERS_EXPECTED_IMPL=DISABLED scripts/test.sh --manifest-path tracers/Cargo.toml
-        displayName: Cargo test default Native NoOp implementation (Linux)
-        condition: eq( variables['Agent.OS'], 'Linux' )
-
-      - script: TRACERS_EXPECTED_IMPL=DISABLED scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features -vv
+      - script: |
+          TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
+          TRACERS_EXPECTED_PROVIDER=test_probes::disabled::0.1.0
+          scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features -vv
         displayName: Cargo test tracing disabled (non-Windows)
-        condition: eq( variables['Agent.OS'], 'Linux' )
+        condition: ne( variables['Agent.OS'], 'Windows_NT' )
 
       - script: |
-          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_IMPL;]DISABLED
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_DYNAMIC_IMPL;]DISABLED
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]test_probes::native/native_noop::0.1.0
+          scripts\test.bat --manifest-path tracers/Cargo.toml --no-default-features -vv
+        displayName: Cargo test default Native NoOp implementation (Windows)
+        condition: eq( variables['Agent.OS'], 'Windows_NT' )
+
+      - script: |
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_DYNAMIC_IMPL;]DISABLED
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]test_probes::disabled::0.1.0
           scripts\test.bat --manifest-path tracers/Cargo.toml --no-default-features -vv
         displayName: Cargo test tracing disabled (Windows)
-        condition: eq( variables['Agent.OS'], 'Windows_NT' )
-
-      - script: TRACERS_EXPECTED_IMPL=DISABLED scripts/test.sh -vv
-        displayName: Cargo test default Native NoOp implementation (non-Windows)
-        condition: and(ne( variables['Agent.OS'], 'Windows_NT' ), ne( variables['Agent.OS'], 'Linux' ))
-
-      - script: |
-          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_IMPL;]no-op
-          scripts\test.bat -vv
-        displayName: Cargo test default Native NoOp implementation (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       # NB: Currently running with `--all-targets` causes a ICE due to this issue:

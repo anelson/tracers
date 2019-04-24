@@ -1,9 +1,12 @@
 //! This module contains some code which is shared between the different code generation
 //! implementations.  It does not contain a working code generator implementation itself.
 use crate::spec::ProbeSpecification;
+use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
+use crate::TracersResult;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
+use syn::spanned::Spanned;
 
 /// Generates the an additional doc comment for the generated provider trait/struct/whatever, which
 /// provides some helpful information about how to use that provider with the various tracing
@@ -169,6 +172,23 @@ TODO: No other platforms supported yet
 );
 
     generate_multiline_comments(&probe_comment)
+}
+
+/// Generates the standard provider init call.  Some implementations may use a different one but
+/// this is the typical impl.
+pub(super) fn generate_init_provider(
+    init: ProviderInitSpecification,
+) -> TracersResult<TokenStream> {
+    //This couldn't be simpler.  We must assume the caller provided a valid provider trait.  If
+    //they didn't this will fail at compile time in a fairly obvious way.
+    //
+    //So we just generate code to call the init function that the provider trait generator will
+    //have already generated on the trait itself.
+    let provider = init.provider;
+    let span = provider.span();
+    Ok(quote_spanned! {span=>
+        #provider::__try_init_provider()
+    })
 }
 
 /// When generating a comment with `#[doc]` if the string is multi-lined then `quote_spanned` seems

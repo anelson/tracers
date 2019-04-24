@@ -50,6 +50,18 @@ impl ProviderSpecification {
         let probes = find_probes(item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash_token_stream(&token_stream);
+        Ok(ProviderSpecification {
+            name: Self::provider_name_from_trait(&item_trait.ident),
+            hash,
+            item_trait: item_trait.clone(),
+            token_stream,
+            probes,
+        })
+    }
+
+    /// Computes the name of a provider given the name of the provider's trait.
+    ///
+    pub(crate) fn provider_name_from_trait(ident: &syn::Ident) -> String {
         // The provider name must be chosen carefully.  As of this writing (2019-04) the `bpftrace`
         // and `bcc` tools have, shall we say, "evolving" support for USDT.  As of now, with the
         // latest git version of `bpftrace`, the provider name can't have dots or colons.  For now,
@@ -57,13 +69,7 @@ impl ProviderSpecification {
         // snake_case for consistency with USDT naming conventions.  If two modules in the same
         // process have the same provider name, they will conflict and some unspecified `bad
         // things` will happen.
-        Ok(ProviderSpecification {
-            name: item_trait.ident.to_string().to_snake_case(),
-            hash,
-            item_trait: item_trait.clone(),
-            token_stream,
-            probes,
-        })
+        ident.to_string().to_snake_case()
     }
 
     pub fn name(&self) -> &str {

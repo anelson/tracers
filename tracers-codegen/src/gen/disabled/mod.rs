@@ -4,16 +4,19 @@
 //! types, although it uses them only at compile time it still requires that the user's crate have
 //! a `probers` dependency.
 use crate::build_rs::BuildInfo;
+use crate::gen::native::noop::probe_call;
+use crate::gen::native::noop::provider_trait;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
+use crate::TracersError;
 use crate::{gen::CodeGenerator, TracersResult};
+use failure::format_err;
 use proc_macro2::TokenStream;
+use quote::quote_spanned;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-
-use crate::gen::native::noop::probe_call;
-use crate::gen::native::noop::provider_trait;
+use syn::spanned::Spanned;
 
 #[allow(dead_code)]
 pub(crate) struct DisabledGenerator {
@@ -35,8 +38,8 @@ impl CodeGenerator for DisabledGenerator {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_init_provider(&self, _init: ProviderInitSpecification) -> TracersResult<TokenStream> {
-        unimplemented!()
+    fn handle_init_provider(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+        generate_init_provider(init)
     }
 
     fn generate_native_code(
@@ -56,4 +59,28 @@ impl CodeGenerator for DisabledGenerator {
 
         Ok(())
     }
+}
+
+/// Generates the stripped-down version of the `init_provider` macro that doesn't assume any trait
+/// code was generated at all
+fn generate_init_provider(init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+    //Probing is entirely disabled so there is not provider `__try_init_provider`, evaluate
+    //the macro to a literal
+    let provider = init.provider;
+    let span = provider.span();
+    let provider_ident = provider
+        .segments
+        .last()
+        .map(|pair| pair.value().ident.clone())
+        .ok_or_else(|| {
+            TracersError::other_error(format_err!("Error getting trait name").context(""))
+        })?;
+
+    let provider_name = ProviderSpecification::provider_name_from_trait(&provider_ident);
+    let version = env!("CARGO_PKG_VERSION");
+    Ok(quote_spanned! {span=>
+        {
+            ::core::result::Result::<&'static str, &'static str>::Ok(concat!(#provider_name, "::", "disabled", "::", #version))
+        }
+    })
 }
