@@ -69,7 +69,8 @@ pub(super) fn generate_try_init_decl(provider: &ProviderSpecification) -> TokenS
         ///
         /// Callers should not call this method directly.  Instead use the provided
         /// `init_provider!` macro.  This will correctly elide the call when probing is
-        /// compile-time disabled.
+        /// compile-time disabled.  When `tracers` is compiled with tracing disabled, this function
+        /// will not be generated so any code that assumes its presence will break;
         ///
         /// # Example
         ///
@@ -119,10 +120,10 @@ pub(super) fn generate_get_init_error_decl(provider: &ProviderSpecification) -> 
         ///
         /// # Usage
         ///
-        /// In general callers should prefer to use the `init_provider!` macro which wraps a
-        /// call to `__try_init_provider`.  Calls to `get_init_error()` directly are necessary
-        /// only when the caller specifically wants to avoid triggering initialization of the
-        /// provider, but merely to test if initialization was attempted and failed previously.
+        /// Callers should *NOT* call this function directly.  When `tracers` is built with tracing
+        /// disabled, this function will not exist, so any code that assumes it does will break.
+        /// The only safe way to access the status of the provider is with the `provider_init!`
+        /// macro.
         #[allow(dead_code)]
         #vis fn __get_init_error() -> Option<&'static ::tracers::runtime::failure::Error>
     }

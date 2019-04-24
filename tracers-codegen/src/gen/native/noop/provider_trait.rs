@@ -79,8 +79,27 @@ impl ProviderTraitGenerator {
         let vis = &self.spec.item_trait().vis;
 
         let trait_doc_comment = common::generate_trait_comment(&self.spec);
-        let try_init_decl = common::generate_try_init_decl(&self.spec);
-        let get_init_error_decl = common::generate_get_init_error_decl(&self.spec);
+
+        let init_methods = if self.has_runtime {
+            //The init methods return a `failure::Error`, which we re-export as
+            //`::probers::runtime::failure::Error` because we can't assume the dependent crate has
+            //a dependency on `failure`.  This obviously only works if tracing is enabled
+            let try_init_decl = common::generate_try_init_decl(&self.spec);
+            let get_init_error_decl = common::generate_get_init_error_decl(&self.spec);
+
+            quote_spanned! {span=>
+                #try_init_decl {
+                    None
+                }
+
+                #get_init_error_decl {
+                    None
+                }
+            }
+        } else {
+            //tracing is disable to don't generate the init methods at all
+            quote! {}
+        };
 
         let result = quote_spanned! {span=>
             #(#attrs)*
@@ -90,13 +109,7 @@ impl ProviderTraitGenerator {
             impl #ident {
                 #(#probe_methods)*
 
-                #try_init_decl {
-                    None
-                }
-
-                #get_init_error_decl {
-                    None
-                }
+                #init_methods
             }
         };
 
