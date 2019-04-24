@@ -12,7 +12,7 @@ use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{CodeGenerator, TracersResult};
+use crate::{gen::CodeGenerator, TracersResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ mod probe_call;
 mod provider_init;
 mod provider_trait;
 
-pub struct DynamicGenerator {
+pub(crate) struct DynamicGenerator {
     _build_info: BuildInfo,
 }
 

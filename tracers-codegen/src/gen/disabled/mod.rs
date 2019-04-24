@@ -7,7 +7,7 @@ use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{CodeGenerator, TracersResult};
+use crate::{gen::CodeGenerator, TracersResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -16,7 +16,7 @@ use crate::gen::native::noop::probe_call;
 use crate::gen::native::noop::provider_trait;
 
 #[allow(dead_code)]
-pub struct DisabledGenerator {
+pub(crate) struct DisabledGenerator {
     build_info: BuildInfo,
 }
 

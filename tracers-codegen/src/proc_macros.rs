@@ -3,6 +3,7 @@
 //! macros and nothing else.  That's an inconvenient restriction, especially since there's quite a
 //! lot of overlap between the macro code and the build-time probe code generation logic.  Hence,
 //! this bifurcation.
+use crate::gen;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
@@ -46,19 +47,18 @@ pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> T
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
 pub fn probe_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
-    crate::code_generator()?.handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
+    gen::code_generator()?.handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
 }
 
 pub fn init_provider_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
-    crate::code_generator()?
+    gen::code_generator()?
         .handle_provider_init(ProviderInitSpecification::from_token_stream(tokens)?)
 }
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
 /// more testable
 pub fn tracer_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
-    crate::code_generator()?
-        .handle_provider_trait(ProviderSpecification::from_token_stream(tokens)?)
+    gen::code_generator()?.handle_provider_trait(ProviderSpecification::from_token_stream(tokens)?)
 }
 
 #[cfg(test)]

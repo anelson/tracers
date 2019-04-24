@@ -4,6 +4,7 @@
 
 use crate::cargo;
 use crate::error::{TracersError, TracersResult};
+use crate::gen;
 use crate::TracingImplementation;
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
@@ -93,7 +94,7 @@ impl FeatureFlags {
 /// Serializable struct which is populated in `build.rs` to indicate to the proc macros which
 /// tracing implementation they should use.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct BuildInfo {
+pub(crate) struct BuildInfo {
     pub implementation: TracingImplementation,
 }
 
@@ -242,7 +243,7 @@ fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> Trace
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
-    crate::code_generator()?.generate_native_code(
+    gen::code_generator()?.generate_native_code(
         out,
         err,
         &Path::new(&manifest_path),

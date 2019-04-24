@@ -13,7 +13,7 @@ use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::{CodeGenerator, TracersResult};
+use crate::{gen::CodeGenerator, TracersResult};
 use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -22,7 +22,7 @@ pub(crate) mod probe_call;
 pub(crate) mod provider_trait;
 
 #[allow(dead_code)]
-pub struct NoOpGenerator {
+pub(crate) struct NoOpGenerator {
     build_info: BuildInfo,
 }
 
