@@ -72,12 +72,22 @@ jobs:
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       - script: TRACERS_EXPECTED_IMPL=dyn_stap scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features --features=enable-dynamic-tracing -vv
-        displayName: Cargo test SystemTap implementation
+        displayName: Cargo test SystemTap implementation (Linux)
         condition: eq( variables['Agent.OS'], 'Linux' )
 
       - script: TRACERS_EXPECTED_IMPL=DISABLED scripts/test.sh --manifest-path tracers/Cargo.toml
         displayName: Cargo test default Native NoOp implementation (Linux)
         condition: eq( variables['Agent.OS'], 'Linux' )
+
+      - script: TRACERS_EXPECTED_IMPL=DISABLED scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features -vv
+        displayName: Cargo test tracing disabled (non-Windows)
+        condition: eq( variables['Agent.OS'], 'Linux' )
+
+      - script: |
+          echo "##vso[task.setvariable variable=TRACERS_EXPECTED_IMPL;]no-op"
+          scripts\test.bat --manifest-path tracers/Cargo.toml --no-default-features -vv
+        displayName: Cargo test tracing disabled (Windows)
+        condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       - script: TRACERS_EXPECTED_IMPL=DISABLED scripts/test.sh -vv
         displayName: Cargo test default Native NoOp implementation (non-Windows)
