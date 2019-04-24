@@ -284,6 +284,7 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
             // "implementation" is to completely disable tracing.  If that's not the case, set the
             // appropriate features for the compiler to use when compiling the `tracers` code.
             if implementation.is_enabled() {
+                writeln!(out, "cargo:rustc-cfg=enabled").unwrap();
                 writeln!(out,
                     "cargo:rustc-cfg={}_enabled",
                     if implementation.is_native() {
@@ -478,19 +479,19 @@ mod tests {
             match expected_impl {
                 TracingImplementation::Disabled => assert!(!output.contains("enabled")),
                 TracingImplementation::NativeNoOp => {
-                    assert!(output.contains("cargo:enabled"));
-                    assert!(output.contains("cargo:native_enabled"));
-                    assert!(output.contains("cargo:native_noop_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=native_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=native_noop_enabled"));
                 }
                 TracingImplementation::DynamicNoOp => {
-                    assert!(output.contains("cargo:enabled"));
-                    assert!(output.contains("cargo:dynamic_enabled"));
-                    assert!(output.contains("cargo:dyn_noop_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=dynamic_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=dyn_noop_enabled"));
                 }
                 TracingImplementation::DynamicStap => {
-                    assert!(output.contains("cargo:enabled"));
-                    assert!(output.contains("cargo:dynamic_enabled"));
-                    assert!(output.contains("cargo:dyn_stap_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=dynamic_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=dyn_stap_enabled"));
                 }
             }
 

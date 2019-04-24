@@ -18,8 +18,8 @@ use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-mod probe_call;
-mod provider_trait;
+pub(crate) mod probe_call;
+pub(crate) mod provider_trait;
 
 #[allow(dead_code)]
 pub struct NoOpGenerator {
@@ -34,7 +34,7 @@ impl NoOpGenerator {
 
 impl CodeGenerator for NoOpGenerator {
     fn handle_provider_trait(&self, provider: ProviderSpecification) -> TracersResult<TokenStream> {
-        provider_trait::ProviderTraitGenerator::new(provider).generate()
+        provider_trait::ProviderTraitGenerator::new(true, provider).generate()
     }
 
     fn handle_probe_call(&self, call: ProbeCallSpecification) -> TracersResult<TokenStream> {

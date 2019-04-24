@@ -1,6 +1,7 @@
-//! This module generates the code for a call to a probe implemented with the `libstapsdt` library.
-//! It's rather simple, because it assumes the Rust bindings on the `libstapsdt` API are already a
-//! dependency and exposed via the `SystemTracer` type alias.
+//! This generates probe calls for the `probe!` macro when the no-op implementation is being used.
+//! That means the call doesn't do anything at runtime, but it should still include in the code an
+//! unreachable line that performs the call, just to make sure the compiler still does type
+//! checking and counts the arguments as being used.
 
 use crate::spec::ProbeCallSpecification;
 use crate::TracersResult;
@@ -8,7 +9,7 @@ use proc_macro2::TokenStream;
 use quote::quote_spanned;
 use syn::spanned::Spanned;
 
-pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> TracersResult<TokenStream> {
+pub(crate) fn generate_probe_call(call: ProbeCallSpecification) -> TracersResult<TokenStream> {
     match call {
         ProbeCallSpecification::FireOnly(details) => {
             //The no-op implementation doesn't permute the probe name at all, it's just called

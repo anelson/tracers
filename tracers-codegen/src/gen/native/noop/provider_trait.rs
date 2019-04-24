@@ -8,22 +8,34 @@ use crate::spec::ProviderSpecification;
 use crate::TracersResult;
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
-use quote::quote_spanned;
+use quote::{quote, quote_spanned};
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
-pub(super) struct ProviderTraitGenerator {
+pub(crate) struct ProviderTraitGenerator {
+    /// true if the code generator can assume the `tracers` runtime code is available
+    /// when used with the `noop` implementation this is `true`, however this code is also used by
+    /// the `disabled` implementation which must work when there is no runtime dependency on
+    /// `tracers` at all
+    has_runtime: bool,
     spec: ProviderSpecification,
     probes: Vec<ProbeGenerator>,
 }
 
 impl ProviderTraitGenerator {
-    pub fn new(spec: ProviderSpecification) -> ProviderTraitGenerator {
+    pub fn new(has_runtime: bool, spec: ProviderSpecification) -> ProviderTraitGenerator {
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
-        let probes: Vec<_> = probes.into_iter().map(ProbeGenerator::new).collect();
-        ProviderTraitGenerator { spec, probes }
+        let probes: Vec<_> = probes
+            .into_iter()
+            .map(|probe| ProbeGenerator::new(has_runtime, probe))
+            .collect();
+        ProviderTraitGenerator {
+            has_runtime,
+            spec,
+            probes,
+        }
     }
 
     pub fn generate(&self) -> TracersResult<TokenStream> {
@@ -92,25 +104,34 @@ impl ProviderTraitGenerator {
     }
 
     fn generate_impl_mod(&self) -> TokenStream {
-        let mod_name = self.get_provider_impl_mod_name();
-        let struct_type_name = syn::Ident::new("ProbeArgTypeCheck", self.spec.item_trait().span());
+        if self.has_runtime {
+            //Generate a module that has some code to use our `ProbeArgType` trait to verify at
+            //compile time that every probe argument has a corresponding C representation.
+            //Since that requires that the `tracers` runtime be available to the caller, it won't
+            //work if that runtime is missing
+            let mod_name = self.get_provider_impl_mod_name();
+            let struct_type_name =
+                syn::Ident::new("ProbeArgTypeCheck", self.spec.item_trait().span());
 
-        let span = self.spec.item_trait().span();
-        quote_spanned! {span=>
-            mod #mod_name {
-                use tracers::runtime::ProbeArgType;
+            let span = self.spec.item_trait().span();
+            quote_spanned! {span=>
+                mod #mod_name {
+                    use tracers::runtime::ProbeArgType;
 
-                pub(super) struct #struct_type_name<T: ProbeArgType<T>> {
-                    _t: ::std::marker::PhantomData<T>,
-                }
+                    pub(super) struct #struct_type_name<T: ProbeArgType<T>> {
+                        _t: ::std::marker::PhantomData<T>,
+                    }
 
-                impl<T: ProbeArgType<T>> #struct_type_name<T> {
-                    #[allow(dead_code)]
-                    pub fn wrap(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
-                        ::tracers::runtime::wrap::<T>(arg)
+                    impl<T: ProbeArgType<T>> #struct_type_name<T> {
+                        #[allow(dead_code)]
+                        pub fn wrap(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
+                            ::tracers::runtime::wrap::<T>(arg)
+                        }
                     }
                 }
             }
+        } else {
+            quote! {}
         }
     }
 
@@ -127,12 +148,13 @@ impl ProviderTraitGenerator {
 }
 
 pub(super) struct ProbeGenerator {
+    has_runtime: bool,
     spec: ProbeSpecification,
 }
 
 impl ProbeGenerator {
-    pub fn new(spec: ProbeSpecification) -> ProbeGenerator {
-        ProbeGenerator { spec }
+    pub fn new(has_runtime: bool, spec: ProbeSpecification) -> ProbeGenerator {
+        ProbeGenerator { has_runtime, spec }
     }
 
     pub fn generate_trait_methods(
@@ -148,8 +170,18 @@ impl ProbeGenerator {
         let args_type_assertions = self.spec.args.iter().map(|arg| {
             let span = arg.syn_typ().span();
             let arg_name = arg.ident();
-            quote_spanned! {span=>
-                #struct_type_path::wrap(#arg_name);
+
+            //If the runtime is available, then the type assertion method is available
+            //If not, just generate an expression that will count as 'using' the argument so the
+            //compiler doesn't complain
+            if self.has_runtime {
+                quote_spanned! {span=>
+                    #struct_type_path::wrap(#arg_name);
+                }
+            } else {
+                quote_spanned! {span=>
+                    let _ = #arg_name;
+                }
             }
         });
 
@@ -200,17 +232,19 @@ mod test {
         })
         .into_iter()
         {
-            let item_trait = test_case.get_item_trait();
-            let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
-                "Failed to create specification from test trait '{}'",
-                test_case.description
-            ));
+            for has_runtime in [false, true].into_iter() {
+                let item_trait = test_case.get_item_trait();
+                let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
+                    "Failed to create specification from test trait '{}'",
+                    test_case.description
+                ));
 
-            let generator = ProviderTraitGenerator::new(spec);
-            generator.generate().expect(&format!(
-                "Failed to generate test trait '{}'",
-                test_case.description
-            ));
+                let generator = ProviderTraitGenerator::new(*has_runtime, spec);
+                generator.generate().expect(&format!(
+                    "Failed to generate test trait '{}'",
+                    test_case.description
+                ));
+            }
         }
     }
 }
