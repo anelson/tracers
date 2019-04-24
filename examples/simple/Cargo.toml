@@ -5,8 +5,8 @@ authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-probers = { path = "../../probers", version = "0.1.0" }
-probers-macros = { path = "../../probers-macros", version = "0.1.0" }
+tracers = { path = "../../tracers", version = "0.1.0" }
+tracers-macros = { path = "../../tracers-macros", version = "0.1.0" }
 
 [build-dependencies]
-probers-build = { path = "../../probers-build", version = "0.1.0" }
+tracers-build = { path = "../../tracers-build", version = "0.1.0" }

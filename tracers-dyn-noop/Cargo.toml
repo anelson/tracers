@@ -1,0 +1,22 @@
+[package]
+name = "tracers-dyn-noop"
+version = "0.1.0"
+authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT/Apache-2.0"
+description = """
+Implements the `tracers` dynamic tracing API but doesn't actually do anything (hence `noop`, as in "No Operation").
+
+This is a fallback when dynamic tracing is enabled, but there are no real dynamic implementations available on the
+target platform.
+
+Never use this crate directly.  Always use `tracers` and let it select the suitable implementation
+"""
+
+[dependencies]
+tracers-core = { path = "../tracers-core", version = "0.1.0" }
+failure = "0.1.5"
+
+[build-dependencies]
+failure = "0.1.5"
+

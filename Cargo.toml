@@ -2,14 +2,14 @@
 members = [
     "libelf-sys",
     "libstapsdt-sys",
-    "probers-build",
-    "probers-codegen",
-    "probers-core",
-    "probers-macros",
-    "probers-macros-hack",
-    "probers-dyn-noop",
-    "probers-dyn-stap",
-    "probers",
+    "tracers-build",
+    "tracers-codegen",
+    "tracers-core",
+    "tracers-macros",
+    "tracers-macros-hack",
+    "tracers-dyn-noop",
+    "tracers-dyn-stap",
+    "tracers",
 
     "examples/simple"
 ]

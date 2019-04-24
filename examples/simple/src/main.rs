@@ -2,9 +2,9 @@
 //!
 //! It's the "hello world" equivalent for tracing
 
-use probers_macros::{probe, prober};
+use tracers_macros::{probe, tracer};
 
-#[prober]
+#[tracer]
 trait SimpleProbes {
     fn hello(who: &str);
 }

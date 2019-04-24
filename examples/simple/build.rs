@@ -1,4 +1,4 @@
-use probers_build::build;
+use tracers_build::build;
 
 fn main() {
     build();

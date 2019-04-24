@@ -1,0 +1,40 @@
+[package]
+name = "tracers-macros-hack"
+version = "0.1.0"
+authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
+edition = "2018"
+license = "MIT/Apache-2.0"
+description = """
+This crate contains the actual `proc-macro=true` crate which implements the probing macros.  Because the
+`probe!` macro is actually a procedural macro but is used in expression position, we must use the `proc_macro_hack` crate
+to work around the fact that Rust doesn't natively support this usage yet.  That hack requires that the actual macro be implemented
+in one crate, then re-exported from a second crate.  Thus, to ensure that callers can simply add a dependency on `tracers_macros`,
+we make `tracers_macros` the re-exporting crate and this one, `tracers_macros_hack`, the actual proc macro crate.
+
+Confused?  Me too.
+"""
+
+[dependencies]
+quote = "0.6.11"
+failure = "0.1.5"
+once_cell = "0.1.8"
+proc-macro2 = "0.4"
+heck = "0.3"
+proc-macro-hack = "0.5"
+tracers-codegen = { path = "../tracers-codegen", version = "0.1.0" }
+tracers-core = { path = "../tracers-core", version = "0.1.0" }
+
+[dependencies.syn]
+# We need some optional features of syn in order to implement the macro
+version = "0.15.27"
+features = ["full"]
+
+[dev-dependencies]
+quickcheck = "0.8"
+quickcheck_macros = "0.8"
+# The integration tests use the macro to generate probe impls so they need access to the type aliases in the top level
+# crate
+#tracers= { path = "..", version = "0.1.0" }
+
+[lib]
+proc-macro=true

@@ -4,7 +4,7 @@
 //!
 //! Many Linux distros have some kind of `libelf` package, but at least on Ubuntu 16.04 and
 //! probably many others, the static lib is not compiled with `-fPIC` and thus can't be used.
-//! Rather than require the user of the `probers` crate to deal with this, it's easier to just
+//! Rather than require the user of the `tracers` crate to deal with this, it's easier to just
 //! build directly from source.
 extern crate cc;
 
