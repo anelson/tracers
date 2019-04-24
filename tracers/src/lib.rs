@@ -14,33 +14,40 @@
 /// there's no reason to even include this runtime
 #[cfg(enabled)]
 pub mod runtime {
-    pub use tracers_core::*;
-    pub extern crate failure;
-    pub extern crate once_cell;
-
-    // Re-export some types from child crates which callers will need to be able to use.  Ergonomically
-    // it makes more sense to a caller to deal with, for example, `tracers::Provider`
-
-    //Alias `SystemTracer` to the appropriate implementation based on the determination made in
-    //`build.rs`
-    #[cfg(dyn_stap_enabled)]
-    pub type SystemTracer = tracers_dyn_stap::StapTracer;
-
-    #[cfg(dyn_noop_enabled)]
-    pub type SystemTracer = tracers_noop::NoOpTracer;
+    pub use tracers_core::failure;
+    pub use tracers_core::{wrap, ProbeArgNativeType, ProbeArgType, ProbeArgWrapper};
 
     #[cfg(dynamic_enabled)]
-    pub type SystemProvider = <SystemTracer as Tracer>::ProviderType;
+    pub mod dynamic {
+        pub extern crate once_cell;
 
-    #[cfg(dynamic_enabled)]
-    pub type SystemProbe = <SystemTracer as Tracer>::ProbeType;
+        pub use tracers_core::dynamic::*;
 
+        // Re-export some types from child crates which callers will need to be able to use.  Ergonomically
+        // it makes more sense to a caller to deal with, for example, `tracers::Provider`
+
+        //Alias `SystemTracer` to the appropriate implementation based on the determination made in
+        //`build.rs`
+        #[cfg(dyn_stap_enabled)]
+        pub type SystemTracer = tracers_dyn_stap::StapTracer;
+
+        #[cfg(dyn_noop_enabled)]
+        pub type SystemTracer = tracers_noop::NoOpTracer;
+
+        #[cfg(dynamic_enabled)]
+        pub type SystemProvider = <SystemTracer as Tracer>::ProviderType;
+
+        #[cfg(dynamic_enabled)]
+        pub type SystemProbe = <SystemTracer as Tracer>::ProbeType;
+    }
 }
 
 #[cfg(test)]
 mod test {
     #[cfg(dynamic_enabled)]
     use super::runtime::*;
+    #[cfg(dynamic_enabled)]
+    use tracers_core::dynamic::Tracer;
 
     #[test]
     #[cfg(dynamic_enabled)]
@@ -50,7 +57,7 @@ mod test {
         //practice this is only used by the CI builds to verify that the compile-time magic always
         //ends up with the expeced implementation on a variety of environments
         if let Ok(expected_impl) = std::env::var("TRACERS_EXPECTED_IMPL") {
-            assert_eq!(expected_impl, SystemTracer::TRACING_IMPLEMENTATION);
+            assert_eq!(expected_impl, dynamic::SystemTracer::TRACING_IMPLEMENTATION);
         }
     }
 

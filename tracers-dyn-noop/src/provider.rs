@@ -1,8 +1,6 @@
 //! Implements the `ProviderBuilder` and `Provider` traits for SystemTap
 use failure::Fallible;
-use tracers_core::ProbeArgs;
-use tracers_core::ProbeDefinition;
-use tracers_core::{Provider, ProviderBuilder};
+use tracers_core::dynamic::{ProbeArgs, ProbeDefinition, Provider, ProviderBuilder};
 
 use super::{NoOpProbe, NoOpTracer};
 

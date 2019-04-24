@@ -4,7 +4,7 @@
 //! few instructions
 use failure::Fallible;
 
-use tracers_core::Tracer;
+use tracers_core::dynamic::Tracer;
 
 use super::{NoOpProbe, NoOpProvider, NoOpProviderBuilder};
 

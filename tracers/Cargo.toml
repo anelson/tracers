@@ -24,11 +24,10 @@ default = ["enable-native-tracing"]
 
 # To enable dynamic tracing requires it be explicitly activated.  Note this is mutually exclusive with
 # enable-native-tracing
-enable-dynamic-tracing = ["tracers-dyn-stap/enabled", "tracers-dyn-noop"]
+enable-dynamic-tracing = ["once_cell", "tracers-core/dynamic", "tracers-dyn-stap/enabled", "tracers-dyn-noop"]
 
 # Native tracing is built in to the generators, it doesn't have any additional dependent crates
-enable-native-tracing = []
-
+enable-native-tracing = ["tracers-core/default"]
 
 force-dyn-stap = ["enable-dynamic-tracing", "tracers-dyn-stap/required"]
 
@@ -44,9 +43,8 @@ path = "src/bin/testfire.rs"
 required-features = [ "binaries" ]
 
 [dependencies]
-failure = "0.1.5"
-once_cell = "0.1.8"
-tracers-core = { path = "../tracers-core", version = "0.1.0" }
+once_cell = { version = "0.1.8", optional = true }
+tracers-core = { path = "../tracers-core", version = "0.1.0", optional = true }
 tracers-dyn-noop = { path = "../tracers-dyn-noop", version = "0.1.0", optional = true }
 tracers-dyn-stap = { path = "../tracers-dyn-stap", version = "0.1.0", optional = true }
 

@@ -130,10 +130,9 @@ impl ProviderTraitGenerator {
         let span = self.spec.item_trait().span();
         quote_spanned! {span=>
             mod #mod_name {
-                use ::tracers::runtime::failure::{bail, Fallible};
-                use ::tracers::runtime::{SystemTracer,SystemProvider, Provider};
-                use ::tracers::runtime::{ProviderBuilder,Tracer};
-                use ::tracers::runtime::once_cell::sync::OnceCell;
+                use ::tracers::runtime::failure::{bail, Fallible, Error};
+                use ::tracers::runtime::dynamic::once_cell::sync::OnceCell;
+                use ::tracers::runtime::dynamic::{SystemTracer,SystemProvider, Provider,ProviderBuilder,Tracer};
 
                 #[allow(dead_code)]
                 pub(super) struct #struct_type_name<#struct_type_params> {
@@ -148,7 +147,7 @@ impl ProviderTraitGenerator {
                 static IMPL_OPT: OnceCell<Option<&'static #struct_type_name>> = OnceCell::INIT;
 
                 impl<#struct_type_params> #struct_type_name<#struct_type_params> {
-                   pub(super) fn get_init_error() -> Option<&'static failure::Error> {
+                   pub(super) fn get_init_error() -> Option<&'static Error> {
                         //Don't do a whole re-init cycle again, but if the initialization has happened,
                         //check for failure
                         #struct_var_name.get().and_then(|fallible|  fallible.as_ref().err() )
@@ -461,7 +460,7 @@ impl ProbeGenerator {
 
         let span = self.spec.span;
         quote_spanned! {span=>
-            ::tracers::runtime::ProviderProbe<#a_lifetime, ::tracers::runtime::SystemProbe, #arg_tuple>
+            ::tracers::runtime::dynamic::ProviderProbe<#a_lifetime, ::tracers::runtime::dynamic::SystemProbe, #arg_tuple>
         }
     }
 

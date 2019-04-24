@@ -1,6 +1,6 @@
 //! Implements the `UnsafeProviderProbeImpl` trait that does nothing ('no-op')
 
-use tracers_core::{ProbeArgNativeType, UnsafeProviderProbeNativeImpl};
+use tracers_core::{dynamic::UnsafeProviderProbeNativeImpl, ProbeArgNativeType};
 
 #[derive(Clone)]
 pub struct NoOpProbe {}

@@ -1,7 +1,7 @@
 //! Implements the `UnsafeProviderProbeImpl` trait for SystemTap
 
 use libstapsdt_sys::{probeFire, SDTProbe_t};
-use tracers_core::{ProbeArgNativeType, UnsafeProviderProbeNativeImpl};
+use tracers_core::{dynamic::UnsafeProviderProbeNativeImpl, ProbeArgNativeType};
 
 /// Represents a SystemTap probe, which is simply an `SDTProbe_t*`.  This can be copied very
 /// cheaply which is why Clone is derived.

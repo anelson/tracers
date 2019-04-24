@@ -1,6 +1,11 @@
-//! This module defines the API which is to be implemented by various tracing implementations to register and fire probes.
-//! This API is not intended to be called directly but rather by the macros which wrap it in a type-safe facade.
-use super::argtypes::{
+//! This module contains the dynamic tracing API which is implemented by various platform-specific
+//! providers.
+//!
+//! The dynamic tracing API is designed for platforms that do not have or projects that do not want
+//! to use static tracing, which is usually more performant.  Dynamic tracing is implemented in
+//! libraries like `libstapsdt`.
+
+use crate::argtypes::{
     wrap, CType, ProbeArgNativeType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper,
 };
 use failure::Fallible;

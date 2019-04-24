@@ -2,7 +2,7 @@
 //! it implements `Tracer` for the Linux SystemTap tracing API
 use failure::Fallible;
 
-use tracers_core::{ProviderBuilder, Tracer};
+use tracers_core::dynamic::{ProviderBuilder, Tracer};
 
 use super::{StapProbe, StapProvider, StapProviderBuilder};
 

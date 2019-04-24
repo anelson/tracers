@@ -1,13 +1,11 @@
 //! Implements the `ProviderBuilder` and `Provider` traits for SystemTap
 use failure::{Fail, Fallible};
 use libstapsdt_sys::*;
-use tracers_core::argtypes::CType;
-use tracers_core::ProbeArgs;
-use tracers_core::ProbeDefinition;
-use tracers_core::{Provider, ProviderBuilder};
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::ptr;
+use tracers_core::argtypes::CType;
+use tracers_core::dynamic::{ProbeArgs, ProbeDefinition, Provider, ProviderBuilder};
 
 use super::{StapProbe, StapTracer};
 
