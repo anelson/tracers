@@ -12,6 +12,7 @@
 ///
 /// The `build.rs` will set a feature to indicate if tracing is enabled at all.  If not then
 /// there's no reason to even include this runtime
+#[cfg(enabled)]
 pub mod runtime {
     pub use tracers_core::*;
     pub extern crate failure;
