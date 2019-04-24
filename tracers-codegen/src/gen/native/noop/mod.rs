@@ -9,6 +9,7 @@
 //!
 //! Thus this mode uses somme creative Rust trickery to generate code that ensures the compiler
 //! does its usual type checks, but at runtime nothing actually happens.
+use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
@@ -21,24 +22,33 @@ mod probe_call;
 mod provider_trait;
 
 #[allow(dead_code)]
-pub struct NoOpGenerator {}
+pub struct NoOpGenerator {
+    build_info: BuildInfo,
+}
+
+impl NoOpGenerator {
+    pub fn new(build_info: BuildInfo) -> NoOpGenerator {
+        NoOpGenerator { build_info }
+    }
+}
 
 impl CodeGenerator for NoOpGenerator {
-    fn handle_provider_trait(provider: ProviderSpecification) -> TracersResult<TokenStream> {
+    fn handle_provider_trait(&self, provider: ProviderSpecification) -> TracersResult<TokenStream> {
         provider_trait::ProviderTraitGenerator::new(provider).generate()
     }
 
-    fn handle_probe_call(call: ProbeCallSpecification) -> TracersResult<TokenStream> {
+    fn handle_probe_call(&self, call: ProbeCallSpecification) -> TracersResult<TokenStream> {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(_init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+    fn handle_provider_init(&self, _init: ProviderInitSpecification) -> TracersResult<TokenStream> {
         unimplemented!()
     }
 
-    fn generate_native_code<WOut: Write, WErr: Write>(
-        stdout: &mut WOut,
-        _stderr: &mut WErr,
+    fn generate_native_code(
+        &self,
+        stdout: &mut dyn Write,
+        _stderr: &mut dyn Write,
         _manifest_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,

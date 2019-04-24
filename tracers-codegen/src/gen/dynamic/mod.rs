@@ -8,6 +8,7 @@
 //! does more work at compile time and fits much better in the SystemTap/DTrace/ETW style of
 //! tracing.  However, this remains in case a use for it emerges, perhaps on another platform with
 //! more intrinsic support for dynamic style tracing.
+use crate::build_rs::BuildInfo;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
@@ -20,26 +21,37 @@ mod probe_call;
 mod provider_init;
 mod provider_trait;
 
-pub struct DynamicGenerator {}
+pub struct DynamicGenerator {
+    _build_info: BuildInfo,
+}
+
+impl DynamicGenerator {
+    pub fn new(build_info: BuildInfo) -> DynamicGenerator {
+        DynamicGenerator {
+            _build_info: build_info,
+        }
+    }
+}
 
 impl CodeGenerator for DynamicGenerator {
-    fn handle_provider_trait(provider: ProviderSpecification) -> TracersResult<TokenStream> {
+    fn handle_provider_trait(&self, provider: ProviderSpecification) -> TracersResult<TokenStream> {
         let generator = provider_trait::ProviderTraitGenerator::new(provider);
 
         generator.generate()
     }
 
-    fn handle_probe_call(call: ProbeCallSpecification) -> TracersResult<TokenStream> {
+    fn handle_probe_call(&self, call: ProbeCallSpecification) -> TracersResult<TokenStream> {
         probe_call::generate_probe_call(call)
     }
 
-    fn handle_provider_init(init: ProviderInitSpecification) -> TracersResult<TokenStream> {
+    fn handle_provider_init(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
         provider_init::generate_provider_init(init)
     }
 
-    fn generate_native_code<WOut: Write, WErr: Write>(
-        stdout: &mut WOut,
-        _stderr: &mut WErr,
+    fn generate_native_code(
+        &self,
+        stdout: &mut dyn Write,
+        _stderr: &mut dyn Write,
         _manifest_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,

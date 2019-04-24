@@ -5,7 +5,6 @@
 use crate::cargo;
 use crate::error::{TracersError, TracersResult};
 use crate::TracingImplementation;
-use crate::{CodeGenerator, Generator};
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -243,7 +242,13 @@ fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> Trace
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
-    Generator::generate_native_code(out, err, &Path::new(&manifest_path), &package_name, targets)
+    crate::code_generator()?.generate_native_code(
+        out,
+        err,
+        &Path::new(&manifest_path),
+        &package_name,
+        targets,
+    )
 }
 
 /// This function is the counterpart to `build`, which is intended to be invoked in the `tracers`
@@ -275,17 +280,20 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
     writeln!(out, "Detected features: \n{:?}", features).unwrap();
 
     select_implementation(&features).map(|implementation| {
-            //Build succeeded, which means the Rust bindings should be enabled and
-            //dependent crates should be signaled that this lib is available
-            writeln!(out,
-                "cargo:rustc-cfg={}_enabled",
-                if implementation.is_native() {
-                    "native"
-                } else {
-                    "dynamic"
-                }
-            ).unwrap(); //this category of tracing is enabled
-            writeln!(out, "cargo:rustc-cfg={}_enabled", implementation.as_ref()).unwrap(); //this specific impl is enabled
+            // Some implementation was selected, but it's possible that the selected
+            // "implementation" is to completely disable tracing.  If that's not the case, set the
+            // appropriate features for the compiler to use when compiling the `tracers` code.
+            if implementation.is_enabled() {
+                writeln!(out,
+                    "cargo:rustc-cfg={}_enabled",
+                    if implementation.is_native() {
+                        "native"
+                    } else {
+                        "dynamic"
+                    }
+                ).unwrap(); //this category of tracing is enabled
+                writeln!(out, "cargo:rustc-cfg={}_enabled", implementation.as_ref()).unwrap(); //this specific impl is enabled
+            }
 
             //All downstream creates from `tracers` will just call `tracers_build::build`, but this
             //is a special case because we've already decided above which implementation to use.
@@ -314,7 +322,7 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
 /// Selects a `tracers` implementation given a set of feature flags specified by the user
 fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplementation> {
     if !features.enable_tracing() {
-        return Ok(TracingImplementation::NativeNoOp);
+        return Ok(TracingImplementation::Disabled);
     }
 
     //If any implementation is forced, then see if it's available and if so then accept it
@@ -418,7 +426,7 @@ mod tests {
             //features, expected_impl
             (
                 FeatureFlags::new(false, false, false, false).unwrap(),
-                TracingImplementation::NativeNoOp,
+                TracingImplementation::Disabled,
             ),
             (
                 FeatureFlags::new(true, false, false, false).unwrap(),
@@ -465,6 +473,26 @@ mod tests {
                 "cargo:build-info-path={}",
                 build_info_path.display()
             )));
+
+            //and the features used to compile `tracers` should correspond to the implementation
+            match expected_impl {
+                TracingImplementation::Disabled => assert!(!output.contains("enabled")),
+                TracingImplementation::NativeNoOp => {
+                    assert!(output.contains("cargo:enabled"));
+                    assert!(output.contains("cargo:native_enabled"));
+                    assert!(output.contains("cargo:native_noop_enabled"));
+                }
+                TracingImplementation::DynamicNoOp => {
+                    assert!(output.contains("cargo:enabled"));
+                    assert!(output.contains("cargo:dynamic_enabled"));
+                    assert!(output.contains("cargo:dyn_noop_enabled"));
+                }
+                TracingImplementation::DynamicStap => {
+                    assert!(output.contains("cargo:enabled"));
+                    assert!(output.contains("cargo:dynamic_enabled"));
+                    assert!(output.contains("cargo:dyn_stap_enabled"));
+                }
+            }
 
             //Next, the user crate's `build.rs` will want to know what the selected impl was
             drop(vars);

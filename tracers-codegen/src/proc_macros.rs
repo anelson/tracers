@@ -10,8 +10,6 @@ use crate::TracersResult;
 use proc_macro2::TokenStream;
 use std::fmt::Display;
 
-use crate::{CodeGenerator, Generator};
-
 /// Uses the `syn` library's `Error` struct to report an error in the form of a `TokenStream`, so
 /// that a proc macro can insert this token stream into its output and thereby report a detailed
 /// error message to the user.
@@ -48,17 +46,19 @@ pub fn report_error<T: quote::ToTokens, U: Display>(tokens: &T, message: U) -> T
 /// In particular, note that the probe's parameters are not evaluated unless the provider
 /// initialized successfully and the probe is enabled.
 pub fn probe_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
-    Generator::handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
+    crate::code_generator()?.handle_probe_call(ProbeCallSpecification::from_token_stream(tokens)?)
 }
 
 pub fn init_provider_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
-    Generator::handle_provider_init(ProviderInitSpecification::from_token_stream(tokens)?)
+    crate::code_generator()?
+        .handle_provider_init(ProviderInitSpecification::from_token_stream(tokens)?)
 }
 
 /// Actual implementation of the macro logic, factored out of the proc macro itself so that it's
 /// more testable
 pub fn tracer_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
-    Generator::handle_provider_trait(ProviderSpecification::from_token_stream(tokens)?)
+    crate::code_generator()?
+        .handle_provider_trait(ProviderSpecification::from_token_stream(tokens)?)
 }
 
 #[cfg(test)]

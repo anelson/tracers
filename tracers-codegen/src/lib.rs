@@ -33,6 +33,9 @@ mod testdata;
 /// The available tracing implementations
 #[derive(Debug, AsRefStr, Serialize, Deserialize, PartialEq)]
 pub enum TracingImplementation {
+    #[strum(serialize = "disabled")]
+    Disabled,
+
     #[strum(serialize = "native_noop")]
     NativeNoOp,
 
@@ -44,10 +47,14 @@ pub enum TracingImplementation {
 }
 
 impl TracingImplementation {
+    pub fn is_enabled(&self) -> bool {
+        *self != TracingImplementation::Disabled
+    }
+
     pub fn is_dynamic(&self) -> bool {
         match self {
             TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => true,
-            TracingImplementation::NativeNoOp => false,
+            TracingImplementation::Disabled | TracingImplementation::NativeNoOp => false,
         }
     }
 
@@ -63,15 +70,15 @@ impl TracingImplementation {
 pub trait CodeGenerator {
     /// Invoked by the `tracer` attribute macro to process a probing provider declaration and
     /// generate whatever code is required there.
-    fn handle_provider_trait(provider: ProviderSpecification) -> TracersResult<TokenStream>;
+    fn handle_provider_trait(&self, provider: ProviderSpecification) -> TracersResult<TokenStream>;
 
     /// Invoked by the `probe!` macro to (conditionally) fire a probe.
-    fn handle_probe_call(call: ProbeCallSpecification) -> TracersResult<TokenStream>;
+    fn handle_probe_call(&self, call: ProbeCallSpecification) -> TracersResult<TokenStream>;
 
     /// Invoked by the `init_provider!` macro to (optionally) initialize the provider, although one
     /// requirement of all implementations is that explicit initialization is not required and will
     /// be done lazily on first use.
-    fn handle_provider_init(init: ProviderInitSpecification) -> TracersResult<TokenStream>;
+    fn handle_provider_init(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream>;
 
     /// This is invoked from within `build.rs` of the crate which is dependent upon `tracers`.  It
     /// doesn't take much arguments because it interacts directly with cargo via environment
@@ -80,75 +87,26 @@ pub trait CodeGenerator {
     /// It is designed not to panic; if there is a hard stop that should cause the dependent crate
     /// to fail, then it returns an error.  Most errors won't be hard stops, but merely warnings
     /// that cause the probing system to switch to a no-nop implementation
-    fn generate_native_code<WOut: Write, WErr: Write>(
-        stdout: &mut WOut,
-        stderr: &mut WErr,
+    fn generate_native_code(
+        &self,
+        stdout: &mut dyn Write,
+        stderr: &mut dyn Write,
         manifest_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
     ) -> TracersResult<()>;
 }
 
-/// Implementation of `CodeGenerator` which delegates to the actual generator which corresponds to
-/// the implementation selected at build time and saved to disk somewhere in `$OUT_DIR` using the
-/// `BuildInfo` struct
-pub struct GeneratorSwitcher {}
-
-/// A little macro to avoid excessive repetition.  Evaluates to an expression which calls `$method`
-/// with `$args` on the `CodeGenerator` implementation which correponds to the implementation
-/// returned by `choose_impl`
-macro_rules! with_impl {
-    ($method:ident ( $($args:expr),* ) ) => {
-        with_impl!(choose_impl(), $method ( $($args),* ) )
-    };
-    ($choose_impl:expr, $method:ident ( $($args:expr),* ) ) => {
-        $choose_impl.and_then(|imp| {
-            match imp {
-                TracingImplementation::NativeNoOp => gen::noop::NoOpGenerator::$method($($args),*),
-                TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => gen::dynamic::DynamicGenerator::$method($($args),*),
-            }
-        })
-    };
-}
-
-fn choose_impl() -> TracersResult<TracingImplementation> {
+/// Loads the `BuildInfo` and based on its contents creates and returns the applicable
+/// `CodeGenerator` implementation
+fn code_generator() -> TracersResult<Box<dyn CodeGenerator>> {
     let bi = BuildInfo::load()?;
 
-    Ok(bi.implementation)
+    Ok(match bi.implementation {
+        TracingImplementation::Disabled => Box::new(gen::disabled::DisabledGenerator::new(bi)),
+        TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => {
+            Box::new(gen::dynamic::DynamicGenerator::new(bi))
+        }
+        TracingImplementation::NativeNoOp => Box::new(gen::native::noop::NoOpGenerator::new(bi)),
+    })
 }
-
-impl CodeGenerator for GeneratorSwitcher {
-    fn handle_provider_trait(provider: ProviderSpecification) -> TracersResult<TokenStream> {
-        with_impl!(handle_provider_trait(provider))
-    }
-
-    fn handle_probe_call(call: ProbeCallSpecification) -> TracersResult<TokenStream> {
-        with_impl!(handle_probe_call(call))
-    }
-
-    fn handle_provider_init(init: ProviderInitSpecification) -> TracersResult<TokenStream> {
-        with_impl!(handle_provider_init(init))
-    }
-
-    fn generate_native_code<WOut: Write, WErr: Write>(
-        stdout: &mut WOut,
-        stderr: &mut WErr,
-        manifest_dir: &Path,
-        package_name: &str,
-        targets: Vec<PathBuf>,
-    ) -> TracersResult<()> {
-        // Until we refactor TracerError to be compatible with `failure`-based errors, we need this
-        // hackery
-        with_impl!(generate_native_code(
-            stdout,
-            stderr,
-            manifest_dir,
-            package_name,
-            targets
-        ))
-    }
-}
-
-// Any other code that needs to refer to the current code generator impl does so through this type
-// alias.
-pub type Generator = GeneratorSwitcher;

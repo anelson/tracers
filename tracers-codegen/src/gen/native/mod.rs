@@ -16,3 +16,5 @@
 //!
 //! The only reason the `dynamic` implementation exists is that I wrote it first, before I figured
 //! out how to make `native` work reliable.
+
+pub(crate) mod noop;

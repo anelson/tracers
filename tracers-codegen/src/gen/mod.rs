@@ -3,7 +3,7 @@
 //! these generators for the various tracing implementations, though only one can be active at
 //! compile time, via conditonal compilation
 //mod c;
-pub mod common;
-pub mod dynamic;
-pub mod native;
-pub mod noop;
+pub(crate) mod common;
+pub(crate) mod disabled;
+pub(crate) mod dynamic;
+pub(crate) mod native;
