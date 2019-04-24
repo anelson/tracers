@@ -71,7 +71,7 @@ jobs:
         displayName: Cargo test (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
-      - script: TRACERS_EXPECTED_IMPL=dyn_stap scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features --features=enable-dynamic-tracing -vv
+      - script: TRACERS_EXPECTED_IMPL=dyn_stap scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing -vv
         displayName: Cargo test SystemTap implementation (Linux)
         condition: eq( variables['Agent.OS'], 'Linux' )
 

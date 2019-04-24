@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 /// influence the logic related to what implementation is preferred
 #[derive(Debug, Clone)]
 struct FeatureFlags {
+    enable_tracing: bool,
     enable_dynamic_tracing: bool,
     enable_native_tracing: bool,
     force_dyn_stap: bool,
@@ -30,8 +31,9 @@ impl FeatureFlags {
     /// Fails with an error if the combination of features is not valid
     pub fn from_env() -> TracersResult<FeatureFlags> {
         Self::new(
-            Self::is_feature_enabled("enable-dynamic-tracing"),
-            Self::is_feature_enabled("enable-native-tracing"),
+            Self::is_feature_enabled("tracing"),
+            Self::is_feature_enabled("dynamic-tracing"),
+            Self::is_feature_enabled("native-tracing"),
             Self::is_feature_enabled("force-dyn-stap"),
             Self::is_feature_enabled("force-dyn-noop"),
         )
@@ -39,20 +41,28 @@ impl FeatureFlags {
 
     /// Creates a feature flag structure from explicit arguments.  Mostly used for testing
     pub fn new(
+        enable_tracing: bool,
         enable_dynamic_tracing: bool,
         enable_native_tracing: bool,
         force_dyn_stap: bool,
         force_dyn_noop: bool,
     ) -> TracersResult<FeatureFlags> {
         if enable_dynamic_tracing && enable_native_tracing {
-            return Err(TracersError::code_generation_error("The features `enable-dynamic-tracing` and `enable-native-tracing` are mutually exclusive; please choose one"));
+            return Err(TracersError::code_generation_error("The features `dynamic-tracing` and `native-tracing` are mutually exclusive; please choose one"));
         }
 
         if force_dyn_stap && force_dyn_noop {
             return Err(TracersError::code_generation_error("The features `force-dyn-stap` and `force_dyn_noop` are mutually exclusive; please choose one"));
         }
 
+        if enable_tracing && !enable_dynamic_tracing && !enable_native_tracing {
+            return Err(TracersError::code_generation_error(
+                "To enable tracing either `native-tracing` or `dynamic-tracing` must be enabled",
+            ));
+        }
+
         Ok(FeatureFlags {
+            enable_tracing,
             enable_dynamic_tracing,
             enable_native_tracing,
             force_dyn_stap,
@@ -61,7 +71,7 @@ impl FeatureFlags {
     }
 
     pub fn enable_tracing(&self) -> bool {
-        self.enable_dynamic() || self.enable_native()
+        self.enable_tracing
     }
 
     pub fn enable_dynamic(&self) -> bool {
@@ -353,6 +363,8 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
         }
     } else {
         // Pick some static tracing impl
+        //TODO: Consider other native impls
+        assert!(features.enable_native());
         Ok(TracingImplementation::NativeNoOp)
     }
 }
@@ -407,8 +419,8 @@ mod tests {
     fn tracers_build_panics_invalid_features() {
         //These two feature flags are mutually exclusive
         let mut _setter = EnvVarsSetter::new(vec![
-            "CARGO_FEATURE_ENABLE_NATIVE_TRACING",
-            "CARGO_FEATURE_ENABLE_DYNAMIC_TRACING",
+            "CARGO_FEATURE_NATIVE_TRACING",
+            "CARGO_FEATURE_DYNAMIC_TRACING",
         ]);
 
         tracers_build();
@@ -427,15 +439,18 @@ mod tests {
         let test_cases = vec![
             //features, expected_impl
             (
-                FeatureFlags::new(false, false, false, false).unwrap(),
+                // Tracing disabled entirely
+                FeatureFlags::new(false, false, false, false, false).unwrap(),
                 TracingImplementation::Disabled,
             ),
             (
-                FeatureFlags::new(true, false, false, false).unwrap(),
+                // Tracing enabled, dynamic mode enabled, native disabled
+                FeatureFlags::new(true, true, false, false, false).unwrap(),
                 TracingImplementation::DynamicNoOp,
             ),
             (
-                FeatureFlags::new(false, true, false, false).unwrap(),
+                // Tracing enabled, dynamic disabled, native enabled
+                FeatureFlags::new(true, false, true, false, false).unwrap(),
                 TracingImplementation::NativeNoOp,
             ),
         ];
