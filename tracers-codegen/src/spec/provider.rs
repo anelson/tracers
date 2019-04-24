@@ -7,7 +7,6 @@ use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
-use std::path::PathBuf;
 use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
 
@@ -67,28 +66,12 @@ impl ProviderSpecification {
         })
     }
 
-    pub fn name_with_hash(&self) -> String {
-        format!("{}-{:x}", self.name, self.hash)
-    }
-
-    pub fn native_provider_source_filename(&self) -> PathBuf {
-        PathBuf::from(format!("{}.cpp", self.name_with_hash()))
-    }
-
-    pub fn native_provider_lib_filename(&self) -> PathBuf {
-        PathBuf::from(format!("{}.a", self.name_with_hash()))
-    }
-
     pub fn name(&self) -> &str {
         &self.name
     }
 
     pub fn item_trait(&self) -> &syn::ItemTrait {
         &self.item_trait
-    }
-
-    pub fn probes(&self) -> &Vec<ProbeSpecification> {
-        &self.probes
     }
 
     /// Consumes this spec and returns the same spec with all probes removed, and instead the

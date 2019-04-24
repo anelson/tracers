@@ -36,6 +36,7 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub enum ProbeCallSpecification {
     FireOnly(ProbeCallDetails),
+    #[allow(dead_code)] //this will be implemented soon
     FireWithCode {
         call: ProbeCallDetails,
         statements: syn::Block,

@@ -7,7 +7,7 @@ use crate::{TracersError, TracersResult};
 use std::fmt;
 use syn::spanned::Spanned;
 
-pub struct ProbeArgSpecification {
+pub(crate) struct ProbeArgSpecification {
     name: String,
     #[allow(dead_code)] //TODO: Temporary
     probe_name: String,
@@ -84,10 +84,6 @@ impl ProbeArgSpecification {
                     format!("The argument type '{}' of argument '{}' on probe '{}' is not supported for probing.  Generally only the standard string, integer, and bool types, as well as references and Option's of the same, are supported", syn_helpers::convert_to_string(typ), ident.ident, probe_method.sig.ident), typ,
             ));
         }
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
     }
 
     pub fn ident(&self) -> &syn::PatIdent {
@@ -290,7 +286,7 @@ mod test {
         {
             let arg = get_arg_from_test_case(&case).expect("unexpected error parsing arg");
 
-            assert_eq!(case.arg_name, arg.name(), "test# {}", index);
+            assert_eq!(case.arg_name, arg.name, "test# {}", index);
             assert_eq!(
                 syn_helpers::convert_to_string(&case.arg_type),
                 syn_helpers::convert_to_string(&arg.syn_typ()),

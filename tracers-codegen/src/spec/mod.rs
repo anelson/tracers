@@ -18,8 +18,10 @@ mod probe_call;
 mod provider;
 mod provider_init;
 
-pub use probe::ProbeSpecification;
-pub use probe_arg::ProbeArgSpecification;
-pub use probe_call::{ProbeCallDetails, ProbeCallSpecification};
-pub use provider::ProviderSpecification;
-pub use provider_init::ProviderInitSpecification;
+pub(crate) use probe::ProbeSpecification;
+pub(crate) use probe_arg::ProbeArgSpecification;
+#[cfg(test)]
+pub(crate) use probe_call::ProbeCallDetails;
+pub(crate) use probe_call::ProbeCallSpecification;
+pub(crate) use provider::ProviderSpecification;
+pub(crate) use provider_init::ProviderInitSpecification;

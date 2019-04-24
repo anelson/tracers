@@ -13,7 +13,7 @@ use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
 
-pub struct ProbeSpecification {
+pub(crate) struct ProbeSpecification {
     pub name: String,
     pub method_name: Ident,
     pub original_method: TraitItemMethod,

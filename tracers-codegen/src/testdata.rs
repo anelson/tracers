@@ -13,7 +13,6 @@ use crate::spec::ProbeCallSpecification;
 use dunce::canonicalize; //on Windows the dunce implementation avoids UNC paths which break things
 use fs_extra::{copy_items, dir};
 use lazy_static::lazy_static;
-use tracers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::fmt;
@@ -21,6 +20,7 @@ use std::fmt;
 use std::fs::canonicalize; //on non-Windows just use the built-in function
 use std::path::PathBuf;
 use tempfile::tempdir;
+use tracers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
 
 pub(crate) struct Target {
     pub name: &'static str,

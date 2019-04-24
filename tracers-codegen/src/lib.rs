@@ -13,7 +13,7 @@ mod error;
 mod gen;
 mod hashing;
 pub mod proc_macros;
-pub mod spec;
+mod spec;
 mod syn_helpers;
 #[cfg(test)]
 mod testdata;
