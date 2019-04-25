@@ -10,6 +10,7 @@ use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::TracersResult;
+use crate::{TracingTarget, TracingType};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::parse_quote;
@@ -38,7 +39,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     ) -> ProviderTraitGenerator<'bi> {
         //This implementation is specific to static tracing (of which `disabled` is merely a
         //special case)
-        assert!(build_info.implementation.is_static() || !build_info.implementation.is_enabled());
+        assert!(!build_info.implementation.is_dynamic());
 
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
@@ -68,24 +69,6 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
             #impl_mod
         })
-    }
-
-    /// True if we are implementing the `noop` tracer, which does compile-time type checks but
-    /// nothing at runtime
-    fn is_noop(&self) -> bool {
-        self.build_info.implementation.is_noop()
-    }
-
-    /// True if we are implementing the `disabled` tracer, which is like `noop` but it doesn't even
-    /// do compile time type checks, and cannot assume that the `tracers::runtime` module is
-    /// available to the generated code
-    fn is_disabled(&self) -> bool {
-        !self.build_info.implementation.is_enabled()
-    }
-
-    /// True if this is a "real" implementation, meaning not `noop` and not `disabled`
-    fn is_real(&self) -> bool {
-        self.build_info.implementation.is_real()
     }
 
     /// A provider is described by the user as a `trait`, with methods corresponding to probes.
@@ -121,10 +104,14 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //a successful result, with a string containing some metadata about the generated provider.
         //Only dynamic implementations can actually fail to initialize, which doesn't apply here
         let provider_name = self.spec.name();
-        let implementation = if self.is_disabled() {
-            "disabled".to_string()
-        } else {
-            format!("static/{}", self.build_info.implementation.as_ref())
+
+        let implementation = match self.build_info.implementation.tracing_target() {
+            TracingTarget::Disabled => TracingType::Disabled.as_ref().to_string(),
+            TracingTarget::NoOp | TracingTarget::Stap => format!(
+                "{}/{}",
+                self.build_info.implementation.tracing_type().as_ref(),
+                self.build_info.implementation.as_ref()
+            ),
         };
         let version = env!("CARGO_PKG_VERSION");
 
@@ -146,36 +133,37 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     }
 
     fn generate_impl_mod(&self) -> TokenStream {
-        if self.is_real() {
-            unimplemented!()
-        } else if self.is_noop() {
-            //Generate a module that has some code to use our `ProbeArgType` trait to verify at
-            //compile time that every probe argument has a corresponding C representation.
-            //Since that requires that the `tracers` runtime be available to the caller, it won't
-            //work if that runtime is missing
-            let mod_name = self.get_provider_impl_mod_name();
-            let struct_type_name = self.get_provider_impl_struct_type_name();
+        match self.build_info.implementation.tracing_target() {
+            TracingTarget::Disabled => {
+                quote! {}
+            }
+            TracingTarget::NoOp => {
+                //Generate a module that has some code to use our `ProbeArgType` trait to verify at
+                //compile time that every probe argument has a corresponding C representation.
+                //Since that requires that the `tracers` runtime be available to the caller, it won't
+                //work if that runtime is missing
+                let mod_name = self.get_provider_impl_mod_name();
+                let struct_type_name = self.get_provider_impl_struct_type_name();
 
-            let span = self.spec.item_trait().span();
-            quote_spanned! {span=>
-                mod #mod_name {
-                    use tracers::runtime::ProbeArgType;
+                let span = self.spec.item_trait().span();
+                quote_spanned! {span=>
+                    mod #mod_name {
+                        use tracers::runtime::ProbeArgType;
 
-                    pub(super) struct #struct_type_name<T: ProbeArgType<T>> {
-                        _t: ::std::marker::PhantomData<T>,
-                    }
+                        pub(super) struct #struct_type_name<T: ProbeArgType<T>> {
+                            _t: ::std::marker::PhantomData<T>,
+                        }
 
-                    impl<T: ProbeArgType<T>> #struct_type_name<T> {
-                        #[allow(dead_code)]
-                        pub fn wrap(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
-                            ::tracers::runtime::wrap::<T>(arg)
+                        impl<T: ProbeArgType<T>> #struct_type_name<T> {
+                            #[allow(dead_code)]
+                            pub fn wrap(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
+                                ::tracers::runtime::wrap::<T>(arg)
+                            }
                         }
                     }
                 }
             }
-        } else {
-            assert!(self.is_disabled());
-            quote! {}
+            TracingTarget::Stap => unimplemented!(),
         }
     }
 }
@@ -254,40 +242,41 @@ impl<'bi> ProbeGenerator<'bi> {
         // * In the case of a `disabled` implementation, the function won't do anything at all.
         // We'll just assign all of the args in a `let _ = $ARGNAME` statement so that the compiler
         // doens't warn about unused arguments.
-        if provider.is_real() {
-            //This is a `real` impl with a G wrapper underneath
-            unimplemented!()
-        } else {
-            //Either `noop` or `disabled`.  In both cases it's just some per-argument statements
-            let args_type_assertions = self.spec.args.iter().map(|arg| {
-                let span = arg.syn_typ().span();
-                let arg_name = arg.ident();
-
-                if provider.is_noop() {
-                    //This is a `noop`  implementation
-                    //Perform type assertions in the form of calls to the generated `wrap` method on the
-                    //impl struct, which uses generic trickery to cause the compiler to ensure each arg
-                    //type has a valid `ProbeArgType` implementation
-                    quote_spanned! {span=>
-                        #struct_type_path::wrap(#arg_name);
+        match provider.build_info.implementation.tracing_target() {
+            target @ TracingTarget::Disabled | target @ TracingTarget::NoOp => {
+                //Either `noop` or `disabled`.  In both cases it's just some per-argument statements
+                let args_type_assertions = self.spec.args.iter().map(|arg| {
+                    let span = arg.syn_typ().span();
+                    let arg_name = arg.ident();
+                    if target == TracingTarget::Disabled {
+                        //This is a `disabled` implementation
+                        //There is no `wrap` method to do any kind of compile time type assertion,
+                        //just perform a pro-forma 'use' of each arg so it doesn't trigger a warning about an
+                        //unused argument
+                        quote_spanned! {span=>
+                            let _ = #arg_name;
+                        }
+                    } else {
+                        //This is a `noop`  implementation
+                        //Perform type assertions in the form of calls to the generated `wrap` method on the
+                        //impl struct, which uses generic trickery to cause the compiler to ensure each arg
+                        //type has a valid `ProbeArgType` implementation
+                        quote_spanned! {span=>
+                            #struct_type_path::wrap(#arg_name);
+                        }
                     }
-                } else {
-                    assert!(provider.is_disabled());
-                    //This is a `disabled` implementation
-                    //There is no `wrap` method to do any kind of compile time type assertion,
-                    //just perform a pro-forma 'use' of each arg so it doesn't trigger a warning about an
-                    //unused argument
-                    quote_spanned! {span=>
-                        let _ = #arg_name;
-                    }
-                }
-            });
+                });
 
-            Ok(quote_spanned! {span=>
-                if false {
-                    #(#args_type_assertions)*
-                }
-            })
+                Ok(quote_spanned! {span=>
+                    if false {
+                        #(#args_type_assertions)*
+                    }
+                })
+            }
+            TracingTarget::Stap => {
+                //This is a `real` impl with a G wrapper underneath
+                unimplemented!()
+            }
         }
     }
 }

@@ -5,7 +5,7 @@
 use crate::build_rs::BuildInfo;
 use crate::error::TracersResult;
 use crate::spec::{ProbeCallSpecification, ProviderInitSpecification, ProviderSpecification};
-use crate::TracingImplementation;
+use crate::TracingType;
 use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -54,14 +54,10 @@ pub(crate) trait CodeGenerator {
 pub(crate) fn code_generator() -> TracersResult<Box<dyn CodeGenerator>> {
     let bi = BuildInfo::load()?;
 
-    Ok(match bi.implementation {
+    Ok(match bi.implementation.tracing_type() {
         //There are two implementations: one for static tracing (`disabled` is a special case of
         //`static`), and one for dynamic
-        TracingImplementation::Disabled | TracingImplementation::StaticNoOp => {
-            Box::new(r#static::StaticGenerator::new(bi))
-        }
-        TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => {
-            Box::new(dynamic::DynamicGenerator::new(bi))
-        }
+        TracingType::Disabled | TracingType::Static => Box::new(r#static::StaticGenerator::new(bi)),
+        TracingType::Dynamic => Box::new(dynamic::DynamicGenerator::new(bi)),
     })
 }

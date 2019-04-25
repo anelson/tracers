@@ -363,6 +363,7 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
 mod tests {
     use super::*;
     use crate::testdata;
+    use crate::TracingType;
 
     /// Helper that sets environment vars, then clears them when it goes out of scope
     struct EnvVarsSetter {
@@ -450,6 +451,12 @@ mod tests {
         let out_dir = temp_dir.path().join("out");
 
         for (features, expected_impl) in test_cases.into_iter() {
+            let context = format!(
+                "features: {:?}\nexpected_impl: {}",
+                features,
+                expected_impl.as_ref()
+            );
+
             //First let's present we're in `tracers/build.rs`, and cargo has set the relevant env
             //vars
             let vars = EnvVarsSetter::new_with_values(vec![
@@ -471,34 +478,38 @@ mod tests {
                 features
             ));
 
-            assert_eq!(expected_impl, step1_build_info.implementation);
+            assert_eq!(
+                expected_impl, step1_build_info.implementation,
+                "context: {}",
+                context
+            );
 
             //And the path to this should have been written to stdout such that cargo will treat it
             //as a variable that is passed to dependent crates' `build.rs`:
             let output = String::from_utf8(stdout).unwrap();
-            assert!(output.contains(&format!(
-                "cargo:build-info-path={}",
-                build_info_path.display()
-            )));
+            assert!(
+                output.contains(&format!(
+                    "cargo:build-info-path={}",
+                    build_info_path.display()
+                )),
+                context
+            );
 
             //and the features used to compile `tracers` should correspond to the implementation
-            match expected_impl {
-                TracingImplementation::Disabled => assert!(!output.contains("enabled")),
-                TracingImplementation::StaticNoOp => {
-                    assert!(output.contains("cargo:rustc-cfg=enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=static_enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=static_noop_enabled"));
-                }
-                TracingImplementation::DynamicNoOp => {
-                    assert!(output.contains("cargo:rustc-cfg=enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=dynamic_enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=dyn_noop_enabled"));
-                }
-                TracingImplementation::DynamicStap => {
-                    assert!(output.contains("cargo:rustc-cfg=enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=dynamic_enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=dyn_stap_enabled"));
-                }
+            match expected_impl.tracing_type() {
+                TracingType::Disabled => assert!(!output.contains("enabled")),
+                TracingType::Dynamic => assert!(output.contains("cargo:rustc-cfg=dynamic_enabled")),
+                TracingType::Static => assert!(output.contains("cargo:rustc-cfg=static_enabled")),
+            }
+
+            if expected_impl.is_enabled() {
+                assert!(
+                    output.contains(&format!(
+                        "cargo:rustc-cfg={}_enabled",
+                        expected_impl.as_ref()
+                    )),
+                    context
+                );
             }
 
             //Next, the user crate's `build.rs` will want to know what the selected impl was
@@ -513,7 +524,7 @@ mod tests {
                 features
             ));
 
-            assert_eq!(step1_build_info, step2_build_info);
+            assert_eq!(step1_build_info, step2_build_info, "context: {}", context);
 
             //At this point in the process if this were a real build, the `build.rs` code would be
             //generating code for a real crate.  We're not going to simulate all of that here,
@@ -564,7 +575,7 @@ mod tests {
                 features
             ));
 
-            assert_eq!(step1_build_info, step3_build_info);
+            assert_eq!(step1_build_info, step3_build_info, "context: {}", context);
 
             drop(vars);
         }

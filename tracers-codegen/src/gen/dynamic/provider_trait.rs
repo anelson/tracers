@@ -100,7 +100,12 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
         //a successful result, with a string containing some metadata about the generated provider
         let provider_name = self.spec.name();
-        let implementation = format!("dynamic/{}", self.build_info.implementation.as_ref());
+        let implementation = format!(
+            "{}/{}",
+            self.build_info.implementation.tracing_type().as_ref(),
+            self.build_info.implementation.as_ref()
+        );
+
         let version = env!("CARGO_PKG_VERSION");
 
         let result = quote_spanned! {span=>
