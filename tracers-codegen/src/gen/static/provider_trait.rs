@@ -10,7 +10,6 @@ use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::TracersResult;
-use crate::TracingImplementation;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::parse_quote;
@@ -74,19 +73,19 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     /// True if we are implementing the `noop` tracer, which does compile-time type checks but
     /// nothing at runtime
     fn is_noop(&self) -> bool {
-        self.build_info.implementation == TracingImplementation::StaticNoOp
+        self.build_info.implementation.is_noop()
     }
 
     /// True if we are implementing the `disabled` tracer, which is like `noop` but it doesn't even
     /// do compile time type checks, and cannot assume that the `tracers::runtime` module is
     /// available to the generated code
     fn is_disabled(&self) -> bool {
-        self.build_info.implementation == TracingImplementation::Disabled
+        !self.build_info.implementation.is_enabled()
     }
 
     /// True if this is a "real" implementation, meaning not `noop` and not `disabled`
     fn is_real(&self) -> bool {
-        !self.is_noop() && !self.is_disabled()
+        self.build_info.implementation.is_real()
     }
 
     /// A provider is described by the user as a `trait`, with methods corresponding to probes.
@@ -97,7 +96,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         // From the probe specifications, generate the corresponding methods that will be on the probe
         // struct.
         let mod_name = self.get_provider_impl_mod_name();
-        let struct_type_name = syn::Ident::new("ProbeArgTypeCheck", self.spec.item_trait().span());
+        let struct_type_name = self.get_provider_impl_struct_type_name();
         let struct_type_path: syn::Path = parse_quote! { #mod_name::#struct_type_name };
         let mut probe_methods: Vec<TokenStream> = Vec::new();
         for probe in self.probes.iter() {
@@ -118,8 +117,9 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
         let try_init_decl = self.generate_try_init_decl();
 
-        //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
-        //a successful result, with a string containing some metadata about the generated provider
+        //the __try_init_provider returns a Result.  In this static implementation, we'll hard-code
+        //a successful result, with a string containing some metadata about the generated provider.
+        //Only dynamic implementations can actually fail to initialize, which doesn't apply here
         let provider_name = self.spec.name();
         let implementation = format!("static/{}", self.build_info.implementation.as_ref());
         let version = env!("CARGO_PKG_VERSION");
@@ -148,8 +148,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
             //Since that requires that the `tracers` runtime be available to the caller, it won't
             //work if that runtime is missing
             let mod_name = self.get_provider_impl_mod_name();
-            let struct_type_name =
-                syn::Ident::new("ProbeArgTypeCheck", self.spec.item_trait().span());
+            let struct_type_name = self.get_provider_impl_struct_type_name();
 
             let span = self.spec.item_trait().span();
             quote_spanned! {span=>
@@ -175,7 +174,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 }
 
 pub(super) struct ProbeGenerator<'bi> {
-    build_info: &'bi BuildInfo,
+    _build_info: &'bi BuildInfo,
     spec: ProbeSpecification,
 }
 
@@ -187,7 +186,10 @@ impl<'bi> ProbeGeneratorBase for ProbeGenerator<'bi> {
 
 impl<'bi> ProbeGenerator<'bi> {
     pub fn new(build_info: &'bi BuildInfo, spec: ProbeSpecification) -> ProbeGenerator<'bi> {
-        ProbeGenerator { build_info, spec }
+        ProbeGenerator {
+            _build_info: build_info,
+            spec,
+        }
     }
 
     pub fn generate_trait_methods(
@@ -198,25 +200,7 @@ impl<'bi> ProbeGenerator<'bi> {
         let vis = &self.spec.vis;
         let original_method = self.spec.original_method.sig.clone();
 
-        //Generate the body of the original method, simply passing its arguments directly to the
-        //type assertion method
-        let args_type_assertions = self.spec.args.iter().map(|arg| {
-            let span = arg.syn_typ().span();
-            let arg_name = arg.ident();
-
-            //If the runtime is available, then the type assertion method is available
-            //If not, just generate an expression that will count as 'using' the argument so the
-            //compiler doesn't complain
-            if self.build_info.implementation.is_enabled() {
-                quote_spanned! {span=>
-                    #struct_type_path::wrap(#arg_name);
-                }
-            } else {
-                quote_spanned! {span=>
-                    let _ = #arg_name;
-                }
-            }
-        });
+        let method_body = self.generate_probe_method_body(&provider, struct_type_path)?;
 
         //Keep the original probe method, but mark it deprecated with a helpful message so that if the
         //user calls the probe method directly they will at least be reminded that they should use the
@@ -237,13 +221,67 @@ impl<'bi> ProbeGenerator<'bi> {
             #(#attrs)*
             #probe_doc_comment
             #deprecation_attribute
-            #[allow(dead_code)]
             #vis #original_method {
+                #method_body
+            }
+        })
+    }
+
+    fn generate_probe_method_body(
+        &self,
+        provider: &ProviderTraitGenerator,
+        struct_type_path: &syn::Path,
+    ) -> TracersResult<TokenStream> {
+        let span = self.spec.original_method.span();
+        // Generate the body of the original method.  This will have the same args as the trait
+        // method declared by the caller, but we will provide an actual implementation.
+
+        // * In the case of a `real` implementation, we'll wrap each arg in its `ProbeArgType` wrapper
+        //   and pass to the C functions that actually fire the probe.
+        //
+        // * In the case of a `noop` implementation, there is no C function underneath so we call
+        // the `wrap` method on the implementation struct which causes the compiler to verify there
+        // is a `ProbeArgType` for each argument's type, but at runtime does not actually do
+        // anything.
+        //
+        // * In the case of a `disabled` implementation, the function won't do anything at all.
+        // We'll just assign all of the args in a `let _ = $ARGNAME` statement so that the compiler
+        // doens't warn about unused arguments.
+        if provider.is_real() {
+            //This is a `real` impl with a G wrapper underneath
+            unimplemented!()
+        } else {
+            //Either `noop` or `disabled`.  In both cases it's just some per-argument statements
+            let args_type_assertions = self.spec.args.iter().map(|arg| {
+                let span = arg.syn_typ().span();
+                let arg_name = arg.ident();
+
+                if provider.is_noop() {
+                    //This is a `noop`  implementation
+                    //Perform type assertions in the form of calls to the generated `wrap` method on the
+                    //impl struct, which uses generic trickery to cause the compiler to ensure each arg
+                    //type has a valid `ProbeArgType` implementation
+                    quote_spanned! {span=>
+                        #struct_type_path::wrap(#arg_name);
+                    }
+                } else {
+                    assert!(provider.is_disabled());
+                    //This is a `disabled` implementation
+                    //There is no `wrap` method to do any kind of compile time type assertion,
+                    //just perform a pro-forma 'use' of each arg so it doesn't trigger a warning about an
+                    //unused argument
+                    quote_spanned! {span=>
+                        let _ = #arg_name;
+                    }
+                }
+            });
+
+            Ok(quote_spanned! {span=>
                 if false {
                     #(#args_type_assertions)*
                 }
-            }
-        })
+            })
+        }
     }
 }
 

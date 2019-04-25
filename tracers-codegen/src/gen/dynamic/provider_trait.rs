@@ -360,7 +360,7 @@ impl ProbeGenerator {
         enabled_method.decl.inputs = syn::punctuated::Punctuated::new();
         enabled_method.decl.output = syn::ReturnType::Default;
 
-        //Generate an (probe)_probe method which returns the raw Option<ProviderProbe>
+        //Generate an get_(probe)_probe method which returns the raw Option<ProviderProbe>
         let mut probe_method = original_method.clone();
         probe_method.ident = syn::Ident::new(
             &format!("get_{}_probe", probe_method.ident),

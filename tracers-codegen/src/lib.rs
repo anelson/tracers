@@ -53,4 +53,12 @@ impl TracingImplementation {
     pub fn is_static(&self) -> bool {
         !self.is_dynamic()
     }
+
+    pub fn is_noop(&self) -> bool {
+        *self == TracingImplementation::DynamicNoOp || *self == TracingImplementation::StaticNoOp
+    }
+
+    pub fn is_real(&self) -> bool {
+        self.is_enabled() && !self.is_noop()
+    }
 }
