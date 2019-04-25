@@ -8,14 +8,13 @@ use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
 /// The type of source dependency.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub(crate) enum SourceDependency {
     /// A `mod` dependency, specifying the name of the module.
     Mod(String),
 }
 
 /// Scans an already-parsed AST and finds the source dependencies within the file
-#[allow(dead_code)] //TODO: Temporary
 pub(crate) fn get_dependencies(contents: &syn::File) -> Vec<SourceDependency> {
     let mut visitor = Visitor::new();
 
@@ -26,7 +25,6 @@ pub(crate) fn get_dependencies(contents: &syn::File) -> Vec<SourceDependency> {
 
 /// Given the path to a source file and a previously-discovered dependency, attempts to resolve
 /// that dependency to an existing source file.
-#[allow(dead_code)] //TODO: Temporary
 pub(crate) fn resolve_dependency(source_path: &Path, dep: &SourceDependency) -> Fallible<PathBuf> {
     match dep {
         SourceDependency::Mod(module_name) => find_module(source_path, &module_name),
@@ -85,7 +83,19 @@ impl<'ast> Visit<'ast> for Visitor {
         //module, relative to the current source file, which should be the last element in the
         //`paths` member.
         if i.content == None {
-            let module_name = i.ident.to_string();
+            let mut module_name = i.ident.to_string();
+
+            //Rust allows module names which are also Rust reserved words to be escaped with `r#`,
+            //for example:
+            //
+            //```
+            //mod r#static //this is in `static.rs` or `static/mod.rs`
+            //```
+            let module_name = if module_name.starts_with("r#") {
+                module_name.split_off(2)
+            } else {
+                module_name
+            };
             self.deps.push(SourceDependency::Mod(module_name));
         }
     }

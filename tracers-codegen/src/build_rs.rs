@@ -2,6 +2,7 @@
 //! the suitable tracing implementation at build time, and within a dependent crate's `build.rs`
 //! file to perform the build-time code generation to support the selected tracing implementation
 
+use crate::cache;
 use crate::cargo;
 use crate::error::{TracersError, TracersResult};
 use crate::gen;
@@ -93,7 +94,7 @@ impl FeatureFlags {
 
 /// Serializable struct which is populated in `build.rs` to indicate to the proc macros which
 /// tracing implementation they should use.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct BuildInfo {
     pub implementation: TracingImplementation,
 }
@@ -242,14 +243,20 @@ fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> Trace
     let manifest_path = PathBuf::from(manifest_dir).join("Cargo.toml");
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
+    let cache_path = cache::get_cache_path(
+        &PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join("cache"),
+    );
 
     gen::code_generator()?.generate_native_code(
         out,
         err,
         &Path::new(&manifest_path),
+        &cache_path,
         &package_name,
         targets,
-    )
+    );
+
+    Ok(())
 }
 
 /// This function is the counterpart to `build`, which is intended to be invoked in the `tracers`
@@ -514,10 +521,13 @@ mod tests {
 
             //Next, the user crate's `build.rs` will want to know what the selected impl was
             drop(vars);
-            let vars = EnvVarsSetter::new_with_values(vec![(
-                "DEP_TRACERS_BUILD_INFO_PATH",
-                build_info_path.to_str().unwrap(),
-            )]);
+            let vars = EnvVarsSetter::new_with_values(vec![
+                (
+                    "DEP_TRACERS_BUILD_INFO_PATH",
+                    build_info_path.to_str().unwrap(),
+                ),
+                ("OUT_DIR", out_dir.to_str().unwrap()),
+            ]);
 
             let step2_build_info = BuildInfo::load().expect(&format!(
                 "Failed to load build info for features: {:?}",

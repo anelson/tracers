@@ -135,13 +135,13 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     fn generate_impl_mod(&self) -> TokenStream {
         match self.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
+                //When tracing is disabled we can't assume the `tracers::runtime` is available so
+                //there is no implementation module in that case
                 quote! {}
             }
             TracingTarget::NoOp => {
                 //Generate a module that has some code to use our `ProbeArgType` trait to verify at
                 //compile time that every probe argument has a corresponding C representation.
-                //Since that requires that the `tracers` runtime be available to the caller, it won't
-                //work if that runtime is missing
                 let mod_name = self.get_provider_impl_mod_name();
                 let struct_type_name = self.get_provider_impl_struct_type_name();
 

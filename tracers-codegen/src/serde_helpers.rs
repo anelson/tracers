@@ -93,12 +93,13 @@ pub(crate) mod span {
     use proc_macro2::Span;
     use serde::de::*;
 
+    #[allow(clippy::trivially_copy_pass_by_ref)] //serde requires by ref here
     pub(crate) fn serialize<S: Serializer>(_x: &Span, s: S) -> Result<S::Ok, S::Error> {
         s.serialize_unit()
     }
 
     pub(crate) fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Span, D::Error> {
-        let _ = <()>::deserialize::<D>(d)?;
+        <()>::deserialize::<D>(d)?;
         Ok(Span::call_site())
     }
 }

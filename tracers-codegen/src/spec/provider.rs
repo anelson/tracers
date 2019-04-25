@@ -80,6 +80,10 @@ impl ProviderSpecification {
         &self.name
     }
 
+    pub fn ident(&self) -> &syn::Ident {
+        &self.item_trait.ident
+    }
+
     pub fn item_trait(&self) -> &syn::ItemTrait {
         &self.item_trait
     }
@@ -110,7 +114,6 @@ impl ProviderSpecification {
 /// invalid as providers, those traits will be silently ignored.  At compile time the `tracer`
 /// attribute will cause a very detailed compile error so there's no chance the user will miss this
 /// mistake.
-#[allow(dead_code)] //TODO: Temporary
 pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
     //Construct an implementation of the `syn` crate's `Visit` trait which will examine all trait
     //declarations in the file looking for possible providers

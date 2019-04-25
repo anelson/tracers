@@ -44,9 +44,10 @@ pub(crate) trait CodeGenerator {
         stdout: &mut dyn Write,
         stderr: &mut dyn Write,
         manifest_dir: &Path,
+        cache_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
-    ) -> TracersResult<()>;
+    );
 }
 
 /// Loads the `BuildInfo` and based on its contents creates and returns the applicable

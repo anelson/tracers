@@ -556,7 +556,7 @@ lazy_static! {
                 Target::new("bin1", "src/bin/bin1.rs", vec![], None),
                 Target::new("bin2", "src/bin/bin2.rs", vec![], None),
                 Target::new("ex1", "examples/ex1.rs", vec![], None),
-                Target::new("test1", "tests/test1.rs", vec![], None),
+                Target::new("test1", "tests/test1.rs", vec![ "tests/static/mod.rs"], None),
                 Target::new("test2", "tests/test2.rs", vec![], None),
             ],
         },

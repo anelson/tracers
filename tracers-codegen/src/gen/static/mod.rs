@@ -27,8 +27,9 @@ use proc_macro2::TokenStream;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-pub(crate) mod probe_call;
-pub(crate) mod provider_trait;
+mod native_code;
+mod probe_call;
+mod provider_trait;
 
 pub(crate) struct StaticGenerator {
     build_info: BuildInfo,
@@ -58,17 +59,20 @@ impl CodeGenerator for StaticGenerator {
     fn generate_native_code(
         &self,
         stdout: &mut dyn Write,
-        _stderr: &mut dyn Write,
-        _manifest_dir: &Path,
-        _package_name: &str,
-        _targets: Vec<PathBuf>,
-    ) -> TracersResult<()> {
-        // The nice thing about this implementation is that no build-time code generation is
-        // required
-        let _ = writeln!(
+        stderr: &mut dyn Write,
+        manifest_dir: &Path,
+        cache_dir: &Path,
+        package_name: &str,
+        targets: Vec<PathBuf>,
+    ) {
+        native_code::generate_native_code(
+            &self.build_info,
             stdout,
-            "dynamic generator doesn't require any build.rs code generation"
+            stderr,
+            manifest_dir,
+            cache_dir,
+            package_name,
+            targets,
         );
-        Ok(())
     }
 }

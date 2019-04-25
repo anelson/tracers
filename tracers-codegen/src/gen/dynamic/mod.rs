@@ -51,15 +51,15 @@ impl CodeGenerator for DynamicGenerator {
         stdout: &mut dyn Write,
         _stderr: &mut dyn Write,
         _manifest_dir: &Path,
+        _cache_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,
-    ) -> TracersResult<()> {
+    ) {
         // The nice thing about this implementation is that no build-time code generation is
         // required
         let _ = writeln!(
             stdout,
             "dynamic generator doesn't require any build.rs code generation"
         );
-        Ok(())
     }
 }

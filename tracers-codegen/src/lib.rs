@@ -57,7 +57,7 @@ pub(crate) enum TracingTarget {
 
 /// All possible tracing implementations.  Every supported linear combination of `TracingType` and
 /// `TracingTarget`
-#[derive(Debug, AsRefStr, Serialize, Deserialize, EnumProperty, PartialEq)]
+#[derive(Clone, Debug, AsRefStr, Serialize, Deserialize, EnumProperty, PartialEq)]
 pub(crate) enum TracingImplementation {
     #[strum(serialize = "disabled", props(type = "disabled", target = "disabled"))]
     Disabled,
