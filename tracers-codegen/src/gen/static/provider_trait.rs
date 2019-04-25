@@ -121,7 +121,11 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //a successful result, with a string containing some metadata about the generated provider.
         //Only dynamic implementations can actually fail to initialize, which doesn't apply here
         let provider_name = self.spec.name();
-        let implementation = format!("static/{}", self.build_info.implementation.as_ref());
+        let implementation = if self.is_disabled() {
+            "disabled".to_string()
+        } else {
+            format!("static/{}", self.build_info.implementation.as_ref())
+        };
         let version = env!("CARGO_PKG_VERSION");
 
         let result = quote_spanned! {span=>
@@ -142,7 +146,9 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     }
 
     fn generate_impl_mod(&self) -> TokenStream {
-        if self.build_info.implementation.is_enabled() {
+        if self.is_real() {
+            unimplemented!()
+        } else if self.is_noop() {
             //Generate a module that has some code to use our `ProbeArgType` trait to verify at
             //compile time that every probe argument has a corresponding C representation.
             //Since that requires that the `tracers` runtime be available to the caller, it won't
@@ -168,6 +174,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 }
             }
         } else {
+            assert!(self.is_disabled());
             quote! {}
         }
     }
