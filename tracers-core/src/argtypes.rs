@@ -18,7 +18,7 @@
 //!
 //!
 use std::fmt::Debug;
-use strum_macros::IntoStaticStr;
+use strum_macros::{Display, EnumString, IntoStaticStr};
 
 pub mod bool;
 pub mod cstring;
@@ -38,7 +38,7 @@ pub use pointer::*;
 pub use refs::*;
 pub use string::*;
 
-#[derive(Debug, Clone, PartialEq, Hash, Eq, IntoStaticStr)]
+#[derive(Display, Debug, Clone, PartialEq, Hash, Eq, IntoStaticStr, EnumString)]
 pub enum CType {
     #[strum(serialize = "void")]
     NoArg,

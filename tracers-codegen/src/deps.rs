@@ -3,10 +3,12 @@
 //! `mod` statements incorporating submodules, but this will also at some point try to follow
 //! `include!` macros where possible.
 use failure::{bail, Fallible};
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use syn::visit::Visit;
 
 /// The type of source dependency.
+#[derive(Serialize, Deserialize)]
 pub(crate) enum SourceDependency {
     /// A `mod` dependency, specifying the name of the module.
     Mod(String),

@@ -15,6 +15,7 @@ mod error;
 mod gen;
 mod hashing;
 pub mod proc_macros;
+mod serde_helpers;
 mod spec;
 mod syn_helpers;
 #[cfg(test)]

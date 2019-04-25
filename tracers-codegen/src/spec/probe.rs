@@ -5,19 +5,26 @@
 //! This module encapsulates most of the messy details of translating a simple trait method into
 //! the definition of a probe.
 
+use crate::serde_helpers;
 use crate::spec::ProbeArgSpecification;
 use crate::{TracersError, TracersResult};
 use proc_macro2::Span;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct ProbeSpecification {
     pub name: String,
+    #[serde(with = "serde_helpers::syn")]
     pub method_name: Ident,
+    #[serde(with = "serde_helpers::syn")]
     pub original_method: TraitItemMethod,
+    #[serde(with = "serde_helpers::syn")]
     pub vis: Visibility,
+    #[serde(with = "serde_helpers::span")]
     pub span: Span,
     pub args: Vec<ProbeArgSpecification>,
 }

@@ -31,6 +31,7 @@ tempfile = "3"
 askama = "0.8"
 strum = "0.15"
 strum_macros = "0.15"
+serde_str = "0.1.0"
 
 tracers-core = { path = "../tracers-core", version = "0.1.0" }
 

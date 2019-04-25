@@ -2,20 +2,32 @@
 
 use crate::argtypes;
 use crate::argtypes::ArgTypeInfo;
+use crate::serde_helpers;
 use crate::syn_helpers;
 use crate::{TracersError, TracersResult};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use syn::spanned::Spanned;
 
+#[derive(Serialize, Deserialize)]
 pub(crate) struct ProbeArgSpecification {
     name: String,
+
     #[allow(dead_code)] //TODO: Temporary
     probe_name: String,
+
     #[allow(dead_code)] //TODO: Temporary
     ordinal: usize,
+
+    #[serde(with = "serde_helpers::pat_ident")]
     ident: syn::PatIdent,
+
+    #[serde(with = "serde_helpers::syn")]
     syn_typ: syn::Type,
+
+    #[serde(with = "serde_helpers::syn")]
     syn_typ_with_lifetimes: syn::Type,
+
     #[allow(dead_code)] //TODO: Temporary
     arg_type_info: ArgTypeInfo,
 }

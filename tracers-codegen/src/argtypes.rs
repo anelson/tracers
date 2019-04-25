@@ -11,14 +11,14 @@
 //!
 //! Anyone who is extending this crate to support additional types, or even just type aliases, must
 //! update the `from_syn_type` function accordingly
+use crate::serde_helpers;
+use serde::{Deserialize, Serialize};
+use std::ffi::{CStr, CString};
 #[cfg(unix)]
 use std::ffi::{OsStr, OsString};
-
-use std::ffi::{CStr, CString};
-
+use syn::parse_quote;
 use tracers_core::argtypes::*;
 use tracers_core::{ProbeArgType, ProbeArgWrapper};
-use syn::parse_quote;
 
 macro_rules! maybe_type {
     ($syn_t:expr, $rust_t:ty) => {
@@ -90,11 +90,12 @@ pub(crate) fn from_syn_type(ty: &syn::Type) -> Option<ArgTypeInfo> {
     None
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub(crate) struct ArgTypeInfo {
+    #[serde(with = "serde_helpers::string")]
     c_type: CType,
-    c_type_str: &'static str,
-    rust_type_str: &'static str,
+    c_type_str: String,
+    rust_type_str: String,
 }
 
 #[allow(dead_code)] //TODO: temporary
@@ -102,8 +103,8 @@ impl ArgTypeInfo {
     pub fn new<T: ProbeArgType<T>>() -> ArgTypeInfo {
         ArgTypeInfo {
             c_type: <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_c_type(),
-            c_type_str: <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_c_type_str(),
-            rust_type_str: <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_rust_type_str()
+            c_type_str: <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_c_type_str().to_owned(),
+            rust_type_str: <<<T as ProbeArgType<T>>::WrapperType as ProbeArgWrapper>::CType as ProbeArgNativeTypeInfo>::get_rust_type_str().to_owned()
         }
     }
 
@@ -115,8 +116,8 @@ impl ArgTypeInfo {
 
     /// Gets a string which contains the C type for use generating C/C++ code.  For example if the
     /// `CType` is `VoidPtr`, this function returns `void *`
-    fn get_c_type_str(&self) -> &'static str {
-        self.c_type_str
+    fn get_c_type_str(&self) -> &str {
+        &self.c_type_str
     }
 
     /// Gets a string containing the Rust type corresponding to the native C type.  This also is
@@ -130,8 +131,8 @@ impl ArgTypeInfo {
     /// For example, if somewhere else in the code we have a bug whereby `&str` is passed as
     /// `void*`, but this code thinks it should be `char*`, when Rust compiles the call to the
     /// generated Rust bindings it will fail.
-    fn get_rust_type_str(&self) -> &'static str {
-        self.rust_type_str
+    fn get_rust_type_str(&self) -> &str {
+        &self.rust_type_str
     }
 }
 
@@ -146,8 +147,8 @@ mod test {
             assert_eq!(
                 Some(ArgTypeInfo {
                     c_type: $c_type,
-                    c_type_str: $c_type.into(),
-                    rust_type_str: $rust_type_str,
+                    c_type_str: $c_type.to_string(),
+                    rust_type_str: $rust_type_str.to_string(),
                 }),
                 from_syn_type(&syn_typ),
                 "Got unexpected arg type info for type expression '{}'", stringify!($rust_t)

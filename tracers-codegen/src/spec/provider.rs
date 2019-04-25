@@ -2,20 +2,24 @@
 //! `tracers` provider traits therein, as well as analyze those traits and produce `ProbeSpec`s for
 //! each of the probes they contain.  Once the provider traits have been discovered, other modules
 //! in this crate can then process them in various ways
+use crate::serde_helpers;
 use crate::spec::ProbeSpecification;
+use crate::{TracersError, TracersResult};
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
 
-use crate::{TracersError, TracersResult};
-
+#[derive(Serialize, Deserialize)]
 pub struct ProviderSpecification {
     name: String,
     hash: crate::hashing::HashCode,
+    #[serde(with = "serde_helpers::syn")]
     item_trait: ItemTrait,
+    #[serde(with = "serde_helpers::token_stream")]
     token_stream: TokenStream,
     probes: Vec<ProbeSpecification>,
 }
@@ -179,6 +183,7 @@ fn find_probes(item: &ItemTrait) -> TracersResult<Vec<ProbeSpecification>> {
 mod test {
     use super::*;
     use crate::testdata::*;
+    use std::io::{BufReader, BufWriter};
     use syn::parse_quote;
 
     impl PartialEq<ProviderSpecification> for ProviderSpecification {
@@ -280,6 +285,42 @@ mod test {
 
             let probes = find_probes(&item_trait).unwrap();
             assert_eq!(probes, test_trait.probes.unwrap_or(Vec::new()));
+        }
+    }
+
+    #[test]
+    fn provider_serde_test() {
+        //Go through all of the valid test traits, parse them in to a provider, then serialize and
+        //deserialize to json to make sure the round trip serialization works
+        for test_trait in get_filtered_test_traits(false) {
+            let provider =
+                ProviderSpecification::from_token_stream(test_trait.tokenstream).unwrap();
+            let mut buffer = Vec::new();
+            let writer = BufWriter::new(&mut buffer);
+            serde_json::to_writer(writer, &provider).unwrap();
+
+            let reader = BufReader::new(buffer.as_slice());
+
+            let rt_provider: ProviderSpecification = match serde_json::from_reader(reader) {
+                Ok(p) => p,
+                Err(e) => {
+                    panic!(
+                        r###"Error deserializing provider:
+                            Test case: {}
+                            JSON: {}
+                            Error: {}"###,
+                        test_trait.description,
+                        String::from_utf8(buffer).unwrap(),
+                        e
+                    );
+                }
+            };
+
+            assert_eq!(
+                provider, rt_provider,
+                "test case: {}",
+                test_trait.description
+            );
         }
     }
 }
