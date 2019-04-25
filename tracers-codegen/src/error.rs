@@ -208,13 +208,13 @@ impl TracersError {
     }
 
     /// Builds an error string with all the relevant info from a `Fail` implementation
-    #[allow(clippy::redundant_closure)] //clippy's proposed alternative won't compile here
+    #[allow(clippy::redundant_closure)] //clippy's proposed alterstatic won't compile here
     fn error_string(e: &Error) -> String {
         let causes: Vec<_> = e.iter_chain().map(|c| c.to_string()).collect();
         causes.join(": ")
     }
 
-    #[allow(clippy::redundant_closure)] //clippy's proposed alternative won't compile here
+    #[allow(clippy::redundant_closure)] //clippy's proposed alterstatic won't compile here
     fn fail_string(f: &dyn Fail) -> String {
         let causes: Vec<_> = f.iter_chain().map(|c| c.to_string()).collect();
         causes.join(": ")

@@ -72,9 +72,9 @@ jobs:
 
       - script: |
           TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
-          TRACERS_EXPECTED_PROVIDER=test_probes::native/native_noop::0.1.0 \
+          TRACERS_EXPECTED_PROVIDER=test_probes::static/static_noop::0.1.0 \
           scripts/test.sh --manifest-path tracers/Cargo.toml -vv
-        displayName: Cargo test default Native NoOp implementation (non-Windows)
+        displayName: Cargo test default Static NoOp implementation (non-Windows)
         condition: ne( variables['Agent.OS'], 'Windows_NT' )
 
       - script: |
@@ -86,13 +86,13 @@ jobs:
 
       - script: |
           echo ##vso[task.setvariable variable=TRACERS_EXPECTED_DYNAMIC_IMPL;]DISABLED
-          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]test_probes::native/native_noop::0.1.0
-        displayName: Set env vars to test default Native NoOp implementation (Windows)
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]test_probes::static/static_noop::0.1.0
+        displayName: Set env vars to test default Static NoOp implementation (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       - script: |
           scripts\test.bat --manifest-path tracers/Cargo.toml -vv
-        displayName: Cargo test default Native NoOp implementation (Windows)
+        displayName: Cargo test default Static NoOp implementation (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       - script: |

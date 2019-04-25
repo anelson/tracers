@@ -85,7 +85,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
         //a successful result, with a string containing some metadata about the generated provider
         let provider_name = self.spec.name();
-        let implementation = format!("native/{}", self.build_info.implementation.as_ref());
+        let implementation = format!("static/{}", self.build_info.implementation.as_ref());
         let version = env!("CARGO_PKG_VERSION");
 
         let result = quote_spanned! {span=>
@@ -243,7 +243,7 @@ mod test {
                 ));
 
                 let build_info = if *is_enabled {
-                    BuildInfo::new(TracingImplementation::NativeNoOp)
+                    BuildInfo::new(TracingImplementation::StaticNoOp)
                 } else {
                     BuildInfo::new(TracingImplementation::Disabled)
                 };

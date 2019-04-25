@@ -28,8 +28,8 @@ pub enum TracingImplementation {
     #[strum(serialize = "disabled")]
     Disabled,
 
-    #[strum(serialize = "native_noop")]
-    NativeNoOp,
+    #[strum(serialize = "static_noop")]
+    StaticNoOp,
 
     #[strum(serialize = "dyn_stap")]
     DynamicStap,
@@ -46,11 +46,11 @@ impl TracingImplementation {
     pub fn is_dynamic(&self) -> bool {
         match self {
             TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => true,
-            TracingImplementation::Disabled | TracingImplementation::NativeNoOp => false,
+            TracingImplementation::Disabled | TracingImplementation::StaticNoOp => false,
         }
     }
 
-    pub fn is_native(&self) -> bool {
+    pub fn is_static(&self) -> bool {
         !self.is_dynamic()
     }
 }

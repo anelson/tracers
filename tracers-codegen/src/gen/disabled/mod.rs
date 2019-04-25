@@ -1,11 +1,11 @@
-//! This module is very similar to the `native::noop` generator, except that when tracing is
+//! This module is very similar to the `static::noop` generator, except that when tracing is
 //! disabled entirely there is no dependency on `tracers` at all, which means no runtime components
 //! at all.  `noop` still uses the runtime code which implements wrapping of Rust types into C
 //! types, although it uses them only at compile time it still requires that the user's crate have
 //! a `probers` dependency.
 use crate::build_rs::BuildInfo;
-use crate::gen::native::noop::probe_call;
-use crate::gen::native::noop::provider_trait;
+use crate::gen::r#static::noop::probe_call;
+use crate::gen::r#static::noop::provider_trait;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
@@ -42,7 +42,7 @@ impl CodeGenerator for DisabledGenerator {
         generate_init_provider(init)
     }
 
-    fn generate_native_code(
+    fn generate_static_code(
         &self,
         stdout: &mut dyn Write,
         _stderr: &mut dyn Write,

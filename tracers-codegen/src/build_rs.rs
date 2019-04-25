@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 struct FeatureFlags {
     enable_dynamic_tracing: bool,
-    enable_native_tracing: bool,
+    enable_static_tracing: bool,
     force_dyn_stap: bool,
     force_dyn_noop: bool,
 }
@@ -31,7 +31,7 @@ impl FeatureFlags {
     pub fn from_env() -> TracersResult<FeatureFlags> {
         Self::new(
             Self::is_feature_enabled("dynamic-tracing"),
-            Self::is_feature_enabled("native-tracing"),
+            Self::is_feature_enabled("static-tracing"),
             Self::is_feature_enabled("force-dyn-stap"),
             Self::is_feature_enabled("force-dyn-noop"),
         )
@@ -40,12 +40,12 @@ impl FeatureFlags {
     /// Creates a feature flag structure from explicit arguments.  Mostly used for testing
     pub fn new(
         enable_dynamic_tracing: bool,
-        enable_native_tracing: bool,
+        enable_static_tracing: bool,
         force_dyn_stap: bool,
         force_dyn_noop: bool,
     ) -> TracersResult<FeatureFlags> {
-        if enable_dynamic_tracing && enable_native_tracing {
-            return Err(TracersError::code_generation_error("The features `dynamic-tracing` and `native-tracing` are mutually exclusive; please choose one"));
+        if enable_dynamic_tracing && enable_static_tracing {
+            return Err(TracersError::code_generation_error("The features `dynamic-tracing` and `static-tracing` are mutually exclusive; please choose one"));
         }
 
         if force_dyn_stap && force_dyn_noop {
@@ -54,22 +54,22 @@ impl FeatureFlags {
 
         Ok(FeatureFlags {
             enable_dynamic_tracing,
-            enable_native_tracing,
+            enable_static_tracing,
             force_dyn_stap,
             force_dyn_noop,
         })
     }
 
     pub fn enable_tracing(&self) -> bool {
-        self.enable_dynamic() || self.enable_native()
+        self.enable_dynamic() || self.enable_static()
     }
 
     pub fn enable_dynamic(&self) -> bool {
         self.enable_dynamic_tracing || self.force_dyn_noop || self.force_dyn_stap
     }
 
-    pub fn enable_native(&self) -> bool {
-        self.enable_native_tracing
+    pub fn enable_static(&self) -> bool {
+        self.enable_static_tracing
     }
 
     pub fn force_dyn_stap(&self) -> bool {
@@ -243,7 +243,7 @@ fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> Trace
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
-    gen::code_generator()?.generate_native_code(
+    gen::code_generator()?.generate_static_code(
         out,
         err,
         &Path::new(&manifest_path),
@@ -288,8 +288,8 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
                 writeln!(out, "cargo:rustc-cfg=enabled").unwrap();
                 writeln!(out,
                     "cargo:rustc-cfg={}_enabled",
-                    if implementation.is_native() {
-                        "native"
+                    if implementation.is_static() {
+                        "static"
                     } else {
                         "dynamic"
                     }
@@ -353,9 +353,9 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
         }
     } else {
         // Pick some static tracing impl
-        //TODO: Consider other native impls
-        assert!(features.enable_native());
-        Ok(TracingImplementation::NativeNoOp)
+        //TODO: Consider other static impls
+        assert!(features.enable_static());
+        Ok(TracingImplementation::StaticNoOp)
     }
 }
 
@@ -409,7 +409,7 @@ mod tests {
     fn tracers_build_panics_invalid_features() {
         //These two feature flags are mutually exclusive
         let mut _setter = EnvVarsSetter::new(vec![
-            "CARGO_FEATURE_NATIVE_TRACING",
+            "CARGO_FEATURE_STATIC_TRACING",
             "CARGO_FEATURE_DYNAMIC_TRACING",
         ]);
 
@@ -434,14 +434,14 @@ mod tests {
                 TracingImplementation::Disabled,
             ),
             (
-                // Tracing enabled, dynamic mode enabled, native disabled
+                // Tracing enabled, dynamic mode enabled, static disabled
                 FeatureFlags::new(true, false, false, false).unwrap(),
                 TracingImplementation::DynamicNoOp,
             ),
             (
-                // Tracing enabled, dynamic disabled, native enabled
+                // Tracing enabled, dynamic disabled, static enabled
                 FeatureFlags::new(false, true, false, false).unwrap(),
-                TracingImplementation::NativeNoOp,
+                TracingImplementation::StaticNoOp,
             ),
         ];
 
@@ -484,10 +484,10 @@ mod tests {
             //and the features used to compile `tracers` should correspond to the implementation
             match expected_impl {
                 TracingImplementation::Disabled => assert!(!output.contains("enabled")),
-                TracingImplementation::NativeNoOp => {
+                TracingImplementation::StaticNoOp => {
                     assert!(output.contains("cargo:rustc-cfg=enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=native_enabled"));
-                    assert!(output.contains("cargo:rustc-cfg=native_noop_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=static_enabled"));
+                    assert!(output.contains("cargo:rustc-cfg=static_noop_enabled"));
                 }
                 TracingImplementation::DynamicNoOp => {
                     assert!(output.contains("cargo:rustc-cfg=enabled"));

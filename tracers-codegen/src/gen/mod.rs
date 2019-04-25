@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 pub(crate) mod common;
 pub(crate) mod disabled;
 pub(crate) mod dynamic;
-pub(crate) mod native;
+pub(crate) mod r#static;
 
 /// Each probing implementation must implement this trait, which has components which are called at
 /// build-time from `build.rs` and also components invoked by the macros at compile time.  Though
@@ -40,7 +40,7 @@ pub(crate) trait CodeGenerator {
     /// It is designed not to panic; if there is a hard stop that should cause the dependent crate
     /// to fail, then it returns an error.  Most errors won't be hard stops, but merely warnings
     /// that cause the probing system to switch to a no-nop implementation
-    fn generate_native_code(
+    fn generate_static_code(
         &self,
         stdout: &mut dyn Write,
         stderr: &mut dyn Write,
@@ -60,6 +60,6 @@ pub(crate) fn code_generator() -> TracersResult<Box<dyn CodeGenerator>> {
         TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => {
             Box::new(dynamic::DynamicGenerator::new(bi))
         }
-        TracingImplementation::NativeNoOp => Box::new(native::noop::NoOpGenerator::new(bi)),
+        TracingImplementation::StaticNoOp => Box::new(r#static::noop::NoOpGenerator::new(bi)),
     })
 }

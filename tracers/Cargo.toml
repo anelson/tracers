@@ -19,17 +19,17 @@ links = "tracers"
 maintenance = { status = "experimental" }
 
 [features]
-# By default, tracing is enabled and set to an automatically selected native implementation
+# By default, tracing is enabled and set to an automatically selected static implementation
 default = ["tracing"]
 
-tracing = ["native-tracing"]
+tracing = ["static-tracing"]
 
 # To enable dynamic tracing requires it be explicitly activated.  Note this is mutually exclusive with
-# enable-native-tracing
+# enable-static-tracing
 dynamic-tracing = ["once_cell", "tracers-core/dynamic", "tracers-dyn-stap/enabled", "tracers-dyn-noop"]
 
-# Native tracing is built in to the generators, it doesn't have any additional dependent crates
-native-tracing = ["tracers-core/default"]
+# Static tracing is built in to the generators, it doesn't have any additional dependent crates
+static-tracing = ["tracers-core/default"]
 
 force-dyn-stap = ["dynamic-tracing", "tracers-dyn-stap/required"]
 
