@@ -243,7 +243,7 @@ fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> Trace
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
 
-    gen::code_generator()?.generate_static_code(
+    gen::code_generator()?.generate_native_code(
         out,
         err,
         &Path::new(&manifest_path),

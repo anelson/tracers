@@ -12,7 +12,6 @@ use std::path::{Path, PathBuf};
 
 //mod c;
 pub(crate) mod common;
-pub(crate) mod disabled;
 pub(crate) mod dynamic;
 pub(crate) mod r#static;
 
@@ -40,7 +39,7 @@ pub(crate) trait CodeGenerator {
     /// It is designed not to panic; if there is a hard stop that should cause the dependent crate
     /// to fail, then it returns an error.  Most errors won't be hard stops, but merely warnings
     /// that cause the probing system to switch to a no-nop implementation
-    fn generate_static_code(
+    fn generate_native_code(
         &self,
         stdout: &mut dyn Write,
         stderr: &mut dyn Write,
@@ -56,10 +55,13 @@ pub(crate) fn code_generator() -> TracersResult<Box<dyn CodeGenerator>> {
     let bi = BuildInfo::load()?;
 
     Ok(match bi.implementation {
-        TracingImplementation::Disabled => Box::new(disabled::DisabledGenerator::new(bi)),
+        //There are two implementations: one for static tracing (`disabled` is a special case of
+        //`static`), and one for dynamic
+        TracingImplementation::Disabled | TracingImplementation::StaticNoOp => {
+            Box::new(r#static::StaticGenerator::new(bi))
+        }
         TracingImplementation::DynamicNoOp | TracingImplementation::DynamicStap => {
             Box::new(dynamic::DynamicGenerator::new(bi))
         }
-        TracingImplementation::StaticNoOp => Box::new(r#static::noop::NoOpGenerator::new(bi)),
     })
 }

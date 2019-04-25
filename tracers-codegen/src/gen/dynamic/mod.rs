@@ -46,7 +46,7 @@ impl CodeGenerator for DynamicGenerator {
         common::generate_init_provider(init)
     }
 
-    fn generate_static_code(
+    fn generate_native_code(
         &self,
         stdout: &mut dyn Write,
         _stderr: &mut dyn Write,

@@ -1,7 +1,10 @@
-//!Code in this module processes the provider trait decorated with the `tracers` attribute, and
-//!replaces it with an implementation which has zero runtime footprint, but at compile-time still
-//!type-checks to ensure errors aren't introduced with the `noop` generator that only become
-//!noticeable with a real generator.
+//! This module contains the code that transforms a trait with the `tracer` attribute into the
+//! infrastructure to perform tracing using a static, platform-specific implementation.
+//!
+//! The generated code is about 90% identical across all possible implementations, so it's shared.
+//! All static targets, including `noop`, as well as the special case `disabled` target, use this
+//! module.  When there is target-specific logic, it is selected based on the `BuildInfo` in effect
+//! at the time of the code generation
 use crate::build_rs::BuildInfo;
 use crate::gen::common;
 use crate::spec::ProbeSpecification;
