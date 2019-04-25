@@ -96,6 +96,7 @@ impl<'ast> Visit<'ast> for Visitor {
             } else {
                 module_name
             };
+
             self.deps.push(SourceDependency::Mod(module_name));
         }
     }

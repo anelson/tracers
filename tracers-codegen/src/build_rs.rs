@@ -213,7 +213,7 @@ pub fn build() {
     let mut out_handle = stdout.lock();
     let mut err_handle = stderr.lock();
 
-    match build_internal(&mut out_handle, &mut err_handle) {
+    match build_internal(&mut out_handle) {
         Ok(_) => writeln!(out_handle, "probes build succeeded").unwrap(),
         Err(e) => {
             //An error that propagates all the way up to here is serious enough that it means we
@@ -225,7 +225,7 @@ pub fn build() {
     };
 }
 
-fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> TracersResult<()> {
+fn build_internal<OUT: Write>(out: &mut OUT) -> TracersResult<()> {
     //First things first; get the BuildInfo from the `tracers` build, and tell Cargo to make that
     //available to the proc macros at compile time via an environment variable
     let build_info_path = BuildInfo::get_build_path()?;
@@ -236,27 +236,7 @@ fn build_internal<OUT: Write, ERR: Write>(out: &mut OUT, err: &mut ERR) -> Trace
     )
     .unwrap();
 
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR").context(
-        "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?",
-    )?;
-
-    let manifest_path = PathBuf::from(manifest_dir).join("Cargo.toml");
-    let package_name = env::var("CARGO_PKG_NAME").unwrap();
-    let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
-    let cache_path = cache::get_cache_path(
-        &PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join("cache"),
-    );
-
-    gen::code_generator()?.generate_native_code(
-        out,
-        err,
-        &Path::new(&manifest_path),
-        &cache_path,
-        &package_name,
-        targets,
-    );
-
-    Ok(())
+    generate_native_code(out)
 }
 
 /// This function is the counterpart to `build`, which is intended to be invoked in the `tracers`
@@ -325,7 +305,13 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
                     writeln!(out, "cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e).unwrap();
                 }
             }
-    })
+    })?;
+
+    //Generate native code for the `tracers` crate.  Nothing in the actual `tracers`
+    //library code contains any `#[tracer]` traits, but the tests and examples do, so if we
+    //want them to work propertly we need to run codegen for them just like on any other
+    //crate
+    generate_native_code(out)
 }
 
 /// Selects a `tracers` implementation given a set of feature flags specified by the user
@@ -364,6 +350,29 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
         assert!(features.enable_static());
         Ok(TracingImplementation::StaticNoOp)
     }
+}
+
+fn generate_native_code(out: &mut dyn Write) -> TracersResult<()> {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").context(
+        "CARGO_MANIFEST_DIR is not set; are you sure you're calling this from within build.rs?",
+    )?;
+
+    let manifest_path = PathBuf::from(manifest_dir).join("Cargo.toml");
+    let package_name = env::var("CARGO_PKG_NAME").unwrap();
+    let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
+    let cache_path = cache::get_cache_path(
+        &PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join("cache"),
+    );
+
+    gen::code_generator()?.generate_native_code(
+        out,
+        &Path::new(&manifest_path),
+        &cache_path,
+        &package_name,
+        targets,
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -454,7 +463,7 @@ mod tests {
         ];
 
         let temp_dir = tempfile::tempdir().unwrap();
-
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
         let out_dir = temp_dir.path().join("out");
 
         for (features, expected_impl) in test_cases.into_iter() {
@@ -464,11 +473,12 @@ mod tests {
                 expected_impl.as_ref()
             );
 
-            //First let's present we're in `tracers/build.rs`, and cargo has set the relevant env
+            //First let's pretend we're in `tracers/build.rs`, and cargo has set the relevant env
             //vars
             let vars = EnvVarsSetter::new_with_values(vec![
                 ("CARGO_PKG_NAME", "tracers"),
                 ("CARGO_PKG_VERSION", "1.2.3"),
+                ("CARGO_MANIFEST_DIR", manifest_dir),
                 ("OUT_DIR", out_dir.to_str().unwrap()),
             ]);
 
@@ -548,7 +558,6 @@ mod tests {
                 );
 
                 let mut stdout = Vec::new();
-                let mut stderr = Vec::new();
 
                 let vars = EnvVarsSetter::new_with_values(vec![
                     ("CARGO_PKG_NAME", test_case.package_name),
@@ -558,7 +567,7 @@ mod tests {
                     ),
                 ]);
 
-                build_internal(&mut stdout, &mut stderr).expect(&context);
+                build_internal(&mut stdout).expect(&context);
 
                 //After the build, it should output something on stdout to tell Cargo to set a
                 //compiler-visible env var telling the proc macros where the `BuildInfo` file is

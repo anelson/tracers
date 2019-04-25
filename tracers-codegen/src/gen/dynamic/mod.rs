@@ -49,7 +49,6 @@ impl CodeGenerator for DynamicGenerator {
     fn generate_native_code(
         &self,
         stdout: &mut dyn Write,
-        _stderr: &mut dyn Write,
         _manifest_dir: &Path,
         _cache_dir: &Path,
         _package_name: &str,

@@ -42,7 +42,6 @@ pub(crate) trait CodeGenerator {
     fn generate_native_code(
         &self,
         stdout: &mut dyn Write,
-        stderr: &mut dyn Write,
         manifest_dir: &Path,
         cache_dir: &Path,
         package_name: &str,

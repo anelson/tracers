@@ -14,7 +14,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// The (possibly cached) data structure containing the results of processing a Rust source file
-#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct ProcessedFile {
     dependencies: Vec<SourceDependency>,
@@ -24,7 +23,6 @@ struct ProcessedFile {
 pub(super) fn generate_native_code(
     build_info: &BuildInfo,
     stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
     manifest_dir: &Path,
     cache_dir: &Path,
     _package_name: &str,
@@ -43,19 +41,13 @@ pub(super) fn generate_native_code(
             for target in targets.into_iter() {
                 let target_path = manifest_dir.join(&target);
                 writeln!(stdout, "Processing target {}", target_path.display()).unwrap();
-                process_file(build_info, stdout, stderr, cache_dir, &target_path);
+                process_file(build_info, stdout, cache_dir, &target_path);
             }
         }
     };
 }
 
-fn process_file(
-    build_info: &BuildInfo,
-    stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
-    cache_dir: &Path,
-    file: &Path,
-) {
+fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, cache_dir: &Path, file: &Path) {
     //Find the dependent files and providers in this source file, retrieving that info from cache
     //if we've done this before
     let processed_file =
@@ -109,7 +101,7 @@ fn process_file(
         for dependency in processed_file.dependencies.into_iter() {
             match deps::resolve_dependency(file, &dependency) {
                 // Dependency resolved; recursively process this one also
-                Ok(dep_file) => process_file(build_info, stdout, stderr, cache_dir, &dep_file),
+                Ok(dep_file) => process_file(build_info, stdout, cache_dir, &dep_file),
 
                 // Failed to resolve dependency.  This code probably won't compile anyway, but log
                 // a warning through Cargo so the user understands the generation step wasn't
@@ -127,24 +119,22 @@ fn process_file(
         for provider in processed_file.providers.into_iter() {
             //Call `process_provider` for each provider in the file.  If it fails, log the failure
             //in a way that will cause Cargo to report a warning, and continue on
-            let _dontcare = process_provider(
-                build_info, stdout, stderr, cache_dir, file, &provider,
-            )
-            .map_err(|e| {
-                writeln!(
-                    stdout,
-                    "cargo:WARNING=Error generating tracing code for '{}': {}",
-                    provider.ident(),
-                    e
-                )
-                .unwrap();
-                writeln!(
-                    stdout,
-                    "cargo:WARNING=Tracing may not be available for {}",
-                    provider.ident()
-                )
-                .unwrap();
-            });
+            let _dontcare = process_provider(build_info, stdout, cache_dir, file, &provider)
+                .map_err(|e| {
+                    writeln!(
+                        stdout,
+                        "cargo:WARNING=Error generating tracing code for '{}': {}",
+                        provider.ident(),
+                        e
+                    )
+                    .unwrap();
+                    writeln!(
+                        stdout,
+                        "cargo:WARNING=Tracing may not be available for {}",
+                        provider.ident()
+                    )
+                    .unwrap();
+                });
         }
     }
 }
@@ -152,7 +142,6 @@ fn process_file(
 fn process_provider(
     _build_info: &BuildInfo,
     _stdout: &mut dyn Write,
-    _stderr: &mut dyn Write,
     _cache_dir: &Path,
     _file: &Path,
     _provider: &ProviderSpecification,
@@ -182,12 +171,10 @@ mod test {
                 for case in TEST_CRATES.iter() {
                     for target in case.targets.iter() {
                         let mut stdout = Vec::new();
-                        let mut stderr = Vec::new();
 
                         process_file(
                             &build_info,
                             &mut stdout,
-                            &mut stderr,
                             &cache_dir,
                             &case.root_directory.join(target.entrypoint),
                         );

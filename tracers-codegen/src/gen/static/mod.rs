@@ -59,7 +59,6 @@ impl CodeGenerator for StaticGenerator {
     fn generate_native_code(
         &self,
         stdout: &mut dyn Write,
-        stderr: &mut dyn Write,
         manifest_dir: &Path,
         cache_dir: &Path,
         package_name: &str,
@@ -68,7 +67,6 @@ impl CodeGenerator for StaticGenerator {
         native_code::generate_native_code(
             &self.build_info,
             stdout,
-            stderr,
             manifest_dir,
             cache_dir,
             package_name,
