@@ -1,13 +1,14 @@
 //!Code in this module processes the provider trait decorated with the `tracers` attribute, and
 //!replaces it with an implementation using libstapsdt.
 use crate::build_rs::BuildInfo;
-use crate::gen::common;
+use crate::gen::common::ProbeGeneratorBase;
+use crate::gen::common::ProviderTraitGeneratorBase;
 use crate::spec::ProbeArgSpecification;
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::syn_helpers;
 use crate::TracersResult;
-use heck::{ShoutySnakeCase, SnakeCase};
+use heck::ShoutySnakeCase;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::parse_quote;
@@ -19,11 +20,24 @@ pub(super) struct ProviderTraitGenerator<'bi> {
     probes: Vec<ProbeGenerator>,
 }
 
+impl<'bi> ProviderTraitGeneratorBase for ProviderTraitGenerator<'bi> {
+    fn spec(&self) -> &ProviderSpecification {
+        &self.spec
+    }
+
+    fn build_info(&self) -> &BuildInfo {
+        self.build_info
+    }
+}
+
 impl<'bi> ProviderTraitGenerator<'bi> {
     pub fn new(
         build_info: &'bi BuildInfo,
         spec: ProviderSpecification,
     ) -> ProviderTraitGenerator<'bi> {
+        //This implementation is specific to dynamic tracing
+        assert!(build_info.implementation.is_dynamic());
+
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
@@ -80,8 +94,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
         let mod_name = self.get_provider_impl_mod_name();
         let struct_type_name = self.get_provider_impl_struct_type_name();
-        let trait_doc_comment = common::generate_trait_comment(&self.spec);
-        let try_init_decl = common::generate_try_init_decl(&self.spec);
+        let trait_doc_comment = self.generate_trait_comment();
+        let try_init_decl = self.generate_try_init_decl();
 
         //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
         //a successful result, with a string containing some metadata about the generated provider
@@ -269,24 +283,6 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         }
     }
 
-    /// Returns the name of the module in which most of the implementation code for this trait will be
-    /// located.
-    fn get_provider_impl_mod_name(&self) -> syn::Ident {
-        let snake_case_name = format!("{}Provider", self.spec.item_trait().ident).to_snake_case();
-
-        syn::Ident::new(
-            &format!("__{}", snake_case_name),
-            self.spec.item_trait().ident.span(),
-        )
-    }
-
-    /// The name of the struct type within the impl module which represents the provider, eg `MyProbesProviderImpl`.
-    /// Note that this is not the same as the struct which we generate which has the same name as the
-    /// trait and implements its methods.
-    fn get_provider_impl_struct_type_name(&self) -> syn::Ident {
-        crate::syn_helpers::add_suffix_to_ident(&self.spec.item_trait().ident, "ProviderImpl")
-    }
-
     /// The name of the static variable which contains the singleton instance of the provider struct,
     /// eg MYPROBESPROVIDERIMPL
     fn get_provider_impl_struct_var_name(&self) -> syn::Ident {
@@ -308,6 +304,12 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
 pub(super) struct ProbeGenerator {
     spec: ProbeSpecification,
+}
+
+impl ProbeGeneratorBase for ProbeGenerator {
+    fn spec(&self) -> &ProbeSpecification {
+        &self.spec
+    }
 }
 
 impl ProbeGenerator {
@@ -397,13 +399,12 @@ impl ProbeGenerator {
         //user calls the probe method directly they will at least be reminded that they should use the
         //macro instead.
         let probe_ident = &self.spec.method_name;
-        let deprecation_attribute =
-            common::generate_probe_deprecation_attribute(&provider.spec, &self.spec);
+        let deprecation_attribute = self.generate_probe_deprecation_attribute(&provider.spec);
 
         //Keep any attributes that were on the original method, and add `doc` attributes at the end
         //to provide some more information about the generated probe mechanics
         let attrs = &self.spec.original_method.attrs;
-        let probe_doc_comment = common::generate_probe_doc_comment(&provider.spec, &self.spec);
+        let probe_doc_comment = self.generate_probe_doc_comment(&provider.spec);
 
         // Note that we don't put an #[allow(dead_code)] attribute on the original method, because
         // the user declared that method.  If it's not being used, let the compiler warn them about
@@ -624,18 +625,25 @@ mod test {
         })
         .into_iter()
         {
-            let item_trait = test_case.get_item_trait();
-            let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
-                "Failed to create specification from test trait '{}'",
-                test_case.description
-            ));
+            for implementation in vec![
+                TracingImplementation::DynamicNoOp,
+                TracingImplementation::DynamicStap,
+            ]
+            .into_iter()
+            {
+                let item_trait = test_case.get_item_trait();
+                let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
+                    "Failed to create specification from test trait '{}'",
+                    test_case.description
+                ));
 
-            let build_info = BuildInfo::new(TracingImplementation::DynamicStap);
-            let generator = ProviderTraitGenerator::new(&build_info, spec);
-            generator.generate().expect(&format!(
-                "Failed to generate test trait '{}'",
-                test_case.description
-            ));
+                let build_info = BuildInfo::new(implementation);
+                let generator = ProviderTraitGenerator::new(&build_info, spec);
+                generator.generate().expect(&format!(
+                    "Failed to generate test trait '{}'",
+                    test_case.description
+                ));
+            }
         }
     }
 }

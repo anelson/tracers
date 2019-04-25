@@ -6,11 +6,11 @@
 //! module.  When there is target-specific logic, it is selected based on the `BuildInfo` in effect
 //! at the time of the code generation
 use crate::build_rs::BuildInfo;
-use crate::gen::common;
+use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::TracersResult;
-use heck::SnakeCase;
+use crate::TracingImplementation;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::parse_quote;
@@ -22,11 +22,25 @@ pub(crate) struct ProviderTraitGenerator<'bi> {
     probes: Vec<ProbeGenerator<'bi>>,
 }
 
+impl<'bi> ProviderTraitGeneratorBase for ProviderTraitGenerator<'bi> {
+    fn spec(&self) -> &ProviderSpecification {
+        &self.spec
+    }
+
+    fn build_info(&self) -> &BuildInfo {
+        self.build_info
+    }
+}
+
 impl<'bi> ProviderTraitGenerator<'bi> {
     pub fn new(
         build_info: &'bi BuildInfo,
         spec: ProviderSpecification,
     ) -> ProviderTraitGenerator<'bi> {
+        //This implementation is specific to static tracing (of which `disabled` is merely a
+        //special case)
+        assert!(build_info.implementation.is_static() || !build_info.implementation.is_enabled());
+
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
@@ -56,6 +70,25 @@ impl<'bi> ProviderTraitGenerator<'bi> {
             #impl_mod
         })
     }
+
+    /// True if we are implementing the `noop` tracer, which does compile-time type checks but
+    /// nothing at runtime
+    fn is_noop(&self) -> bool {
+        self.build_info.implementation == TracingImplementation::StaticNoOp
+    }
+
+    /// True if we are implementing the `disabled` tracer, which is like `noop` but it doesn't even
+    /// do compile time type checks, and cannot assume that the `tracers::runtime` module is
+    /// available to the generated code
+    fn is_disabled(&self) -> bool {
+        self.build_info.implementation == TracingImplementation::Disabled
+    }
+
+    /// True if this is a "real" implementation, meaning not `noop` and not `disabled`
+    fn is_real(&self) -> bool {
+        !self.is_noop() && !self.is_disabled()
+    }
+
     /// A provider is described by the user as a `trait`, with methods corresponding to probes.
     /// However it's actually implemented as a `struct` with no member fields, with static methods
     /// implementing the probes.  Thus, given as input the `trait`, we produce a `struct` of the same
@@ -81,9 +114,9 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         let ident = &self.spec.item_trait().ident;
         let vis = &self.spec.item_trait().vis;
 
-        let trait_doc_comment = common::generate_trait_comment(&self.spec);
+        let trait_doc_comment = self.generate_trait_comment();
 
-        let try_init_decl = common::generate_try_init_decl(&self.spec);
+        let try_init_decl = self.generate_try_init_decl();
 
         //the __try_init_provider returns a Result.  In this no-op implementation, we'll hard-code
         //a successful result, with a string containing some metadata about the generated provider
@@ -139,22 +172,17 @@ impl<'bi> ProviderTraitGenerator<'bi> {
             quote! {}
         }
     }
-
-    /// Returns the name of the module in which most of the implementation code for this trait will be
-    /// located.
-    fn get_provider_impl_mod_name(&self) -> syn::Ident {
-        let snake_case_name = format!("{}Provider", self.spec.item_trait().ident).to_snake_case();
-
-        syn::Ident::new(
-            &format!("__{}", snake_case_name),
-            self.spec.item_trait().ident.span(),
-        )
-    }
 }
 
 pub(super) struct ProbeGenerator<'bi> {
     build_info: &'bi BuildInfo,
     spec: ProbeSpecification,
+}
+
+impl<'bi> ProbeGeneratorBase for ProbeGenerator<'bi> {
+    fn spec(&self) -> &ProbeSpecification {
+        &self.spec
+    }
 }
 
 impl<'bi> ProbeGenerator<'bi> {
@@ -193,13 +221,12 @@ impl<'bi> ProbeGenerator<'bi> {
         //Keep the original probe method, but mark it deprecated with a helpful message so that if the
         //user calls the probe method directly they will at least be reminded that they should use the
         //macro instead.
-        let deprecation_attribute =
-            common::generate_probe_deprecation_attribute(&provider.spec, &self.spec);
+        let deprecation_attribute = self.generate_probe_deprecation_attribute(&provider.spec);
 
         //Keep any attributes that were on the original method, and add `doc` attributes at the end
         //to provide some more information about the generated probe mechanics
         let attrs = &self.spec.original_method.attrs;
-        let probe_doc_comment = common::generate_probe_doc_comment(&provider.spec, &self.spec);
+        let probe_doc_comment = self.generate_probe_doc_comment(&provider.spec);
 
         // Note that we don't put an #[allow(dead_code)] attribute on the original method, because
         // the user declared that method.  If it's not being used, let the compiler warn them about
@@ -238,18 +265,19 @@ mod test {
         })
         .into_iter()
         {
-            for is_enabled in [false, true].into_iter() {
+            for implementation in vec![
+                TracingImplementation::Disabled,
+                TracingImplementation::StaticNoOp,
+            ]
+            .into_iter()
+            {
                 let item_trait = test_case.get_item_trait();
                 let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
                     "Failed to create specification from test trait '{}'",
                     test_case.description
                 ));
 
-                let build_info = if *is_enabled {
-                    BuildInfo::new(TracingImplementation::StaticNoOp)
-                } else {
-                    BuildInfo::new(TracingImplementation::Disabled)
-                };
+                let build_info = BuildInfo::new(implementation);
                 let generator = ProviderTraitGenerator::new(&build_info, spec);
                 generator.generate().expect(&format!(
                     "Failed to generate test trait '{}'",
