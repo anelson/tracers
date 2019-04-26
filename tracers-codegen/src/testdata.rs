@@ -536,7 +536,8 @@ lazy_static! {
                 "src/lib.rs",
                 vec!["src/child_module.rs"],
                 None
-            )],
+            ),
+            Target::new("simplelib", "build.rs", vec![], None)],
         },
         TestCrate {
             root_directory: TEST_CRATE_DIR.join("simplebin"),
@@ -558,6 +559,7 @@ lazy_static! {
                 Target::new("ex1", "examples/ex1.rs", vec![], None),
                 Target::new("test1", "tests/test1.rs", vec![ "tests/static/mod.rs"], None),
                 Target::new("test2", "tests/test2.rs", vec![], None),
+                Target::new("complexlib", "build.rs", vec![], None),
             ],
         },
         TestCrate {

@@ -43,7 +43,7 @@ pub(crate) trait CodeGenerator {
         &self,
         stdout: &mut dyn Write,
         manifest_dir: &Path,
-        cache_dir: &Path,
+        out_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
     );

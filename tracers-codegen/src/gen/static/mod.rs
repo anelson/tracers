@@ -60,7 +60,7 @@ impl CodeGenerator for StaticGenerator {
         &self,
         stdout: &mut dyn Write,
         manifest_dir: &Path,
-        cache_dir: &Path,
+        out_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
     ) {
@@ -68,7 +68,7 @@ impl CodeGenerator for StaticGenerator {
             &self.build_info,
             stdout,
             manifest_dir,
-            cache_dir,
+            out_dir,
             package_name,
             targets,
         );

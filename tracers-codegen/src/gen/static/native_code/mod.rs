@@ -13,6 +13,8 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+mod target;
+
 /// The (possibly cached) data structure containing the results of processing a Rust source file
 #[derive(Serialize, Deserialize)]
 struct ProcessedFile {
@@ -20,11 +22,38 @@ struct ProcessedFile {
     providers: Vec<ProviderSpecification>,
 }
 
+/// The (possibly cached) data structure containing the results of running code gen on a provider
+/// trait
+#[derive(Serialize, Deserialize)]
+struct ProcessedProviderTrait {
+    lib_path: PathBuf,
+    bindings_path: PathBuf,
+}
+
+trait NativeCodeGenerator {
+    /// Generates a native static library that wraps the platform-speciifc probing calls in
+    /// something that Rust's FFI can handle
+    fn generate_native_lib(&self) -> TracersResult<PathBuf>;
+
+    /// Generates Rust bindings which wrap the native lib in somethign Rust-callable
+    fn generate_rust_bindings(&self, native_lib_path: &Path) -> TracersResult<PathBuf>;
+
+    fn out_dir(&self) -> &Path;
+
+    fn build_dir(&self) -> PathBuf {
+        self.out_dir().join("build")
+    }
+
+    fn output_dir(&self) -> PathBuf {
+        self.out_dir().join("output")
+    }
+}
+
 pub(super) fn generate_native_code(
     build_info: &BuildInfo,
     stdout: &mut dyn Write,
     manifest_dir: &Path,
-    cache_dir: &Path,
+    out_dir: &Path,
     _package_name: &str,
     targets: Vec<PathBuf>,
 ) {
@@ -41,17 +70,18 @@ pub(super) fn generate_native_code(
             for target in targets.into_iter() {
                 let target_path = manifest_dir.join(&target);
                 writeln!(stdout, "Processing target {}", target_path.display()).unwrap();
-                process_file(build_info, stdout, cache_dir, &target_path);
+                process_file(build_info, stdout, out_dir, &target_path);
             }
         }
     };
 }
 
-fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, cache_dir: &Path, file: &Path) {
+fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, file: &Path) {
     //Find the dependent files and providers in this source file, retrieving that info from cache
     //if we've done this before
-    let processed_file =
-        cache::cache_file_computation(cache_dir, file, "processed-file", |file_contents| {
+    let cache_dir = cache_dir(out_dir);
+    let result =
+        cache::cache_file_computation(&cache_dir, file, "processed-file", |file_contents| {
             writeln!(
                 stdout,
                 "Generating {} implementation for target {}",
@@ -75,8 +105,37 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, cache_dir: &Path
                 dependencies,
                 providers,
             })
-        })
-        .map_err(|e| {
+        });
+
+    match result {
+        Ok(processed_file) => {
+            //Maybe cached maybe not, we got the info for this file
+            //Generate code for the providers, and recursively process all dependent files
+            for dependency in processed_file.dependencies.into_iter() {
+                match deps::resolve_dependency(file, &dependency) {
+                    // Dependency resolved; recursively process this one also
+                    Ok(dep_file) => process_file(build_info, stdout, out_dir, &dep_file),
+
+                    // Failed to resolve dependency.  This code probably won't compile anyway, but log
+                    // a warning through Cargo so the user understands the generation step wasn't
+                    // successful either
+                    Err(_) => {
+                        writeln!(stdout,
+                             "cargo:WARNING=Unable to resove dependency {:?} in {}; any tracing providers it may contain will not be processed",
+                             dependency,
+                             file.display()
+                             ).unwrap();
+                    }
+                }
+            }
+
+            for provider in processed_file.providers.into_iter() {
+                //Call `process_provider` for each provider in the file.  If it fails, log the failure
+                //in a way that will cause Cargo to report a warning, and continue on
+                process_provider(build_info, stdout, out_dir, file, provider);
+            }
+        }
+        Err(e) => {
             //Failures to process a single file should not fail this call.  The proc macros
             //will handle reporting any errors
             writeln!(
@@ -92,61 +151,99 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, cache_dir: &Path
                 file.display()
             )
             .unwrap();
-        })
-        .ok();
-
-    if let Some(processed_file) = processed_file {
-        //Maybe cached maybe not, we got the info for this file
-        //Generate code for the providers, and recursively process all dependent files
-        for dependency in processed_file.dependencies.into_iter() {
-            match deps::resolve_dependency(file, &dependency) {
-                // Dependency resolved; recursively process this one also
-                Ok(dep_file) => process_file(build_info, stdout, cache_dir, &dep_file),
-
-                // Failed to resolve dependency.  This code probably won't compile anyway, but log
-                // a warning through Cargo so the user understands the generation step wasn't
-                // successful either
-                Err(_) => {
-                    writeln!(stdout,
-                             "cargo:WARNING=Unable to resove dependency {:?} in {}; any tracing providers it may contain will not be processed",
-                             dependency,
-                             file.display()
-                             ).unwrap();
-                }
-            }
         }
+    };
+}
 
-        for provider in processed_file.providers.into_iter() {
-            //Call `process_provider` for each provider in the file.  If it fails, log the failure
-            //in a way that will cause Cargo to report a warning, and continue on
-            let _dontcare = process_provider(build_info, stdout, cache_dir, file, &provider)
-                .map_err(|e| {
-                    writeln!(
-                        stdout,
-                        "cargo:WARNING=Error generating tracing code for '{}': {}",
-                        provider.ident(),
-                        e
-                    )
-                    .unwrap();
-                    writeln!(
-                        stdout,
-                        "cargo:WARNING=Tracing may not be available for {}",
-                        provider.ident()
-                    )
-                    .unwrap();
-                });
+fn process_provider(
+    build_info: &BuildInfo,
+    stdout: &mut dyn Write,
+    out_dir: &Path,
+    _file: &Path,
+    provider: ProviderSpecification,
+) {
+    let cache_dir = cache_dir(out_dir);
+
+    // For this trait, generate native and rust code for it.  If this trait was processed before
+    // and hasn't changed, even if the source file it's in has changed, then we can skip that
+    // generation and used the cached result
+    let result = cache::cache_tokenstream_computation(
+        &cache_dir,
+        provider.token_stream(),
+        provider.name(),
+        |_| {
+            let generator = create_native_code_generator(build_info, out_dir, provider);
+
+            let lib_path = generator.generate_native_lib()?;
+            let bindings_path = generator.generate_rust_bindings(&lib_path)?;
+
+            Ok(ProcessedProviderTrait {
+                lib_path,
+                bindings_path,
+            })
+        },
+    );
+
+    match result {
+        Ok(processed_provider) => {
+            //Output commands to cargo to ensure it can locate this static library.  The Rust
+            //bindings will be injected by the `tracer` proc macro
+            let lib_directory = processed_provider
+                .lib_path
+                .parent()
+                .expect("lib must have a parent");
+            let lib_filename = processed_provider
+                .lib_path
+                .file_stem()
+                .expect("lib must have a file name");
+
+            writeln!(
+                stdout,
+                "cargo:rustc-link-lib=static={}",
+                lib_filename.to_str().expect("filename isn't valid")
+            );
+            writeln!(
+                stdout,
+                "cargo:rustc-link-search=native={}",
+                lib_directory.display()
+            );
+        }
+        Err(e) => {
+            writeln!(
+                stdout,
+                "cargo:WARNING=Error generating tracing code for '{}': {}",
+                provider.ident(),
+                e
+            )
+            .unwrap();
+            writeln!(
+                stdout,
+                "cargo:WARNING=Tracing may not be available for {}",
+                provider.ident()
+            )
+            .unwrap();
         }
     }
 }
 
-fn process_provider(
-    _build_info: &BuildInfo,
-    _stdout: &mut dyn Write,
-    _cache_dir: &Path,
-    _file: &Path,
-    _provider: &ProviderSpecification,
-) -> TracersResult<()> {
-    unimplemented!()
+fn create_native_code_generator(
+    build_info: &BuildInfo,
+    out_dir: &Path,
+    provider: ProviderSpecification,
+) -> Box<NativeCodeGenerator> {
+    match build_info.implementation.tracing_target() {
+        TracingTarget::Disabled | TracingTarget::NoOp => panic!(
+            "{} should never be passed to this function",
+            build_info.implementation.as_ref()
+        ),
+        TracingTarget::Stap => {
+            Box::new(target::stap::StapNativeCodeGenerator::new(build_info, out_dir, provider))
+        }
+    }
+}
+
+fn cache_dir(out_dir: &Path) -> PathBuf {
+    out_dir.join("cache")
 }
 
 #[cfg(test)]

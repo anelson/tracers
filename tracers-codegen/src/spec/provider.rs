@@ -88,6 +88,10 @@ impl ProviderSpecification {
         &self.item_trait
     }
 
+    pub fn token_stream(&self) -> &TokenStream {
+        &self.token_stream
+    }
+
     /// Consumes this spec and returns the same spec with all probes removed, and instead the
     /// probes vector is returned separately.  This is a convenient way to wrap
     /// ProviderSpecification in something else (in truth its designed for the

@@ -50,7 +50,7 @@ impl CodeGenerator for DynamicGenerator {
         &self,
         stdout: &mut dyn Write,
         _manifest_dir: &Path,
-        _cache_dir: &Path,
+        _out_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,
     ) {
