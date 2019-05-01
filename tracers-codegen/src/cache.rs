@@ -118,6 +118,23 @@ pub(crate) fn cache_object_computation<
     load_cached_results::<T>(&abs_path)
 }
 
+/// Identical to `cache_object_computation` except this is read-only; if the computation does not
+/// exist in the cache it returns an error
+pub(crate) fn get_cached_object_computation<T: Serialize + DeserializeOwned>(
+    cache_path: &Path,
+    object_name: &str,
+    hash: HashCode,
+    key: &str,
+) -> Fallible<T> {
+    //Just like the file scenario, use the object's hash to detect changes
+    let results_path = cached_results_path(Path::new(object_name), key, hash);
+
+    //Try to load a cached results file.  If it doesn't exist or there's any kind of error loading
+    //it, just invoke the function again
+    let abs_path = cache_path.join(results_path);
+    load_cached_results::<T>(&abs_path)
+}
+
 /// Lower-level caching function.  Given some arbitrary file name (and optional path components)
 /// relative to the cache path, if the file exists, returns the fully qualified path to the file in
 /// the cache, if not, it passes that fully qualified path to the provided closure, and if that
@@ -436,5 +453,34 @@ mod test {
 
         assert_eq!(2, compute_count);
         assert_eq!(hash_foo1 as usize, result.answer);
+    }
+
+    #[test]
+    fn caches_generated_data() {
+        let key = "mylib.c";
+        let root_dir = tempfile::tempdir().unwrap();
+        let cache_dir = root_dir.path().join("cache");
+
+        let hash_foo1: HashCode = 5;
+
+        //Query the cached computation.  It's not happened yet so that should be an error
+        let result: Fallible<TestResult> =
+            get_cached_object_computation(&cache_dir, "foo", hash_foo1, key);
+        assert!(result.is_err());
+
+        //Invoke the computation for the first time; closure should be called and the result saved
+        cache_object_computation(&cache_dir, "foo", hash_foo1, key, || {
+            Ok(TestResult {
+                answer: hash_foo1 as usize,
+            })
+        })
+        .unwrap();
+
+        //Now the computation is cached; it should return
+        let result: Fallible<TestResult> =
+            get_cached_object_computation(&cache_dir, "foo", hash_foo1, key);
+        assert!(result.is_ok());
+
+        assert_eq!(hash_foo1 as usize, result.unwrap().answer);
     }
 }
