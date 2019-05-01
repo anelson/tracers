@@ -15,12 +15,106 @@ use fs_extra::{copy_items, dir};
 use lazy_static::lazy_static;
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::env;
 use std::fmt;
 #[cfg(not(target_os = "windows"))]
 use std::fs::canonicalize; //on non-Windows just use the built-in function
 use std::path::PathBuf;
+use std::sync::{Mutex, MutexGuard};
 use tempfile::tempdir;
 use tracers_core::argtypes::{CType, ProbeArgNativeTypeInfo, ProbeArgType, ProbeArgWrapper};
+
+type EnvVarsVec = Vec<(String, String, Option<String>)>;
+
+lazy_static! {
+    /// The `EnvVarsSetter` must only be used with the mutex held, otherwise the test runner can
+    /// parallelize test runs and they can overwrite eachother's env vars
+    static ref ENV_VARS_MUTEX: Mutex<EnvVarsVec> = Mutex::new(Vec::new());
+}
+
+fn unset_vars(vars: &mut EnvVarsVec) {
+    println!("Restoring environment variables");
+    for (key, _, old_val) in vars.iter() {
+        if let Some(old_val) = old_val {
+            println!("Restoring '{}' to '{}'", key, old_val);
+            env::set_var(key, old_val)
+        } else {
+            println!("Unsetting '{}'", key);
+            env::remove_var(key);
+        }
+    }
+
+    vars.clear();
+}
+
+pub(crate) struct EnvVarsSetterGuard<'a> {
+    guard: MutexGuard<'a, EnvVarsVec>,
+}
+
+impl<'a> EnvVarsSetterGuard<'a> {
+    fn unset(&mut self) {
+        unset_vars(&mut self.guard);
+    }
+}
+
+impl<'a> Drop for EnvVarsSetterGuard<'a> {
+    fn drop(&mut self) {
+        //Unset the env vars before the guard is released
+        self.unset();
+    }
+}
+
+/// Sets the specified environment variables for the current process, and keeps them set until the
+/// returned guard object is dropped.  Once it's dropped, the previous state of the environment
+/// variables is restored.
+///
+/// Note that internally this uses a mutex to ensure there is only one thread in the process at a
+/// time operating with modified environment variables.  Otherwise multiple threads could
+/// interfere with the environment variables of the process and cause unpredictable behavior
+pub(crate) fn with_env_vars<'a, K: AsRef<str>, V: AsRef<str>>(
+    vars: Vec<(K, V)>,
+) -> EnvVarsSetterGuard<'a> {
+    println!("Acquiring mutex");
+    let mut guard = match ENV_VARS_MUTEX.lock() {
+        Err(e) => {
+            println!("Mutex is poisoned; cleaning up previous env vars");
+            e.into_inner()
+        }
+        Ok(guard) => guard,
+    };
+
+    //If there are any entries left in this vector, it suggest a previous test paniced and left
+    //some variables set
+    unset_vars(&mut guard);
+
+    //Now the mutex is held and any previously un-restored env var overrides have been unwound.
+    //The env vars now should be the state they were before we started to mess with them.  In this
+    //state, grab the current value of each of the variables we are going to override, so we can
+    //restore them later
+    let vars: EnvVarsVec = vars
+        .into_iter()
+        .map(|(k, v)| {
+            (
+                k.as_ref().to_owned(),
+                v.as_ref().to_owned(),
+                env::var(k.as_ref()).ok(),
+            )
+        })
+        .collect();
+
+    //Push these new variables into the vector
+    for variable in vars.into_iter() {
+        guard.push(variable);
+    }
+
+    //And set the variables
+    for (key, value, _) in guard.iter() {
+        println!("Setting '{}' to '{}'", key, value);
+        env::set_var(key, value);
+    }
+
+    EnvVarsSetterGuard { guard: guard }
+}
 
 pub(crate) struct Target {
     pub name: &'static str,
