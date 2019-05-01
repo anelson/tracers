@@ -89,6 +89,35 @@ pub(crate) fn cache_tokenstream_computation<
     load_cached_results::<T>(&abs_path)
 }
 
+/// Similar to `cache_file_computation`, except the computation is not on the contents of a file
+/// but rather on some arbitrary object with a name and a hash.  If the computation has previously
+/// been performed on the same name and hash, the previous result is returned.  Otherwise the
+/// computation is performed and saved in the cache for future invocations.
+pub(crate) fn cache_object_computation<
+    T: Serialize + DeserializeOwned,
+    F: FnOnce() -> Fallible<T>,
+>(
+    cache_path: &Path,
+    object_name: &str,
+    hash: HashCode,
+    key: &str,
+    f: F,
+) -> Fallible<T> {
+    //Just like the file scenario, use the object's hash to detect changes
+    let results_path = cached_results_path(Path::new(object_name), key, hash);
+
+    //Try to load a cached results file.  If it doesn't exist or there's any kind of error loading
+    //it, just invoke the function again
+    let abs_path = cache_generated_file(cache_path, &results_path, |abs_path| {
+        f().and_then(|result| {
+            //Result was computed; serialize it back
+            save_results::<T>(&abs_path, &result).and(Ok(abs_path))
+        })
+    })?;
+
+    load_cached_results::<T>(&abs_path)
+}
+
 /// Lower-level caching function.  Given some arbitrary file name (and optional path components)
 /// relative to the cache path, if the file exists, returns the fully qualified path to the file in
 /// the cache, if not, it passes that fully qualified path to the provided closure, and if that
@@ -342,5 +371,70 @@ mod test {
 
         assert_eq!(2, compute_count);
         assert_eq!("FearIsTheMindKiller".len(), result.answer);
+    }
+
+    #[test]
+    fn caches_objects_results() {
+        let key = "mylib.c";
+        let root_dir = tempfile::tempdir().unwrap();
+        let cache_dir = root_dir.path().join("cache");
+
+        let hash_foo1: HashCode = 5;
+        let hash_foo2: HashCode = 6;
+
+        let mut compute_count: usize = 0;
+
+        //Invoke the computation for the first time; closure should be called and the result saved
+        let result: TestResult =
+            cache_object_computation(&cache_dir, "foo", hash_foo1, key, || {
+                compute_count += 1;
+                Ok(TestResult {
+                    answer: hash_foo1 as usize,
+                })
+            })
+            .unwrap();
+
+        assert_eq!(1, compute_count);
+        assert_eq!(hash_foo1 as usize, result.answer);
+
+        //Now invoke again; the result should have been cached
+        let result: TestResult =
+            cache_object_computation(&cache_dir, "foo", hash_foo1, key, || {
+                compute_count += 1;
+                Ok(TestResult {
+                    answer: hash_foo1 as usize,
+                })
+            })
+            .unwrap();
+
+        assert_eq!(1, compute_count);
+        assert_eq!(hash_foo1 as usize, result.answer);
+
+        //Now use another object with a different hash; a new result should be computed
+        let result: TestResult =
+            cache_object_computation(&cache_dir, "foo", hash_foo2, key, || {
+                compute_count += 1;
+                Ok(TestResult {
+                    answer: hash_foo2 as usize,
+                })
+            })
+            .unwrap();
+
+        assert_eq!(2, compute_count);
+        assert_eq!(hash_foo2 as usize, result.answer);
+
+        //Finally, use another instance of the object that should have the same content, and
+        //thus use the cached result
+        let result: TestResult =
+            cache_object_computation(&cache_dir, "foo", hash_foo1, key, || {
+                compute_count += 1;
+                Ok(TestResult {
+                    answer: hash_foo1 as usize,
+                })
+            })
+            .unwrap();
+
+        assert_eq!(2, compute_count);
+        assert_eq!(hash_foo1 as usize, result.answer);
     }
 }
