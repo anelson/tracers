@@ -74,10 +74,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
-        let probes: Vec<_> = probes
-            .into_iter()
-            .map(|probe| ProbeGenerator::new(probe))
-            .collect();
+        let probes: Vec<_> = probes.into_iter().map(ProbeGenerator::new).collect();
         ProviderTraitGenerator {
             build_info,
             spec,
