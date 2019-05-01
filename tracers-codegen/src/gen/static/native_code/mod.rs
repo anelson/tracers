@@ -37,7 +37,7 @@ trait NativeCodeGenerator {
     fn generate_native_lib(&self) -> TracersResult<PathBuf>;
 
     /// Generates Rust bindings which wrap the native lib in somethign Rust-callable
-    fn generate_rust_bindings(&self, native_lib_path: &Path) -> TracersResult<PathBuf>;
+    fn generate_rust_bindings(&self) -> TracersResult<PathBuf>;
 
     fn out_dir(&self) -> &Path;
 
@@ -178,7 +178,7 @@ fn process_provider(
             let generator = create_native_code_generator(build_info, out_dir, provider);
 
             let lib_path = generator.generate_native_lib()?;
-            let bindings_path = generator.generate_rust_bindings(&lib_path)?;
+            let bindings_path = generator.generate_rust_bindings()?;
 
             Ok(ProcessedProviderTrait {
                 lib_path,
