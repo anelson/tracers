@@ -28,7 +28,6 @@ pub(crate) struct ProbeArgSpecification {
     #[serde(with = "serde_helpers::syn")]
     syn_typ_with_lifetimes: syn::Type,
 
-    #[allow(dead_code)] //TODO: Temporary
     arg_type_info: ArgTypeInfo,
 }
 
@@ -98,8 +97,16 @@ impl ProbeArgSpecification {
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn ident(&self) -> &syn::PatIdent {
         &self.ident
+    }
+
+    pub fn arg_type_info(&self) -> &ArgTypeInfo {
+        &self.arg_type_info
     }
 
     pub fn syn_typ(&self) -> &syn::Type {

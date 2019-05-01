@@ -2,6 +2,7 @@
 //! `tracers` provider traits therein, as well as analyze those traits and produce `ProbeSpec`s for
 //! each of the probes they contain.  Once the provider traits have been discovered, other modules
 //! in this crate can then process them in various ways
+use crate::hashing::HashCode;
 use crate::serde_helpers;
 use crate::spec::ProbeSpecification;
 use crate::{TracersError, TracersResult};
@@ -16,7 +17,7 @@ use syn::{ItemTrait, TraitItem};
 #[derive(Serialize, Deserialize)]
 pub struct ProviderSpecification {
     name: String,
-    hash: crate::hashing::HashCode,
+    hash: HashCode,
     #[serde(with = "serde_helpers::syn")]
     item_trait: ItemTrait,
     #[serde(with = "serde_helpers::token_stream")]
@@ -76,20 +77,30 @@ impl ProviderSpecification {
         ident.to_string().to_snake_case()
     }
 
-    pub fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         &self.name
     }
 
-    pub fn ident(&self) -> &syn::Ident {
+    /// The name of this provider (in snake_case) combined with the hash of the provider's
+    /// contents.  Eg: `my_provider_deadc0de1918df`
+    pub(crate) fn name_with_hash(&self) -> String {
+        format!("{}_{:x}", self.name, self.hash)
+    }
+
+    pub(crate) fn ident(&self) -> &syn::Ident {
         &self.item_trait.ident
     }
 
-    pub fn item_trait(&self) -> &syn::ItemTrait {
+    pub(crate) fn item_trait(&self) -> &syn::ItemTrait {
         &self.item_trait
     }
 
-    pub fn token_stream(&self) -> &TokenStream {
+    pub(crate) fn token_stream(&self) -> &TokenStream {
         &self.token_stream
+    }
+
+    pub(crate) fn probes(&self) -> &Vec<ProbeSpecification> {
+        &self.probes
     }
 
     /// Consumes this spec and returns the same spec with all probes removed, and instead the

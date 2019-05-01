@@ -1,0 +1,3 @@
+# In this particular case the `target` directory contains source code
+!target/
+

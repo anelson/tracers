@@ -8,6 +8,7 @@ use crate::deps::{self, SourceDependency};
 use crate::spec::{self, ProviderSpecification};
 use crate::TracersResult;
 use crate::TracingTarget;
+use crate::TracingType;
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -57,6 +58,8 @@ pub(super) fn generate_native_code(
     _package_name: &str,
     targets: Vec<PathBuf>,
 ) {
+    assert!(build_info.implementation.tracing_type() == TracingType::Static);
+
     match build_info.implementation.tracing_target() {
         TracingTarget::Disabled | TracingTarget::NoOp => {
             writeln!(
@@ -167,11 +170,11 @@ fn process_provider(
     // For this trait, generate native and rust code for it.  If this trait was processed before
     // and hasn't changed, even if the source file it's in has changed, then we can skip that
     // generation and used the cached result
-    let result = cache::cache_tokenstream_computation(
-        &cache_dir,
-        provider.token_stream(),
-        provider.name(),
-        |_| {
+    let token_stream = provider.token_stream().clone();
+    let name = provider.name().to_owned();
+    let ident = provider.ident().clone();
+    let result =
+        cache::cache_tokenstream_computation(&cache_dir, &token_stream, &name, move |_| {
             let generator = create_native_code_generator(build_info, out_dir, provider);
 
             let lib_path = generator.generate_native_lib()?;
@@ -181,8 +184,7 @@ fn process_provider(
                 lib_path,
                 bindings_path,
             })
-        },
-    );
+        });
 
     match result {
         Ok(processed_provider) => {
@@ -201,25 +203,26 @@ fn process_provider(
                 stdout,
                 "cargo:rustc-link-lib=static={}",
                 lib_filename.to_str().expect("filename isn't valid")
-            );
+            )
+            .unwrap();
             writeln!(
                 stdout,
                 "cargo:rustc-link-search=native={}",
                 lib_directory.display()
-            );
+            )
+            .unwrap();
         }
         Err(e) => {
             writeln!(
                 stdout,
                 "cargo:WARNING=Error generating tracing code for '{}': {}",
-                provider.ident(),
-                e
+                ident, e
             )
             .unwrap();
             writeln!(
                 stdout,
                 "cargo:WARNING=Tracing may not be available for {}",
-                provider.ident()
+                ident
             )
             .unwrap();
         }
@@ -236,9 +239,9 @@ fn create_native_code_generator(
             "{} should never be passed to this function",
             build_info.implementation.as_ref()
         ),
-        TracingTarget::Stap => {
-            Box::new(target::stap::StapNativeCodeGenerator::new(build_info, out_dir, provider))
-        }
+        TracingTarget::Stap => Box::new(target::stap::StapNativeCodeGenerator::new(
+            out_dir, provider,
+        )),
     }
 }
 
@@ -256,7 +259,7 @@ mod test {
     fn caches_results() {
         // For each of our test crates, run the code generator twice.  Once with an empty cache,
         // and then again.  The first time should produce some output.  The second time should
-        // produce nothing for crates that are valid, but for crates with missing dependencies the
+        // produce no debug output for crates that are valid, but for crates with missing dependencies the
         // missing dependency error info should be output again
         for implementation in [TracingImplementation::StaticStap].iter() {
             let build_info = BuildInfo::new((*implementation).clone());
@@ -295,9 +298,19 @@ mod test {
                                     case.root_directory.display()
                                 );
                             } else {
+                                //No errors are expected, so the only output should be the cargo
+                                //commands to link to the native libraries.
+                                let lines = output
+                                    .lines()
+                                    .filter(|line| {
+                                        !(line.starts_with("cargo:rustc-link-lib")
+                                            || line.starts_with("cargo:rustc-link-search"))
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
                                 assert_eq!(
                                     "",
-                                    output,
+                                    lines,
                                     "test crate {}",
                                     case.root_directory.display()
                                 );

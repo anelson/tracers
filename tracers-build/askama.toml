@@ -1,0 +1,3 @@
+[general]
+# Tell Askama to look in the codegen project for templates
+dirs = ["../tracers-codegen/templates"]

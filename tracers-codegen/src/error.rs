@@ -57,6 +57,12 @@ pub enum TracersError {
     CodeGenerationError {
         message: String,
     },
+
+    NativeCodeGenerationError {
+        message: String,
+        #[fail(cause)]
+        error: Error,
+    },
 }
 
 impl Display for TracersError {
@@ -69,7 +75,8 @@ impl Display for TracersError {
             TracersError::MissingCallInBuildRs => write!(f, "Build environment is incomplete; make sure you are calling `tracers_build::build()` in your `build.rs` build script"),
             TracersError::BuildInfoReadError { message, .. } => write!(f, "{}", message),
             TracersError::BuildInfoWriteError { message, .. } => write!(f, "{}", message),
-            TracersError::CodeGenerationError { message } => write!(f, "Error generating probing code: {}", message)
+            TracersError::CodeGenerationError { message } => write!(f, "Error generating probing code: {}", message),
+            TracersError::NativeCodeGenerationError { message, .. } => write!(f, "Error generating or compiling native C++ wrapper code: {}", message)
         }
     }
 }
@@ -164,6 +171,20 @@ impl TracersError {
     pub fn code_generation_error<S: AsRef<str>>(message: S) -> TracersError {
         TracersError::CodeGenerationError {
             message: message.as_ref().to_owned(),
+        }
+    }
+
+    pub fn native_code_generation_error<
+        S: AsRef<str>,
+        //E: std::error::Error + Sync + Send + 'static,
+        E: Into<Error> + Display,
+    >(
+        message: S,
+        e: E,
+    ) -> TracersError {
+        TracersError::NativeCodeGenerationError {
+            message: format!("{}: {}", message.as_ref(), e),
+            error: e.into(),
         }
     }
 

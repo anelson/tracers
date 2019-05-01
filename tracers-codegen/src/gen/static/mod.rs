@@ -64,13 +64,16 @@ impl CodeGenerator for StaticGenerator {
         package_name: &str,
         targets: Vec<PathBuf>,
     ) {
-        native_code::generate_native_code(
-            &self.build_info,
-            stdout,
-            manifest_dir,
-            out_dir,
-            package_name,
-            targets,
-        );
+        //Native code gen is only used for static, not for disabled
+        if self.build_info.implementation.is_static() {
+            native_code::generate_native_code(
+                &self.build_info,
+                stdout,
+                manifest_dir,
+                out_dir,
+                package_name,
+                targets,
+            );
+        }
     }
 }

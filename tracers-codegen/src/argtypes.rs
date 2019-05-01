@@ -110,13 +110,13 @@ impl ArgTypeInfo {
 
     /// Gets the `CType` enum which corresponds to the C data type which is used to represent this
     /// type when calling probes
-    fn get_c_type_enum(&self) -> CType {
+    pub fn get_c_type_enum(&self) -> CType {
         self.c_type.clone()
     }
 
     /// Gets a string which contains the C type for use generating C/C++ code.  For example if the
     /// `CType` is `VoidPtr`, this function returns `void *`
-    fn get_c_type_str(&self) -> &str {
+    pub fn get_c_type_str(&self) -> &str {
         &self.c_type_str
     }
 
@@ -131,7 +131,7 @@ impl ArgTypeInfo {
     /// For example, if somewhere else in the code we have a bug whereby `&str` is passed as
     /// `void*`, but this code thinks it should be `char*`, when Rust compiles the call to the
     /// generated Rust bindings it will fail.
-    fn get_rust_type_str(&self) -> &str {
+    pub fn get_rust_type_str(&self) -> &str {
         &self.rust_type_str
     }
 }

@@ -565,6 +565,9 @@ mod tests {
                         "CARGO_MANIFEST_DIR",
                         test_case.root_directory.to_str().unwrap(),
                     ),
+                    ("TARGET", "x86_64-linux-gnu"),
+                    ("HOST", "x86_64-linux-gnu"),
+                    ("OPT_LEVEL", "1"),
                 ]);
 
                 build_internal(&mut stdout).expect(&context);
