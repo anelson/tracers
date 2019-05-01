@@ -6,11 +6,10 @@ use crate::build_rs::BuildInfo;
 use crate::cache;
 use crate::deps::{self, SourceDependency};
 use crate::spec::{self, ProviderSpecification};
-use crate::TracersResult;
-use crate::TracingTarget;
-use crate::TracingType;
+use crate::{TracersError, TracersResult, TracingTarget, TracingType};
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +17,7 @@ mod target;
 
 /// The (possibly cached) data structure containing the results of processing a Rust source file
 #[derive(Serialize, Deserialize)]
-struct ProcessedFile {
+pub(crate) struct ProcessedFile {
     dependencies: Vec<SourceDependency>,
     providers: Vec<ProviderSpecification>,
 }
@@ -26,9 +25,9 @@ struct ProcessedFile {
 /// The (possibly cached) data structure containing the results of running code gen on a provider
 /// trait
 #[derive(Serialize, Deserialize)]
-struct ProcessedProviderTrait {
-    lib_path: PathBuf,
-    bindings_path: PathBuf,
+pub(crate) struct ProcessedProviderTrait {
+    pub lib_path: PathBuf,
+    pub bindings_path: PathBuf,
 }
 
 trait NativeCodeGenerator {
@@ -48,6 +47,31 @@ trait NativeCodeGenerator {
     fn output_dir(&self) -> PathBuf {
         self.out_dir().join("output")
     }
+}
+
+const PROCESSED_PROVIDER_KEY: &str = "processed_provider";
+
+/// Checks the cache to see if the provider described by `provider` has already been processed by
+/// the native code generator and produced a native lib and Rust bindings.  If so returns the
+/// details.  If not returns an error.
+///
+/// This is called from within the proc macros when they need to know about the generated bindings
+/// for a given provider.
+///
+/// It assumes the environmant variable `OUT_DIR` is set to the output directory used when
+/// `tracers_build::build()` was invoked in the caller's `build.rs` file.
+pub(crate) fn get_processed_provider_info(
+    provider: &ProviderSpecification,
+) -> TracersResult<ProcessedProviderTrait> {
+    let out_dir = PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?);
+    let cache_dir = cache_dir(&out_dir);
+    cache::get_cached_object_computation(
+        &cache_dir,
+        provider.name(),
+        provider.hash(),
+        PROCESSED_PROVIDER_KEY,
+    )
+    .map_err(|e| TracersError::provider_trait_not_processed_error(provider.ident().to_string(), e))
 }
 
 pub(super) fn generate_native_code(
@@ -170,11 +194,14 @@ fn process_provider(
     // For this trait, generate native and rust code for it.  If this trait was processed before
     // and hasn't changed, even if the source file it's in has changed, then we can skip that
     // generation and used the cached result
-    let token_stream = provider.token_stream().clone();
     let name = provider.name().to_owned();
     let ident = provider.ident().clone();
-    let result =
-        cache::cache_tokenstream_computation(&cache_dir, &token_stream, &name, move |_| {
+    let result = cache::cache_object_computation(
+        &cache_dir,
+        &name,
+        provider.hash(),
+        PROCESSED_PROVIDER_KEY,
+        move || {
             let generator = create_native_code_generator(build_info, out_dir, provider);
 
             let lib_path = generator.generate_native_lib()?;
@@ -184,7 +211,8 @@ fn process_provider(
                 lib_path,
                 bindings_path,
             })
-        });
+        },
+    );
 
     match result {
         Ok(processed_provider) => {

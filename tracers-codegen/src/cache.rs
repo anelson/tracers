@@ -1,11 +1,8 @@
 //! Implements a simple filesystem-based caching system, where the results of idempotent
 //! computations on either filesystem or `TokenStream` inputs are cached in a file system directory
 //! (intended to be the `OUT_DIR` of a Cargo build).
-#![allow(dead_code)] //TODO: Only temporary
-
 use crate::hashing::*;
 use failure::{bail, format_err, Fallible};
-use proc_macro2::TokenStream;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fs::File;
 use std::io::Read;
@@ -56,34 +53,6 @@ pub(crate) fn cache_file_computation<
                 //Result was computed; serialize it back
                 save_results::<T>(&abs_path, &result).and(Ok(abs_path))
             })
-    })?;
-
-    load_cached_results::<T>(&abs_path)
-}
-
-/// Similar to `cache_file_computation`, except the computation is not on the contents of a file
-/// but rather on a `TokenStream`.
-pub(crate) fn cache_tokenstream_computation<
-    T: Serialize + DeserializeOwned,
-    F: FnOnce(&TokenStream) -> Fallible<T>,
->(
-    cache_path: &Path,
-    token_stream: &TokenStream,
-    key: &str,
-    f: F,
-) -> Fallible<T> {
-    //Just like the file scenario, use the tokenstream's hash to detect changes
-    let hash = hash_token_stream(token_stream);
-
-    let results_path = cached_results_path(Path::new("tokenstream"), key, hash);
-
-    //Try to load a cached results file.  If it doesn't exist or there's any kind of error loading
-    //it, just invoke the function again
-    let abs_path = cache_generated_file(cache_path, &results_path, |abs_path| {
-        f(token_stream).and_then(|result| {
-            //Result was computed; serialize it back
-            save_results::<T>(&abs_path, &result).and(Ok(abs_path))
-        })
     })?;
 
     load_cached_results::<T>(&abs_path)
@@ -229,10 +198,8 @@ fn cached_results_path(input_path: &Path, key: &str, hash: HashCode) -> PathBuf 
 #[cfg(test)]
 mod test {
     use super::*;
-    use quote::quote;
     use serde::Deserialize;
     use std::io::Write;
-    use syn::ItemTrait;
 
     #[derive(Deserialize, Serialize, Debug)]
     struct TestResult {
@@ -312,82 +279,6 @@ mod test {
 
         assert_eq!(2, compute_count);
         assert_eq!("Fear is the mind killer".len(), result.answer);
-    }
-
-    #[test]
-    fn caches_tokenstream_results() {
-        let key = "mylib.c";
-        let root_dir = tempfile::tempdir().unwrap();
-        let cache_dir = root_dir.path().join("cache");
-
-        let trait_foo1 = quote! {
-            trait FearIsTheMindKiller {}
-        };
-        let trait_foo2 = quote! {
-            #trait_foo1
-        };
-        let trait_bar = quote! {
-            trait IWillFaceMyFear {}
-        };
-
-        let mut compute_count: usize = 0;
-
-        //Invoke the computation for the first time; closure should be called and the result saved
-        let result: TestResult =
-            cache_tokenstream_computation(&cache_dir, &trait_foo1, key, |input| {
-                compute_count += 1;
-                let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
-                Ok(TestResult {
-                    answer: trait_item.ident.to_string().len(),
-                })
-            })
-            .unwrap();
-
-        assert_eq!(1, compute_count);
-        assert_eq!("FearIsTheMindKiller".len(), result.answer);
-
-        //Now invoke again; the result should have been cached
-        let result: TestResult =
-            cache_tokenstream_computation(&cache_dir, &trait_foo1, key, |input| {
-                compute_count += 1;
-                let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
-                Ok(TestResult {
-                    answer: trait_item.ident.to_string().len(),
-                })
-            })
-            .unwrap();
-
-        assert_eq!(1, compute_count);
-        assert_eq!("FearIsTheMindKiller".len(), result.answer);
-
-        //Now use another trait with a different name; a new result should be computed
-        let result: TestResult =
-            cache_tokenstream_computation(&cache_dir, &trait_bar, key, |input| {
-                compute_count += 1;
-                let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
-                Ok(TestResult {
-                    answer: trait_item.ident.to_string().len(),
-                })
-            })
-            .unwrap();
-
-        assert_eq!(2, compute_count);
-        assert_eq!("IWillFaceMyFear".len(), result.answer);
-
-        //Finally, use another instance of the TokenStream that should have the same content, and
-        //thus use the cached result
-        let result: TestResult =
-            cache_tokenstream_computation(&cache_dir, &trait_foo2, key, |input| {
-                compute_count += 1;
-                let trait_item = syn::parse2::<ItemTrait>(input.clone()).unwrap();
-                Ok(TestResult {
-                    answer: trait_item.ident.to_string().len(),
-                })
-            })
-            .unwrap();
-
-        assert_eq!(2, compute_count);
-        assert_eq!("FearIsTheMindKiller".len(), result.answer);
     }
 
     #[test]

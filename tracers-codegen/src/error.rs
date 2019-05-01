@@ -54,6 +54,13 @@ pub enum TracersError {
         error: Error,
     },
 
+    ProviderTraitNotProcessedError {
+        message: String,
+        trait_name: String,
+        #[fail(cause)]
+        error: Error,
+    },
+
     CodeGenerationError {
         message: String,
     },
@@ -75,6 +82,7 @@ impl Display for TracersError {
             TracersError::MissingCallInBuildRs => write!(f, "Build environment is incomplete; make sure you are calling `tracers_build::build()` in your `build.rs` build script"),
             TracersError::BuildInfoReadError { message, .. } => write!(f, "{}", message),
             TracersError::BuildInfoWriteError { message, .. } => write!(f, "{}", message),
+            TracersError::ProviderTraitNotProcessedError { message,.. } => write!(f, "{}", message),
             TracersError::CodeGenerationError { message } => write!(f, "Error generating probing code: {}", message),
             TracersError::NativeCodeGenerationError { message, .. } => write!(f, "Error generating or compiling native C++ wrapper code: {}", message)
         }
@@ -168,17 +176,26 @@ impl TracersError {
         }
     }
 
+    pub fn provider_trait_not_processed_error<T: AsRef<str>, E: Into<Error> + Display>(
+        trait_name: T,
+        e: E,
+    ) -> TracersError {
+        TracersError::ProviderTraitNotProcessedError {
+            message: format!("The provider trait '{}' couldn't be processed by the code generator: {}\nCheck your build output for errors.  Tracing will be disabled for this provider",
+                             trait_name.as_ref(),
+                             e),
+            trait_name: trait_name.as_ref().to_owned(),
+            error: e.into()
+        }
+    }
+
     pub fn code_generation_error<S: AsRef<str>>(message: S) -> TracersError {
         TracersError::CodeGenerationError {
             message: message.as_ref().to_owned(),
         }
     }
 
-    pub fn native_code_generation_error<
-        S: AsRef<str>,
-        //E: std::error::Error + Sync + Send + 'static,
-        E: Into<Error> + Display,
-    >(
+    pub fn native_code_generation_error<S: AsRef<str>, E: Into<Error> + Display>(
         message: S,
         e: E,
     ) -> TracersError {

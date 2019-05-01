@@ -55,6 +55,12 @@ pub(crate) enum TracingTarget {
     NoOp,
 }
 
+impl TracingTarget {
+    pub fn is_enabled(&self) -> bool {
+        *self != TracingTarget::Disabled && *self != TracingTarget::NoOp
+    }
+}
+
 /// All possible tracing implementations.  Every supported linear combination of `TracingType` and
 /// `TracingTarget`
 #[derive(Clone, Debug, AsRefStr, Serialize, Deserialize, EnumProperty, PartialEq)]

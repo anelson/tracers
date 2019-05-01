@@ -7,19 +7,23 @@
 //! at the time of the code generation
 use crate::build_rs::BuildInfo;
 use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
+use crate::gen::r#static::native_code::{self, ProcessedProviderTrait};
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::TracersResult;
+use crate::TracingImplementation;
 use crate::{TracingTarget, TracingType};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
+use std::borrow::Cow;
 use syn::parse_quote;
 use syn::spanned::Spanned;
 
 pub(crate) struct ProviderTraitGenerator<'bi> {
-    build_info: &'bi BuildInfo,
+    build_info: Cow<'bi, BuildInfo>,
     spec: ProviderSpecification,
-    probes: Vec<ProbeGenerator<'bi>>,
+    processed_provider: Option<ProcessedProviderTrait>,
+    probes: Vec<ProbeGenerator>,
 }
 
 impl<'bi> ProviderTraitGeneratorBase for ProviderTraitGenerator<'bi> {
@@ -28,7 +32,7 @@ impl<'bi> ProviderTraitGeneratorBase for ProviderTraitGenerator<'bi> {
     }
 
     fn build_info(&self) -> &BuildInfo {
-        self.build_info
+        &self.build_info
     }
 }
 
@@ -41,16 +45,43 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //special case)
         assert!(!build_info.implementation.is_dynamic());
 
+        let mut build_info = Cow::Borrowed(build_info);
+
+        //Attempt to load the processed provider trait info for this trait.  That's the state
+        //information left behind from `build.rs` telling us where to find the generated C wrapper
+        //and the generated Rust bindings for that wrapper.  This isn't generated for all targets,
+        //and if generation fails it shouldn't cause a compile error but rather it should cause us
+        //to fall back to the Disabled generator for this provider
+        let processed_provider = if build_info.implementation.tracing_target().is_enabled() {
+            match native_code::get_processed_provider_info(&spec) {
+                Err(e) => {
+                    eprintln!("Warning: {}", e);
+
+                    //This needs to override the implementation from whatever it was to disabled
+                    //because the code generation was unsuccessful
+                    build_info.to_mut().implementation = TracingImplementation::Disabled;
+
+                    None
+                }
+                Ok(processed_provider) => Some(processed_provider),
+            }
+        } else {
+            //Else the implementation isn't 'real' it's `Disabled` so no need to look for the
+            //processed provider info
+            None
+        };
+
         //Consume this provider spec and separate out the probe specs, each of which we want to
         //wrap in our own ProbeGenerator
         let (spec, probes) = spec.separate_probes();
         let probes: Vec<_> = probes
             .into_iter()
-            .map(|probe| ProbeGenerator::new(build_info, probe))
+            .map(|probe| ProbeGenerator::new(probe))
             .collect();
         ProviderTraitGenerator {
             build_info,
             spec,
+            processed_provider,
             probes,
         }
     }
@@ -133,6 +164,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     }
 
     fn generate_impl_mod(&self) -> TokenStream {
+        let span = self.spec.item_trait().span();
         match self.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
                 //When tracing is disabled we can't assume the `tracers::runtime` is available so
@@ -145,7 +177,6 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 let mod_name = self.get_provider_impl_mod_name();
                 let struct_type_name = self.get_provider_impl_struct_type_name();
 
-                let span = self.spec.item_trait().span();
                 quote_spanned! {span=>
                     mod #mod_name {
                         use tracers::runtime::ProbeArgType;
@@ -163,28 +194,40 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                     }
                 }
             }
-            TracingTarget::Stap => unimplemented!(),
+            TracingTarget::Stap => {
+                //The build-time code generator should have already generated Rust bindings.
+                //Inside those Rust bindings a module is defined.  All that's needed here is to
+                //simply include it
+                let processed_provider = self
+                    .processed_provider
+                    .as_ref()
+                    .expect("stap always has valid processed_provider");
+
+                let bindings_path = processed_provider
+                    .bindings_path
+                    .to_str()
+                    .expect("Invalid path string");
+                quote_spanned! {span=>
+                    include!(#bindings_path)
+                }
+            }
         }
     }
 }
 
-pub(super) struct ProbeGenerator<'bi> {
-    _build_info: &'bi BuildInfo,
+pub(super) struct ProbeGenerator {
     spec: ProbeSpecification,
 }
 
-impl<'bi> ProbeGeneratorBase for ProbeGenerator<'bi> {
+impl ProbeGeneratorBase for ProbeGenerator {
     fn spec(&self) -> &ProbeSpecification {
         &self.spec
     }
 }
 
-impl<'bi> ProbeGenerator<'bi> {
-    pub fn new(build_info: &'bi BuildInfo, spec: ProbeSpecification) -> ProbeGenerator<'bi> {
-        ProbeGenerator {
-            _build_info: build_info,
-            spec,
-        }
+impl ProbeGenerator {
+    pub fn new(spec: ProbeSpecification) -> ProbeGenerator {
+        ProbeGenerator { spec }
     }
 
     pub fn generate_trait_methods(

@@ -88,6 +88,10 @@ impl ProviderSpecification {
         format!("{}_{:x}", self.name, self.hash)
     }
 
+    pub(crate) fn hash(&self) -> HashCode {
+        self.hash
+    }
+
     pub(crate) fn ident(&self) -> &syn::Ident {
         &self.item_trait.ident
     }
