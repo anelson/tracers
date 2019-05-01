@@ -363,4 +363,37 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn falls_back_to_disabled_on_error() {
+        //If the native wrapper generation in `build.rs` failed, should fall back to `Disabled` no
+        //matter what implementation was requested.  Since this test doesn't bother trying to
+        //simulate the build-time code generation, it's guaranteed that there will be no
+        //ProcessedProviderTrait for any of the provider traits, and thus the fallback logic should
+        //be triggered
+        for test_case in testdata::get_test_provider_traits(|c: &testdata::TestProviderTrait| {
+            c.expected_error.is_none()
+        })
+        .into_iter()
+        {
+            for implementation in vec![TracingImplementation::StaticStap].into_iter() {
+                let item_trait = test_case.get_item_trait();
+                let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
+                    "Failed to create specification from test trait '{}'",
+                    test_case.description
+                ));
+
+                let build_info = BuildInfo::new(implementation);
+                let generator = ProviderTraitGenerator::new(&build_info, spec);
+                assert_eq!(
+                    TracingImplementation::Disabled,
+                    generator.build_info.implementation
+                );
+                generator.generate().expect(&format!(
+                    "Failed to generate test trait '{}'",
+                    test_case.description
+                ));
+            }
+        }
+    }
 }

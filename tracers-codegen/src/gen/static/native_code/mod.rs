@@ -278,8 +278,10 @@ fn cache_dir(out_dir: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod test {
     use super::*;
+    use crate::testdata;
     use crate::testdata::*;
     use crate::TracingImplementation;
 
@@ -297,6 +299,14 @@ mod test {
             for first_run in [true, false].into_iter() {
                 //Generate code for all of the crates.
                 for case in TEST_CRATES.iter() {
+                    let guard = testdata::with_env_vars(vec![
+                        ("CARGO_PKG_NAME", case.package_name),
+                        ("CARGO_MANIFEST_DIR", case.root_directory.to_str().unwrap()),
+                        ("TARGET", "x86_64-linux-gnu"),
+                        ("HOST", "x86_64-linux-gnu"),
+                        ("OPT_LEVEL", "1"),
+                    ]);
+
                     for target in case.targets.iter() {
                         let mut stdout = Vec::new();
 
@@ -345,6 +355,8 @@ mod test {
                             }
                         }
                     }
+
+                    drop(guard); //unset the env vars
                 }
             }
         }

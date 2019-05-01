@@ -381,56 +381,18 @@ mod tests {
     use crate::testdata;
     use crate::TracingType;
 
-    /// Helper that sets environment vars, then clears them when it goes out of scope
-    struct EnvVarsSetter {
-        vars: Vec<(String, String)>,
-    }
-
-    impl EnvVarsSetter {
-        fn new<K: AsRef<str>>(vars: Vec<K>) -> EnvVarsSetter {
-            let vars: Vec<_> = vars.into_iter().map(|k| (k, "1")).collect();
-
-            Self::new_with_values(vars)
-        }
-
-        fn new_with_values<K: AsRef<str>, V: AsRef<str>>(vars: Vec<(K, V)>) -> EnvVarsSetter {
-            let vars: Vec<_> = vars
-                .into_iter()
-                .map(|(k, v)| (k.as_ref().to_owned(), v.as_ref().to_owned()))
-                .collect();
-
-            for (key, value) in vars.iter() {
-                env::set_var(key, value);
-            }
-
-            EnvVarsSetter { vars }
-        }
-
-        fn unset(&mut self) {
-            for (key, _) in self.vars.iter() {
-                env::remove_var(key);
-            }
-
-            self.vars.clear();
-        }
-    }
-
-    impl Drop for EnvVarsSetter {
-        fn drop(&mut self) {
-            self.unset()
-        }
-    }
-
     #[test]
     #[should_panic]
     fn tracers_build_panics_invalid_features() {
         //These two feature flags are mutually exclusive
-        let mut _setter = EnvVarsSetter::new(vec![
-            "CARGO_FEATURE_STATIC_TRACING",
-            "CARGO_FEATURE_DYNAMIC_TRACING",
+        let guard = testdata::with_env_vars(vec![
+            ("CARGO_FEATURE_STATIC_TRACING", "1"),
+            ("CARGO_FEATURE_DYNAMIC_TRACING", "1"),
         ]);
 
         tracers_build();
+
+        drop(guard);
     }
 
     #[test]
@@ -475,7 +437,7 @@ mod tests {
 
             //First let's pretend we're in `tracers/build.rs`, and cargo has set the relevant env
             //vars
-            let vars = EnvVarsSetter::new_with_values(vec![
+            let guard = testdata::with_env_vars(vec![
                 ("CARGO_PKG_NAME", "tracers"),
                 ("CARGO_PKG_VERSION", "1.2.3"),
                 ("CARGO_MANIFEST_DIR", manifest_dir),
@@ -530,8 +492,8 @@ mod tests {
             }
 
             //Next, the user crate's `build.rs` will want to know what the selected impl was
-            drop(vars);
-            let vars = EnvVarsSetter::new_with_values(vec![
+            drop(guard);
+            let guard = testdata::with_env_vars(vec![
                 (
                     "DEP_TRACERS_BUILD_INFO_PATH",
                     build_info_path.to_str().unwrap(),
@@ -545,6 +507,7 @@ mod tests {
             ));
 
             assert_eq!(step1_build_info, step2_build_info, "context: {}", context);
+            drop(guard);
 
             //At this point in the process if this were a real build, the `build.rs` code would be
             //generating code for a real crate.  We're not going to simulate all of that here,
@@ -559,7 +522,12 @@ mod tests {
 
                 let mut stdout = Vec::new();
 
-                let vars = EnvVarsSetter::new_with_values(vec![
+                let guard = testdata::with_env_vars(vec![
+                    (
+                        "DEP_TRACERS_BUILD_INFO_PATH",
+                        build_info_path.to_str().unwrap(),
+                    ),
+                    ("OUT_DIR", out_dir.to_str().unwrap()),
                     ("CARGO_PKG_NAME", test_case.package_name),
                     (
                         "CARGO_MANIFEST_DIR",
@@ -580,14 +548,12 @@ mod tests {
                     build_info_path.display()
                 )));
 
-                drop(vars);
+                drop(guard);
             }
 
             //That worked, next the proc macros will be run by `rustc` while it builds the user
             //crate.
-            drop(vars);
-
-            let vars = EnvVarsSetter::new_with_values(vec![(
+            let guard = testdata::with_env_vars(vec![(
                 "TRACERS_BUILD_INFO_PATH",
                 build_info_path.to_str().unwrap(),
             )]);
@@ -599,7 +565,7 @@ mod tests {
 
             assert_eq!(step1_build_info, step3_build_info, "context: {}", context);
 
-            drop(vars);
+            drop(guard);
         }
     }
 }
