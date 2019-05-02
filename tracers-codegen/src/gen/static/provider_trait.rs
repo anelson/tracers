@@ -183,14 +183,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 // FFI bindings, despite the name
                 quote_spanned! {span=>
                     #vis mod #mod_name {
-                        use tracers::runtime::ProbeArgType;
-
                         #(#native_declarations)*
-
-                        #[allow(dead_code)]
-                        pub fn wrap<T: ProbeArgType<T>>(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
-                            ::tracers::runtime::wrap::<T>(arg)
-                        }
                     }
                 }
             }
@@ -290,10 +283,10 @@ impl ProbeGenerator {
         // doens't warn about unused arguments.
         //
         // * In the case of either a `noop` implementation or one of the 'real' implementations
-        // with a C++ wrapper layer, we will use the `probe!` macro to fire the probe, just as the
-        // caller should have done.  The actual firing of the probe doesn't call the probe function
-        // at all but rather a wrapper in the implementation mod, which expects the arguments to
-        // already be converted into their C-compatible form.
+        // with a C++ wrapper layer, we'll do the same thing the `probe!` macro does, and wrap each
+        // of the args in the `ProbeArgType`-provided wrapper before passing them to the "native"
+        // wrapper function ("native" in quotes because for `noop` it's actually just a do-nothing
+        // Rust impl that has the same signature as a native function would).
         match provider.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
                 //Disabled.  Just make the arguments go away
@@ -312,7 +305,8 @@ impl ProbeGenerator {
                 })
             }
             TracingTarget::NoOp | TracingTarget::Stap => {
-                //This is a `real` impl with a G wrapper underneath
+                //This is a `real` impl with a C wrapper underneath (or in the case of `noop` a
+                //Rust function with the same signature as a C wrapper).
                 //The implementation is in the impl mod, with each probe as a function named the
                 //same as the original probe method declaration, but taking as arguments the C
                 //version of each parameter (although obviously declared as the Rust equivalent).
@@ -321,16 +315,21 @@ impl ProbeGenerator {
                 //mis-uses the probing library and tries to call the probe method directly, it
                 //actually works (but they will still get a warning as this is not a very
                 //performant way to fire probes)
-                let trait_name = provider.spec.ident();
+                let mod_name = provider.get_provider_impl_mod_name();
                 let probe_name = &self.spec.method_name;
                 let args = self.spec.args.iter().map(|arg| {
                     let arg_name = arg.ident();
 
-                    quote! { #arg_name }
+                    quote! { ::tracers::runtime::wrap(#arg_name).as_c_type() }
                 });
 
                 Ok(quote_spanned! {span=>
-                    probe!(#trait_name::#probe_name(#(#args),*))
+                    // The compiler warns on this import as unused, even though without this trait
+                    // imported the use of `as_c_type()` will fail
+                    #[allow(unused_imports)]
+                    use ::tracers::runtime::ProbeArgWrapper as _;
+
+                    #mod_name::#probe_name(#(#args),*);
                 })
             }
         }
