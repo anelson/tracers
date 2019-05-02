@@ -16,7 +16,6 @@ use crate::{TracingTarget, TracingType};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use std::borrow::Cow;
-use syn::parse_quote;
 use syn::spanned::Spanned;
 
 pub(crate) struct ProviderTraitGenerator<'bi> {
@@ -51,15 +50,15 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         //information left behind from `build.rs` telling us where to find the generated C wrapper
         //and the generated Rust bindings for that wrapper.  This isn't generated for all targets,
         //and if generation fails it shouldn't cause a compile error but rather it should cause us
-        //to fall back to the Disabled generator for this provider
+        //to fall back to the NoOp generator for this provider
         let processed_provider = if build_info.implementation.tracing_target().is_enabled() {
             match native_code::get_processed_provider_info(&spec) {
                 Err(e) => {
                     eprintln!("Warning: {}", e);
 
-                    //This needs to override the implementation from whatever it was to disabled
+                    //This needs to override the implementation from whatever it was to noop
                     //because the code generation was unsuccessful
-                    build_info.to_mut().implementation = TracingImplementation::Disabled;
+                    build_info.to_mut().implementation = TracingImplementation::StaticNoOp;
 
                     None
                 }
@@ -87,8 +86,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
         // Re-generate this trait as a struct with our probing implementation in it
         let tracer_struct = self.generate_tracer_struct()?;
 
-        // Generate a module which will `use` all of the `ProbeArgType` impls and compile-time
-        // verify all probe arg types have a suitable implementaiton
+        // Generate a module which will contain the low-level implementation which actually
+        // performs the tracing.
         let impl_mod = self.generate_impl_mod();
 
         let span = self.spec.item_trait().span();
@@ -106,12 +105,9 @@ impl<'bi> ProviderTraitGenerator<'bi> {
     fn generate_tracer_struct(&self) -> TracersResult<TokenStream> {
         // From the probe specifications, generate the corresponding methods that will be on the probe
         // struct.
-        let mod_name = self.get_provider_impl_mod_name();
-        let struct_type_name = self.get_provider_impl_struct_type_name();
-        let struct_type_path: syn::Path = parse_quote! { #mod_name::#struct_type_name };
         let mut probe_methods: Vec<TokenStream> = Vec::new();
         for probe in self.probes.iter() {
-            probe_methods.push(probe.generate_trait_methods(self, &struct_type_path)?);
+            probe_methods.push(probe.generate_trait_methods(self)?);
         }
 
         // Re-generate the trait method that we took as input, with the modifications to support
@@ -162,6 +158,13 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
     fn generate_impl_mod(&self) -> TokenStream {
         let span = self.spec.item_trait().span();
+        let vis = &self.spec.item_trait().vis;
+        let mod_name = self.get_provider_impl_mod_name();
+        let native_declarations = self
+            .probes
+            .iter()
+            .map(|p| p.generate_native_declaration(&self));
+
         match self.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
                 //When tracing is disabled we can't assume the `tracers::runtime` is available so
@@ -169,24 +172,24 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 quote! {}
             }
             TracingTarget::NoOp => {
-                //Generate a module that has some code to use our `ProbeArgType` trait to verify at
-                //compile time that every probe argument has a corresponding C representation.
-                let mod_name = self.get_provider_impl_mod_name();
-                let struct_type_name = self.get_provider_impl_struct_type_name();
-
+                // Generate a module which has dummy versions the functions that would have been
+                // generated from C++ code in a real target.  These versions don't actually call
+                // down into any C++ code of course, but their presence, and the implementation
+                // calling them, verifies at compile time that the probe argument types all have
+                // suitable `ProbeArgType` implementations so that if this is ever re-compiled to
+                // support a real tracing back-end everything will work as expected
+                //
+                // When the target is `noop` the "native" implementations won't actually be Rust
+                // FFI bindings, despite the name
                 quote_spanned! {span=>
-                    mod #mod_name {
+                    #vis mod #mod_name {
                         use tracers::runtime::ProbeArgType;
 
-                        pub(super) struct #struct_type_name<T: ProbeArgType<T>> {
-                            _t: ::std::marker::PhantomData<T>,
-                        }
+                        #(#native_declarations)*
 
-                        impl<T: ProbeArgType<T>> #struct_type_name<T> {
-                            #[allow(dead_code)]
-                            pub fn wrap(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
-                                ::tracers::runtime::wrap::<T>(arg)
-                            }
+                        #[allow(dead_code)]
+                        pub fn wrap<T: ProbeArgType<T>>(arg: T) -> <T as ProbeArgType<T>>::WrapperType {
+                            ::tracers::runtime::wrap::<T>(arg)
                         }
                     }
                 }
@@ -201,7 +204,6 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 //is enabled with nothing more than a mem read.
                 //
                 //There is no impl struct for the real implementations
-                let mod_name = self.get_provider_impl_mod_name();
                 let processed_provider = self
                     .processed_provider
                     .as_ref()
@@ -213,13 +215,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                     .to_str()
                     .expect("lib file name is not a valid Rust string");
 
-                let native_declarations = self
-                    .probes
-                    .iter()
-                    .map(|p| p.generate_native_declaration(&self));
-
                 quote_spanned! {span=>
-                    mod #mod_name {
+                    #vis mod #mod_name {
                         #[link(name = #lib_name)]
                         extern "C" {
                             #(#native_declarations)*
@@ -249,12 +246,11 @@ impl ProbeGenerator {
     pub fn generate_trait_methods(
         &self,
         provider: &ProviderTraitGenerator,
-        struct_type_path: &syn::Path,
     ) -> TracersResult<TokenStream> {
         let vis = &self.spec.vis;
         let original_method = self.spec.original_method.sig.clone();
 
-        let method_body = self.generate_probe_method_body(&provider, struct_type_path)?;
+        let method_body = self.generate_probe_method_body(&provider)?;
 
         //Keep the original probe method, but mark it deprecated with a helpful message so that if the
         //user calls the probe method directly they will at least be reminded that they should use the
@@ -284,45 +280,28 @@ impl ProbeGenerator {
     fn generate_probe_method_body(
         &self,
         provider: &ProviderTraitGenerator,
-        struct_type_path: &syn::Path,
     ) -> TracersResult<TokenStream> {
         let span = self.spec.original_method.span();
         // Generate the body of the original method.  This will have the same args as the trait
         // method declared by the caller, but we will provide an actual implementation.
 
-        // * In the case of a `real` implementation, we'll wrap each arg in its `ProbeArgType` wrapper
-        //   and pass to the C functions that actually fire the probe.
-        //
-        // * In the case of a `noop` implementation, there is no C function underneath so we call
-        // the `wrap` method on the implementation struct which causes the compiler to verify there
-        // is a `ProbeArgType` for each argument's type, but at runtime does not actually do
-        // anything.
-        //
         // * In the case of a `disabled` implementation, the function won't do anything at all.
         // We'll just assign all of the args in a `let _ = $ARGNAME` statement so that the compiler
         // doens't warn about unused arguments.
+        //
+        // * In the case of either a `noop` implementation or one of the 'real' implementations
+        // with a C++ wrapper layer, we will use the `probe!` macro to fire the probe, just as the
+        // caller should have done.  The actual firing of the probe doesn't call the probe function
+        // at all but rather a wrapper in the implementation mod, which expects the arguments to
+        // already be converted into their C-compatible form.
         match provider.build_info.implementation.tracing_target() {
-            target @ TracingTarget::Disabled | target @ TracingTarget::NoOp => {
-                //Either `noop` or `disabled`.  In both cases it's just some per-argument statements
+            TracingTarget::Disabled => {
+                //Disabled.  Just make the arguments go away
                 let args_type_assertions = self.spec.args.iter().map(|arg| {
                     let span = arg.syn_typ().span();
                     let arg_name = arg.ident();
-                    if target == TracingTarget::Disabled {
-                        //This is a `disabled` implementation
-                        //There is no `wrap` method to do any kind of compile time type assertion,
-                        //just perform a pro-forma 'use' of each arg so it doesn't trigger a warning about an
-                        //unused argument
-                        quote_spanned! {span=>
-                            let _ = #arg_name;
-                        }
-                    } else {
-                        //This is a `noop`  implementation
-                        //Perform type assertions in the form of calls to the generated `wrap` method on the
-                        //impl struct, which uses generic trickery to cause the compiler to ensure each arg
-                        //type has a valid `ProbeArgType` implementation
-                        quote_spanned! {span=>
-                            #struct_type_path::wrap(#arg_name);
-                        }
+                    quote_spanned! {span=>
+                        let _ = #arg_name;
                     }
                 });
 
@@ -332,7 +311,7 @@ impl ProbeGenerator {
                     }
                 })
             }
-            TracingTarget::Stap => {
+            TracingTarget::NoOp | TracingTarget::Stap => {
                 //This is a `real` impl with a G wrapper underneath
                 //The implementation is in the impl mod, with each probe as a function named the
                 //same as the original probe method declaration, but taking as arguments the C
@@ -351,12 +330,25 @@ impl ProbeGenerator {
                 });
 
                 Ok(quote_spanned! {span=>
-                        probe!(#trait_name::#probe_name(#(#args),*))
+                    probe!(#trait_name::#probe_name(#(#args),*))
                 })
             }
         }
     }
 
+    /// Generates the declaration for the "native" C++ functions which fire the probes using
+    /// whatever the platform's tracing system is.  Depending upon the target, this generates one
+    /// of two possible things:
+    ///
+    /// For the `NoOp` target, this generates Rust functions with the same signatures as the native
+    /// functions would have been, but rather than being `extern` FFI declarations, these are
+    /// actually implemented with an empty method body that does nothing.  This way the actual
+    /// probe firing code generated by the `probe!` macro is the same for either `NoOp` or a real
+    /// implementation.
+    ///
+    /// For real implementations (anything but `StaticNoOp` and `Disabled`), generates an `extern
+    /// "C"` block which declares the native wrapper functions, which will be linked in a static
+    /// library generated already at build time in `build.rs`.
     fn generate_native_declaration(&self, provider: &ProviderTraitGenerator) -> TokenStream {
         //Because of limitations in the tracing system, the name of the provider needs to
         //be fairly simple (no punctuation for example).  So we use the name of the trait,
@@ -372,20 +364,42 @@ impl ProbeGenerator {
         //even if there is a collission here, it won't result in any UB; it just means a
         //probe might think it's enabled when it's not, leading to a slightly inefficient
         //call into the wrapper function which will end up being a no-op
+        assert!(provider.build_info.implementation != TracingImplementation::Disabled);
+        let is_real = provider
+            .build_info
+            .implementation
+            .tracing_target()
+            .is_enabled();
         let provider_name = provider.spec.name();
         let provider_name_with_hash = provider.spec.name_with_hash();
+
         let native_func_name = format!("{}_{}", provider_name_with_hash, self.spec.name);
+        let func_attrs = if is_real {
+            quote! { #[link(name = #native_func_name)] }
+        } else {
+            quote! {}
+        };
         let func_ident = &self.spec.method_name;
+
         let native_semaphore_name = format!("{}_{}_semaphore", provider_name, self.spec.name);
-        let semaphore_name = format!("{}_semaphore", self.spec.name);
+        let semaphore_name = format!("{}_semaphore", self.spec.name).to_uppercase();
         let semaphore_ident = syn::Ident::new(&semaphore_name, self.spec.original_method.span());
+        let semaphore_attrs = if is_real {
+            quote! {
+               #[link(name = #native_semaphore_name)]
+               #[link_section = ".probes"]
+            }
+        } else {
+            quote! {}
+        };
 
         let args = self.spec.args.iter().map(|arg| {
             let arg_name = arg.ident();
-            let rust_typ = syn::Ident::new(
-                arg.arg_type_info().get_rust_type_str(),
-                arg.syn_typ().span(),
-            );
+            let rust_typ: syn::Type = syn::parse_str(arg.arg_type_info().get_rust_type_str())
+                .expect(&format!(
+                    "Failed to parse Rust type expression '{}'",
+                    arg.arg_type_info().get_rust_type_str()
+                ));
 
             let span = arg.ident().span();
             quote_spanned! {span=>
@@ -393,14 +407,39 @@ impl ProbeGenerator {
             }
         });
 
+        let func_body = if is_real {
+            quote! { ; }
+        } else {
+            //The dummy no-op impl just pro-forma uses each argument to avoid a warning about
+            //unused arguments
+            let args_use = self.spec.args.iter().map(|arg| {
+                let arg_name = arg.ident();
+
+                let span = arg.ident().span();
+                quote_spanned! {span=>
+                    let _ = #arg_name;
+                }
+            });
+
+            quote! {
+                {
+                    #(#args_use)*
+                }
+            }
+        };
+
+        let semaphore_initializer = if is_real {
+            quote! { ; }
+        } else {
+            quote! { = 0; }
+        };
         let span = self.spec.original_method.span();
         quote_spanned! {span=>
-            #[link(name = #native_func_name)]
-            pub fn  #func_ident( #(#args)* );
+            #func_attrs
+            pub fn  #func_ident( #(#args)* ) #func_body
 
-            #[link(name = #native_semaphore_name)]
-            #[link_section = ".probes"]
-            pub static #semaphore_ident: u16;
+            #semaphore_attrs
+            pub static #semaphore_ident: u16 #semaphore_initializer
         }
     }
 }
@@ -447,7 +486,7 @@ mod test {
 
     #[test]
     fn falls_back_to_disabled_on_error() {
-        //If the native wrapper generation in `build.rs` failed, should fall back to `Disabled` no
+        //If the native wrapper generation in `build.rs` failed, should fall back to `NoOp` no
         //matter what implementation was requested.  Since this test doesn't bother trying to
         //simulate the build-time code generation, it's guaranteed that there will be no
         //ProcessedProviderTrait for any of the provider traits, and thus the fallback logic should
@@ -467,7 +506,7 @@ mod test {
                 let build_info = BuildInfo::new(implementation);
                 let generator = ProviderTraitGenerator::new(&build_info, spec);
                 assert_eq!(
-                    TracingImplementation::Disabled,
+                    TracingImplementation::StaticNoOp,
                     generator.build_info.implementation
                 );
                 generator.generate().expect(&format!(
