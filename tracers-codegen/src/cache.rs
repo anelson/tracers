@@ -139,7 +139,6 @@ pub(crate) fn cache_generated_file<F: FnOnce(PathBuf) -> Fallible<(PathBuf)>>(
 /// are invalidated whenever a new version is released
 pub(crate) fn get_cache_path(root: &Path) -> PathBuf {
     let mut root = root.to_owned();
-    root.push("cache");
     root.push(concat!(
         env!("CARGO_PKG_NAME"),
         "-",

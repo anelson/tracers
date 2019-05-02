@@ -23,6 +23,8 @@ struct FeatureFlags {
     enable_static_tracing: bool,
     force_dyn_stap: bool,
     force_dyn_noop: bool,
+    force_static_stap: bool,
+    force_static_noop: bool,
 }
 
 impl FeatureFlags {
@@ -35,6 +37,8 @@ impl FeatureFlags {
             Self::is_feature_enabled("static-tracing"),
             Self::is_feature_enabled("force-dyn-stap"),
             Self::is_feature_enabled("force-dyn-noop"),
+            Self::is_feature_enabled("force-static-stap"),
+            Self::is_feature_enabled("force-static-noop"),
         )
     }
 
@@ -44,6 +48,8 @@ impl FeatureFlags {
         enable_static_tracing: bool,
         force_dyn_stap: bool,
         force_dyn_noop: bool,
+        force_static_stap: bool,
+        force_static_noop: bool,
     ) -> TracersResult<FeatureFlags> {
         if enable_dynamic_tracing && enable_static_tracing {
             return Err(TracersError::code_generation_error("The features `dynamic-tracing` and `static-tracing` are mutually exclusive; please choose one"));
@@ -53,11 +59,17 @@ impl FeatureFlags {
             return Err(TracersError::code_generation_error("The features `force-dyn-stap` and `force_dyn_noop` are mutually exclusive; please choose one"));
         }
 
+        if force_static_stap && force_static_noop {
+            return Err(TracersError::code_generation_error("The features `force-static-stap` and `force_static_noop` are mutually exclusive; please choose one"));
+        }
+
         Ok(FeatureFlags {
             enable_dynamic_tracing,
             enable_static_tracing,
             force_dyn_stap,
             force_dyn_noop,
+            force_static_stap,
+            force_static_noop,
         })
     }
 
@@ -81,6 +93,16 @@ impl FeatureFlags {
     pub fn force_dyn_noop(&self) -> bool {
         //Should the dynamic stap be required on pain of build failure?
         self.force_dyn_noop
+    }
+
+    pub fn force_static_stap(&self) -> bool {
+        //Should the staticamic stap be required on pain of build failure?
+        self.force_static_stap
+    }
+
+    pub fn force_static_noop(&self) -> bool {
+        //Should the staticamic stap be required on pain of build failure?
+        self.force_static_noop
     }
 
     fn is_feature_enabled(name: &str) -> bool {
@@ -346,9 +368,16 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
         }
     } else {
         // Pick some static tracing impl
-        //TODO: Consider other static impls
         assert!(features.enable_static());
-        Ok(TracingImplementation::StaticNoOp)
+
+        //TODO: Be a bit smarter about this
+        if features.force_static_stap() {
+            Ok(TracingImplementation::StaticStap)
+        } else if features.force_static_noop() {
+            Ok(TracingImplementation::StaticNoOp)
+        } else {
+            Ok(TracingImplementation::StaticNoOp)
+        }
     }
 }
 
@@ -409,17 +438,17 @@ mod tests {
             //features, expected_impl
             (
                 // Tracing disabled entirely
-                FeatureFlags::new(false, false, false, false).unwrap(),
+                FeatureFlags::new(false, false, false, false, false, false).unwrap(),
                 TracingImplementation::Disabled,
             ),
             (
                 // Tracing enabled, dynamic mode enabled, static disabled
-                FeatureFlags::new(true, false, false, false).unwrap(),
+                FeatureFlags::new(true, false, false, false, false, false).unwrap(),
                 TracingImplementation::DynamicNoOp,
             ),
             (
                 // Tracing enabled, dynamic disabled, static enabled
-                FeatureFlags::new(false, true, false, false).unwrap(),
+                FeatureFlags::new(false, true, false, false, false, false).unwrap(),
                 TracingImplementation::StaticNoOp,
             ),
         ];

@@ -35,6 +35,10 @@ force-dyn-stap = ["dynamic-tracing", "tracers-dyn-stap/required"]
 
 force-dyn-noop = ["dynamic-tracing", "tracers-dyn-noop"]
 
+force-static-noop = ["static-tracing"]
+
+force-static-stap = ["static-tracing"]
+
 # An optional feature will build binaries which are used to interact with the probing framework.  These are only useful
 # as part of our CI tests, or when troubleshooting unexpected behavior with the probes
 binaries = ["nom"]
