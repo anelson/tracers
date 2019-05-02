@@ -122,12 +122,9 @@ TODO: No other platforms supported yet
     /// Returns the name of the module in which most of the implementation code for this trait will be
     /// located.
     fn get_provider_impl_mod_name(&self) -> syn::Ident {
-        let snake_case_name = format!("{}Provider", self.spec().item_trait().ident).to_snake_case();
+        let snake_case_name = get_provider_impl_mod_name(&self.spec().item_trait().ident);
 
-        syn::Ident::new(
-            &format!("__{}", snake_case_name),
-            self.spec().item_trait().ident.span(),
-        )
+        syn::Ident::new(&snake_case_name, self.spec().item_trait().ident.span())
     }
 
     /// The name of the struct type within the impl module which represents the provider, eg `MyProbesProviderImpl`.
@@ -203,6 +200,12 @@ TODO: No other platforms supported yet
 
         generate_multiline_comments(&probe_comment)
     }
+}
+
+/// Returns the name of the module in which most of the implementation code for this trait will be
+/// located.
+fn get_provider_impl_mod_name(trait_ident: &syn::Ident) -> String {
+    format!("__{}Provider", trait_ident).to_snake_case()
 }
 
 /// Generates the standard provider init call.  Some implementations may use a different one but

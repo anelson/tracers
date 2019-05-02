@@ -9,7 +9,6 @@ use crate::{TracersError, TracersResult};
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
-use quote::ToTokens;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use syn::visit::Visit;
@@ -106,11 +105,6 @@ impl ProviderSpecification {
 
     pub(crate) fn probes(&self) -> &Vec<ProbeSpecification> {
         &self.probes
-    }
-
-    /// The Rust visibility of the trait as a string which can be used in generated code
-    pub(crate) fn vis_str(&self) -> String {
-        self.item_trait.vis.clone().into_token_stream().to_string()
     }
 
     /// Consumes this spec and returns the same spec with all probes removed, and instead the

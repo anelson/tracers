@@ -192,20 +192,39 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 }
             }
             TracingTarget::Stap => {
-                //The build-time code generator should have already generated Rust bindings.
-                //Inside those Rust bindings a module is defined.  All that's needed here is to
-                //simply include it
+                //The implementations which depend upon a generated C++ wrapper library work a bit
+                //differently than `NoOp`.  The implementation mod will declare `extern` functions
+                //for each wrapper function, and also `extern static` variables for each probe's
+                //semaphore.  That's the dtrace/stap term for a 16 bit unsigned int that is
+                //initially `0` and set to non-zero when a probe is enabled.  A critical part of
+                //our high-performance design is the use of this semaphore to detect when a probe
+                //is enabled with nothing more than a mem read.
+                //
+                //There is no impl struct for the real implementations
+                let mod_name = self.get_provider_impl_mod_name();
                 let processed_provider = self
                     .processed_provider
                     .as_ref()
-                    .expect("stap always has valid processed_provider");
-
-                let bindings_path = processed_provider
-                    .bindings_path
+                    .expect("stap requires successful codegen");
+                let lib_name = processed_provider
+                    .lib_path
+                    .file_stem()
+                    .expect("expected valid lib file name")
                     .to_str()
-                    .expect("Invalid path string");
+                    .expect("lib file name is not a valid Rust string");
+
+                let native_declarations = self
+                    .probes
+                    .iter()
+                    .map(|p| p.generate_native_declaration(&self));
+
                 quote_spanned! {span=>
-                    include!(#bindings_path)
+                    mod #mod_name {
+                        #[link(name = #lib_name)]
+                        extern "C" {
+                            #(#native_declarations)*
+                        }
+                    }
                 }
             }
         }
@@ -315,8 +334,73 @@ impl ProbeGenerator {
             }
             TracingTarget::Stap => {
                 //This is a `real` impl with a G wrapper underneath
-                unimplemented!()
+                //The implementation is in the impl mod, with each probe as a function named the
+                //same as the original probe method declaration, but taking as arguments the C
+                //version of each parameter (although obviously declared as the Rust equivalent).
+                //
+                //Thus, there's no practical need for this method, other than to ensure if a user
+                //mis-uses the probing library and tries to call the probe method directly, it
+                //actually works (but they will still get a warning as this is not a very
+                //performant way to fire probes)
+                let trait_name = provider.spec.ident();
+                let probe_name = &self.spec.method_name;
+                let args = self.spec.args.iter().map(|arg| {
+                    let arg_name = arg.ident();
+
+                    quote! { #arg_name }
+                });
+
+                Ok(quote_spanned! {span=>
+                        probe!(#trait_name::#probe_name(#(#args),*))
+                })
             }
+        }
+    }
+
+    fn generate_native_declaration(&self, provider: &ProviderTraitGenerator) -> TokenStream {
+        //Because of limitations in the tracing system, the name of the provider needs to
+        //be fairly simple (no punctuation for example).  So we use the name of the trait,
+        //converted to snake case.  Thus it's theoretically possible for there to be name
+        //collisions.  That's why the name of the native library and the wrapper functions
+        //are namespaced with a hash of the trait's source code, so if there is a
+        //collision they will be disambiguated by the different implementation.  And, if
+        //two crates happen to have the same exact provider trait declaration, then they'll
+        //be treated as the same for tracing purposes.
+        //
+        //The only exception is the semaphore, because the C tracing macros make
+        //assumptions about its name based on the provider and probe names.  Fortunately
+        //even if there is a collission here, it won't result in any UB; it just means a
+        //probe might think it's enabled when it's not, leading to a slightly inefficient
+        //call into the wrapper function which will end up being a no-op
+        let provider_name = provider.spec.name();
+        let provider_name_with_hash = provider.spec.name_with_hash();
+        let native_func_name = format!("{}_{}", provider_name_with_hash, self.spec.name);
+        let func_ident = &self.spec.method_name;
+        let native_semaphore_name = format!("{}_{}_semaphore", provider_name, self.spec.name);
+        let semaphore_name = format!("{}_semaphore", self.spec.name);
+        let semaphore_ident = syn::Ident::new(&semaphore_name, self.spec.original_method.span());
+
+        let args = self.spec.args.iter().map(|arg| {
+            let arg_name = arg.ident();
+            let rust_typ = syn::Ident::new(
+                arg.arg_type_info().get_rust_type_str(),
+                arg.syn_typ().span(),
+            );
+
+            let span = arg.ident().span();
+            quote_spanned! {span=>
+                #arg_name: #rust_typ
+            }
+        });
+
+        let span = self.spec.original_method.span();
+        quote_spanned! {span=>
+            #[link(name = #native_func_name)]
+            pub fn  #func_ident( #(#args)* );
+
+            #[link(name = #native_semaphore_name)]
+            #[link_section = ".probes"]
+            pub static #semaphore_ident: u16;
         }
     }
 }
