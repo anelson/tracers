@@ -8,8 +8,7 @@
 use crate::build_rs::BuildInfo;
 use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::gen::r#static::native_code::{self, ProcessedProviderTrait};
-use crate::spec::ProbeSpecification;
-use crate::spec::ProviderSpecification;
+use crate::spec::{ProbeSpecification, ProviderSpecification,ProbeArgSpecification};
 use crate::TracersResult;
 use crate::TracingImplementation;
 use crate::{TracingTarget, TracingType};
@@ -331,9 +330,7 @@ impl ProbeGenerator {
 
                     quote! { let #arg_name = ::tracers::runtime::wrap(#arg_name); }
                 });
-                let arg_names = self.spec.args.iter().map(|arg| {
-                    arg.ident()
-                });
+                let arg_names = self.spec.args.iter().map(ProbeArgSpecification::ident);
 
                 Ok(quote_spanned! {span=>
                     // The compiler warns on this import as unused, even though without this trait
@@ -408,10 +405,12 @@ impl ProbeGenerator {
         let args = self.spec.args.iter().map(|arg| {
             let arg_name = arg.ident();
             let rust_typ: syn::Type = syn::parse_str(arg.arg_type_info().get_rust_type_str())
-                .expect(&format!(
-                    "Failed to parse Rust type expression '{}'",
-                    arg.arg_type_info().get_rust_type_str()
-                ));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Failed to parse Rust type expression '{}'",
+                        arg.arg_type_info().get_rust_type_str()
+                    )
+                });
 
             let span = arg.ident().span();
             quote_spanned! {span=>
