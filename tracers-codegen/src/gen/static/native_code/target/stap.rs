@@ -24,18 +24,6 @@ impl<'a> NativeProviderTemplate<'a> {
     }
 }
 
-#[derive(Template)]
-#[template(path = "provider_wrapper.rs", escape = "none")]
-struct RustProviderTemplate<'a> {
-    spec: &'a ProviderSpecification,
-}
-
-impl<'a> RustProviderTemplate<'a> {
-    fn from_provider_spec<'b: 'a>(provider: &'b ProviderSpecification) -> RustProviderTemplate<'a> {
-        RustProviderTemplate { spec: provider }
-    }
-}
-
 pub(crate) struct StapNativeCodeGenerator {
     out_dir: PathBuf,
     provider: ProviderSpecification,
@@ -105,37 +93,6 @@ impl NativeCodeGenerator for StapNativeCodeGenerator {
             })?;
 
         Ok(lib_path)
-    }
-
-    /// Generates Rust bindings which wrap the native lib in somethign Rust-callable
-    fn generate_rust_bindings(&self) -> TracersResult<PathBuf> {
-        let bindings_code = RustProviderTemplate::from_provider_spec(&self.provider)
-            .render()
-            .map_err(|e| {
-                TracersError::native_code_generation_error("Rendering Rust wrapper template", e)
-            })?;
-
-        let code_dir = self.output_dir();
-        fs::create_dir_all(&code_dir).map_err(|e| {
-            TracersError::native_code_generation_error("Creating output directory", e)
-        })?;
-        let code_path = code_dir.join(format!("{}.rs", self.provider.name_with_hash()));
-
-        let mut file = File::create(&code_path).map_err(|e| {
-            TracersError::native_code_generation_error(
-                format!("Creating bindings file {}", code_path.display()),
-                e,
-            )
-        })?;
-
-        #[cfg(debug_assertions)]
-        println!("Generated Rust bindings code:\n{}", bindings_code);
-
-        file.write_all(bindings_code.as_bytes()).map_err(|e| {
-            TracersError::native_code_generation_error("Writing to bindings file", e)
-        })?;
-
-        Ok(code_path)
     }
 
     fn out_dir(&self) -> &Path {

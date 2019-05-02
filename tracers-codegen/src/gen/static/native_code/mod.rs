@@ -27,16 +27,12 @@ pub(crate) struct ProcessedFile {
 #[derive(Serialize, Deserialize)]
 pub(crate) struct ProcessedProviderTrait {
     pub lib_path: PathBuf,
-    pub bindings_path: PathBuf,
 }
 
 trait NativeCodeGenerator {
     /// Generates a native static library that wraps the platform-speciifc probing calls in
     /// something that Rust's FFI can handle
     fn generate_native_lib(&self) -> TracersResult<PathBuf>;
-
-    /// Generates Rust bindings which wrap the native lib in somethign Rust-callable
-    fn generate_rust_bindings(&self) -> TracersResult<PathBuf>;
 
     fn out_dir(&self) -> &Path;
 
@@ -191,7 +187,7 @@ fn process_provider(
 ) {
     let cache_dir = cache_dir(out_dir);
 
-    // For this trait, generate native and rust code for it.  If this trait was processed before
+    // For this trait, generate native code for the probes.  If this trait was processed before
     // and hasn't changed, even if the source file it's in has changed, then we can skip that
     // generation and used the cached result
     let name = provider.name().to_owned();
@@ -205,19 +201,14 @@ fn process_provider(
             let generator = create_native_code_generator(build_info, out_dir, provider);
 
             let lib_path = generator.generate_native_lib()?;
-            let bindings_path = generator.generate_rust_bindings()?;
 
-            Ok(ProcessedProviderTrait {
-                lib_path,
-                bindings_path,
-            })
+            Ok(ProcessedProviderTrait { lib_path })
         },
     );
 
     match result {
         Ok(processed_provider) => {
-            //Output commands to cargo to ensure it can locate this static library.  The Rust
-            //bindings will be injected by the `tracer` proc macro
+            //Output commands to cargo to ensure it can locate this static library.
             let lib_directory = processed_provider
                 .lib_path
                 .parent()
