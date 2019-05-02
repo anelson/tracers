@@ -5,53 +5,9 @@ authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
 description = """
-This is actually the exact same crate as `tracers-codegen`, with the same code and the same dependencies.  It is exposed in duplicate form
-here as a workaround to Cargo bug #4866 (https://github.com/rust-lang/cargo/issues/4866).  Due to this bug, it's not possible to have one crate
-as both a dependency and build-dependency with different features.  That makes it impossible to support `no_std` at runtime because the compile-time
-code generation code is heavily dependent upon the standard library.
-
-The workaround is to use tracers-build for the build dependency, and let tracers-codegen remain a regular dependency.
+This crate should be a `build-dependencies` dependency of alll crates that use `tracers`.
 """
 
-[lib]
-path = "../tracers-codegen/src/lib.rs"
-
 [dependencies]
-quote = "0.6.11"
-failure = "0.1.5"
-once_cell = "0.1.8"
-proc-macro2 = "0.4"
-heck = "0.3"
-cargo_metadata = "0.7.4"
-lazy_static = "1.3"
-twox-hash = "1.2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tempfile = "3"
-askama = "0.8"
-strum = "0.15"
-strum_macros = "0.15"
-serde_str = "0.1.0"
-cc = "1.0"
+tracers-codegen = { path = "../tracers-codegen", version = "0.1.0" }
 
-tracers-core = { path = "../tracers-core", version = "0.1.0" }
-
-[features]
-
-default = []
-experimental = []
-
-[dependencies.syn]
-# We need some optional features of syn in order to implement the macro
-version = "0.15"
-features = ["full", "visit", "parsing", "extra-traits"]
-
-[dev-dependencies]
-quickcheck = "0.8"
-quickcheck_macros = "0.8"
-tempfile = "3"
-fs_extra = "1"
-
-[target.'cfg(windows)'.dev-dependencies]
-# Need to use Dunce to de-UNC the canonicalized paths on Windows
-dunce = "1.0.0"
