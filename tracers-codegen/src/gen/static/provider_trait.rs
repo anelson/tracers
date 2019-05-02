@@ -255,15 +255,26 @@ impl ProbeGenerator {
         let attrs = &self.spec.original_method.attrs;
         let probe_doc_comment = self.generate_probe_doc_comment(&provider.spec);
 
-        // Note that we don't put an #[allow(dead_code)] attribute on the original method, because
-        // the user declared that method.  If it's not being used, let the compiler warn them about
-        // it just like it would any other unused method.  The methods we generate, however, won't
-        // be directly visible to the user and thus should not cause a warning if left un-called
+        let allow_attr = if provider.build_info.implementation.is_enabled() {
+            //We will generate another probe method inside the impl module which is used to fire
+            //the probe.  So in normal use this original method will never be called.  That will
+            //confuse users because the `probe!` macro causes what looks like a methdo call on the
+            //original probe function.  So put an attribute on the original function suppressing
+            //that warning
+            quote! { #[allow(dead_code)] }
+        } else {
+            //Tracing is disabled, so there is no impl mod, so the `probe!` calls will actually
+            //reference the original method.  That means if a probe method is unused, we want the
+            //compiler to warn the user about it just like it would any other unused method
+            quote! {}
+        };
+
         let span = original_method.span();
         Ok(quote_spanned! {span=>
             #(#attrs)*
             #probe_doc_comment
             #deprecation_attribute
+            #allow_attr
             #vis #original_method {
                 #method_body
             }
@@ -290,7 +301,7 @@ impl ProbeGenerator {
         match provider.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
                 //Disabled.  Just make the arguments go away
-                let args_type_assertions = self.spec.args.iter().map(|arg| {
+                let args = self.spec.args.iter().map(|arg| {
                     let span = arg.syn_typ().span();
                     let arg_name = arg.ident();
                     quote_spanned! {span=>
@@ -299,9 +310,7 @@ impl ProbeGenerator {
                 });
 
                 Ok(quote_spanned! {span=>
-                    if false {
-                        #(#args_type_assertions)*
-                    }
+                    #(#args)*
                 })
             }
             TracingTarget::NoOp | TracingTarget::Stap => {
@@ -317,10 +326,13 @@ impl ProbeGenerator {
                 //performant way to fire probes)
                 let mod_name = provider.get_provider_impl_mod_name();
                 let probe_name = &self.spec.method_name;
-                let args = self.spec.args.iter().map(|arg| {
+                let wrap_args = self.spec.args.iter().map(|arg| {
                     let arg_name = arg.ident();
 
-                    quote! { ::tracers::runtime::wrap(#arg_name).as_c_type() }
+                    quote! { let #arg_name = ::tracers::runtime::wrap(#arg_name); }
+                });
+                let arg_names = self.spec.args.iter().map(|arg| {
+                    arg.ident()
                 });
 
                 Ok(quote_spanned! {span=>
@@ -329,7 +341,8 @@ impl ProbeGenerator {
                     #[allow(unused_imports)]
                     use ::tracers::runtime::ProbeArgWrapper as _;
 
-                    #mod_name::#probe_name(#(#args),*);
+                    #(#wrap_args)*
+                    #mod_name::#probe_name(#(#arg_names.as_c_type()),*);
                 })
             }
         }

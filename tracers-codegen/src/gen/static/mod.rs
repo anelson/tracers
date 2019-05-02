@@ -49,7 +49,7 @@ impl CodeGenerator for StaticGenerator {
     }
 
     fn handle_probe_call(&self, call: ProbeCallSpecification) -> TracersResult<TokenStream> {
-        probe_call::generate_probe_call(call)
+        probe_call::generate_probe_call(&self.build_info, call)
     }
 
     fn handle_init_provider(&self, init: ProviderInitSpecification) -> TracersResult<TokenStream> {
