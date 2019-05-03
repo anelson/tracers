@@ -90,7 +90,7 @@ pub(crate) fn from_syn_type(ty: &syn::Type) -> Option<ArgTypeInfo> {
     None
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub(crate) struct ArgTypeInfo {
     #[serde(with = "serde_helpers::string")]
     c_type: CType,
