@@ -67,7 +67,7 @@ pub(crate) fn generate_probe_call(
 
                         //TODO: if the `unlikely` intrinsic is ever stabilized, use that here so
                         //the optimizer knows this will be false most of the time
-                        quote! { #mod_path::#semaphore_name != 0 }
+                        quote! { unsafe { #mod_path::#semaphore_name != 0 } }
                     };
 
                     //For each argument, which is some arbitrary Rust expression, generate a
@@ -105,7 +105,7 @@ pub(crate) fn generate_probe_call(
                             if #conditional_expression {
                                 #(#wrapped_args)*
 
-                                #mod_path::#probe(#(#probe_parameters),*);
+                                unsafe { #mod_path::#probe(#(#probe_parameters),*); }
                             }
                         }
                     })

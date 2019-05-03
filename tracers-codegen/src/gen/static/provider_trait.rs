@@ -339,7 +339,7 @@ impl ProbeGenerator {
                     use ::tracers::runtime::ProbeArgWrapper as _;
 
                     #(#wrap_args)*
-                    #mod_name::#probe_name(#(#arg_names.as_c_type()),*);
+                    unsafe { #mod_name::#probe_name(#(#arg_names.as_c_type()),*); }
                 })
             }
         }
@@ -384,7 +384,7 @@ impl ProbeGenerator {
 
         let native_func_name = format!("{}_{}", provider_name_with_hash, self.spec.name);
         let func_attrs = if is_real {
-            quote! { #[link(name = #native_func_name)] }
+            quote! { #[link_name = #native_func_name] }
         } else {
             quote! {}
         };
@@ -395,7 +395,7 @@ impl ProbeGenerator {
         let semaphore_ident = syn::Ident::new(&semaphore_name, self.spec.original_method.span());
         let semaphore_attrs = if is_real {
             quote! {
-               #[link(name = #native_semaphore_name)]
+               #[link_name = #native_semaphore_name]
                #[link_section = ".probes"]
             }
         } else {
