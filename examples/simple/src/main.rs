@@ -1,6 +1,7 @@
 //! This is a simple binary which declares and fires some simple probes
 //!
 //! It's the "hello world" equivalent for tracing
+#![deny(warnings)]
 
 use tracers_macros::{probe, tracer};
 

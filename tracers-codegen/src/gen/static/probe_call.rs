@@ -97,6 +97,14 @@ pub(crate) fn generate_probe_call(
                         quote! { #arg_name.as_c_type() }
                     });
 
+                    let unsafe_block = if target == TracingTarget::NoOp {
+                        //No unsafe block is needed and using one just triggers a warning
+                        quote! {}
+                    } else {
+                        //'real' impls call unsafe extern functions
+                        quote! { unsafe }
+                    };
+
                     let span = details.call.span();
                     Ok(quote_spanned! {span=>
                         {
@@ -105,7 +113,7 @@ pub(crate) fn generate_probe_call(
                             if #conditional_expression {
                                 #(#wrapped_args)*
 
-                                unsafe { #mod_path::#probe(#(#probe_parameters),*); }
+                                #unsafe_block { #mod_path::#probe(#(#probe_parameters),*); }
                             }
                         }
                     })

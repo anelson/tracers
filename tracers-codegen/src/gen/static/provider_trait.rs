@@ -312,7 +312,7 @@ impl ProbeGenerator {
                     #(#args)*
                 })
             }
-            TracingTarget::NoOp | TracingTarget::Stap => {
+            target @ TracingTarget::NoOp | target @ TracingTarget::Stap => {
                 //This is a `real` impl with a C wrapper underneath (or in the case of `noop` a
                 //Rust function with the same signature as a C wrapper).
                 //The implementation is in the impl mod, with each probe as a function named the
@@ -332,6 +332,14 @@ impl ProbeGenerator {
                 });
                 let arg_names = self.spec.args.iter().map(ProbeArgSpecification::ident);
 
+                let unsafe_block = if target == TracingTarget::NoOp {
+                    //No unsafe block is needed and using one just triggers a warning
+                    quote! {}
+                } else {
+                    //'real' impls call unsafe extern functions
+                    quote! { unsafe }
+                };
+
                 Ok(quote_spanned! {span=>
                     // The compiler warns on this import as unused, even though without this trait
                     // imported the use of `as_c_type()` will fail
@@ -339,7 +347,7 @@ impl ProbeGenerator {
                     use ::tracers::runtime::ProbeArgWrapper as _;
 
                     #(#wrap_args)*
-                    unsafe { #mod_name::#probe_name(#(#arg_names.as_c_type()),*); }
+                    #unsafe_block { #mod_name::#probe_name(#(#arg_names.as_c_type()),*); }
                 })
             }
         }
