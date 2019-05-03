@@ -2,7 +2,6 @@
 //! the suitable tracing implementation at build time, and within a dependent crate's `build.rs`
 //! file to perform the build-time code generation to support the selected tracing implementation
 
-use crate::cache;
 use crate::cargo;
 use crate::error::{TracersError, TracersResult};
 use crate::gen;
@@ -389,14 +388,12 @@ fn generate_native_code(out: &mut dyn Write) -> TracersResult<()> {
     let manifest_path = PathBuf::from(manifest_dir).join("Cargo.toml");
     let package_name = env::var("CARGO_PKG_NAME").unwrap();
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
-    let cache_path = cache::get_cache_path(
-        &PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?).join("cache"),
-    );
+    let out_path = &PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?);
 
     gen::code_generator()?.generate_native_code(
         out,
         &Path::new(&manifest_path),
-        &cache_path,
+        &out_path,
         &package_name,
         targets,
     );
@@ -442,14 +439,24 @@ mod tests {
                 TracingImplementation::Disabled,
             ),
             (
-                // Tracing enabled, dynamic mode enabled, static disabled
+                // Tracing enabled, dynamic mode enabled with auto-detect, static disabled
                 FeatureFlags::new(true, false, false, false, false, false).unwrap(),
                 TracingImplementation::DynamicNoOp,
             ),
             (
-                // Tracing enabled, dynamic disabled, static enabled
+                // Tracing enabled, dynamic disabled, static enabled with auto-detect
                 FeatureFlags::new(false, true, false, false, false, false).unwrap(),
                 TracingImplementation::StaticNoOp,
+            ),
+            (
+                // Tracing enabled, dynamic disabled, static enabled with force-static-noop
+                FeatureFlags::new(false, true, false, false, false, true).unwrap(),
+                TracingImplementation::StaticNoOp,
+            ),
+            (
+                // Tracing enabled, dynamic disabled, static enabled with force-static-stap
+                FeatureFlags::new(false, true, false, false, true, false).unwrap(),
+                TracingImplementation::StaticStap,
             ),
         ];
 
