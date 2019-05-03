@@ -205,7 +205,7 @@ TODO: No other platforms supported yet
 /// Returns the name of the module in which most of the implementation code for this trait will be
 /// located.
 pub(super) fn get_provider_impl_mod_name(trait_ident: &syn::Ident) -> String {
-    format!("__{}Provider", trait_ident).to_snake_case()
+    format!("__{}", format!("{}Provider", trait_ident).to_snake_case())
 }
 
 /// Generates the standard provider init call.  Some implementations may use a different one but
