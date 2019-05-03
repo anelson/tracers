@@ -99,11 +99,6 @@ impl FeatureFlags {
         self.force_static_stap
     }
 
-    pub fn force_static_noop(&self) -> bool {
-        //Should the staticamic stap be required on pain of build failure?
-        self.force_static_noop
-    }
-
     fn is_feature_enabled(name: &str) -> bool {
         env::var(&format!(
             "CARGO_FEATURE_{}",
@@ -372,8 +367,6 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
         //TODO: Be a bit smarter about this
         if features.force_static_stap() {
             Ok(TracingImplementation::StaticStap)
-        } else if features.force_static_noop() {
-            Ok(TracingImplementation::StaticNoOp)
         } else {
             Ok(TracingImplementation::StaticNoOp)
         }
