@@ -1,10 +1,10 @@
 extern crate tracers;
 
 use nom::*;
+use std::io::prelude::*;
 use tracers::init_provider;
 use tracers::probe;
 use tracers::tracer;
-use std::io::prelude::*;
 
 #[link_section = ".note.stapst"]
 pub static TEST_NOTE: [u8; 2] = [0x00, 0x01];
@@ -15,7 +15,7 @@ pub static TEST_BASE: [u8; 2] = [0x00, 0x01];
 /// This is a probe provider which is used to exercise the probing infrastructure with a few
 /// different combinations of arguments.
 #[tracer]
-pub trait TestProbes {
+pub trait TestFireProbes {
     fn probe0();
     fn probe1(text: &str);
     fn probe2(text: &str, number: usize);
@@ -109,11 +109,11 @@ named!(
 fn fire_probe(pt: ProbeType) {
     dump_status();
     match pt {
-        ProbeType::Probe0 => probe!(TestProbes::probe0()),
-        ProbeType::Probe1 { text } => probe!(TestProbes::probe1(&text)),
-        ProbeType::Probe2 { text, number } => probe!(TestProbes::probe2(&text, number)),
+        ProbeType::Probe0 => probe!(TestFireProbes::probe0()),
+        ProbeType::Probe1 { text } => probe!(TestFireProbes::probe1(&text)),
+        ProbeType::Probe2 { text, number } => probe!(TestFireProbes::probe2(&text, number)),
         ProbeType::Probe3 { text, number, opt } => {
-            probe!(TestProbes::probe3(&text, number, &opt.as_ref()))
+            probe!(TestFireProbes::probe3(&text, number, &opt.as_ref()))
         }
     }
 }
@@ -121,16 +121,16 @@ fn fire_probe(pt: ProbeType) {
 fn dump_status() {
     println!(
         "Probe status: probe0:{} probe1:{} probe2:{} probe3:{}",
-        TestProbes::probe0_enabled(),
-        TestProbes::probe1_enabled(),
-        TestProbes::probe2_enabled(),
-        TestProbes::probe3_enabled()
+        TestFireProbes::probe0_enabled(),
+        TestFireProbes::probe1_enabled(),
+        TestFireProbes::probe2_enabled(),
+        TestFireProbes::probe3_enabled()
     );
 }
 
 fn main() {
     println!("Initializing the probe provider");
-    if let Some(err) = init_provider!(TestProbes) {
+    if let Some(err) = init_provider!(TestFireProbes) {
         panic!("Probe provider initialization failed: {}", err);
     }
     println!("Probe provider initialized");
