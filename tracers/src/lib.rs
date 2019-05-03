@@ -15,6 +15,7 @@
 #[cfg(enabled)]
 pub mod runtime {
     pub use tracers_core::failure;
+    pub use tracers_core::libc;
     pub use tracers_core::{wrap, ProbeArgNativeType, ProbeArgType, ProbeArgWrapper};
 
     #[cfg(dynamic_enabled)]

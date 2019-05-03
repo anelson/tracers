@@ -8,6 +8,8 @@ extern crate quickcheck_macros;
 //and doesn't have to add their own explicit dep
 pub extern crate failure;
 
+pub extern crate libc;
+
 pub mod argtypes;
 pub use argtypes::{wrap, ProbeArgNativeType, ProbeArgType, ProbeArgWrapper};
 
