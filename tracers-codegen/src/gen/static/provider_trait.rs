@@ -164,6 +164,13 @@ impl<'bi> ProviderTraitGenerator<'bi> {
             .iter()
             .map(|p| p.generate_native_declaration(&self));
 
+        // These imports aren't always used but it's easier to always import than to detect when
+        // probe arg types need `libc`
+        let mod_imports = quote! {
+            #[allow(unused_imports)]
+            use ::tracers::runtime::libc;
+        };
+
         match self.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
                 //When tracing is disabled we can't assume the `tracers::runtime` is available so
@@ -182,6 +189,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 // FFI bindings, despite the name
                 quote_spanned! {span=>
                     #vis mod #mod_name {
+                        #mod_imports
+
                         #(#native_declarations)*
                     }
                 }
@@ -209,6 +218,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
                 quote_spanned! {span=>
                     #vis mod #mod_name {
+                        #mod_imports
+
                         #[link(name = #lib_name)]
                         extern "C" {
                             #(#native_declarations)*
