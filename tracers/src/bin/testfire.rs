@@ -1,16 +1,6 @@
-extern crate tracers;
-
 use nom::*;
 use std::io::prelude::*;
-use tracers::init_provider;
-use tracers::probe;
-use tracers::tracer;
-
-#[link_section = ".note.stapst"]
-pub static TEST_NOTE: [u8; 2] = [0x00, 0x01];
-
-#[link_section = ".stapsdt.base"]
-pub static TEST_BASE: [u8; 2] = [0x00, 0x01];
+use tracers_macros::{init_provider, probe, tracer};
 
 /// This is a probe provider which is used to exercise the probing infrastructure with a few
 /// different combinations of arguments.
@@ -107,7 +97,6 @@ named!(
     );
 
 fn fire_probe(pt: ProbeType) {
-    dump_status();
     match pt {
         ProbeType::Probe0 => probe!(TestFireProbes::probe0()),
         ProbeType::Probe1 { text } => probe!(TestFireProbes::probe1(&text)),
@@ -118,23 +107,13 @@ fn fire_probe(pt: ProbeType) {
     }
 }
 
-fn dump_status() {
-    println!(
-        "Probe status: probe0:{} probe1:{} probe2:{} probe3:{}",
-        TestFireProbes::probe0_enabled(),
-        TestFireProbes::probe1_enabled(),
-        TestFireProbes::probe2_enabled(),
-        TestFireProbes::probe3_enabled()
-    );
-}
-
 fn main() {
     println!("Initializing the probe provider");
-    if let Some(err) = init_provider!(TestFireProbes) {
-        panic!("Probe provider initialization failed: {}", err);
+    match init_provider!(TestFireProbes) {
+        Ok(ver) => println!("Provider initialized: {}", ver),
+        Err(err) => panic!("Probe provider initialization failed: {}", err),
     }
     println!("Probe provider initialized");
-    dump_status();
 
     for line in std::io::stdin().lock().lines() {
         let line = line.expect("Error reading line from stdin");

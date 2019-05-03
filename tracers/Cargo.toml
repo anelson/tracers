@@ -40,8 +40,9 @@ force-static-noop = ["static-tracing"]
 force-static-stap = ["static-tracing"]
 
 # An optional feature will build binaries which are used to interact with the probing framework.  These are only useful
-# as part of our CI tests, or when troubleshooting unexpected behavior with the probes
-binaries = ["nom"]
+# as part of our CI tests, or when troubleshooting unexpected behavior with the probes.  If you are using this crate as a dependency,
+# you should not activate this feature as it will add `tracers-macros` to the runtime-dependencies of `tracers`
+binaries = ["nom", "tracers-macros"]
 
 [[bin]]
 name = "testfire"
@@ -55,6 +56,7 @@ tracers-dyn-noop = { path = "../tracers-dyn-noop", version = "0.1.0", optional =
 tracers-dyn-stap = { path = "../tracers-dyn-stap", version = "0.1.0", optional = true }
 
 nom = { version = "4.2.3", optional = true, features = ["verbose-errors"] }
+tracers-macros = { path = "../tracers-macros", version = "0.1.0", optional = true }
 
 [build-dependencies]
 tracers-build = { path = "../tracers-build", version = "0.1.0" }
