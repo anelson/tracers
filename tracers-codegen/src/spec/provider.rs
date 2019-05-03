@@ -14,7 +14,7 @@ use std::fmt;
 use syn::visit::Visit;
 use syn::{ItemTrait, TraitItem};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ProviderSpecification {
     name: String,
     hash: HashCode,
@@ -46,19 +46,19 @@ impl fmt::Debug for ProviderSpecification {
 impl ProviderSpecification {
     pub fn from_token_stream(tokens: TokenStream) -> TracersResult<ProviderSpecification> {
         match syn::parse2::<syn::ItemTrait>(tokens) {
-            Ok(item_trait) => Self::from_trait(&item_trait),
+            Ok(item_trait) => Self::from_trait(item_trait),
             Err(e) => Err(TracersError::syn_error("Expected a trait", e)),
         }
     }
 
-    pub fn from_trait(item_trait: &ItemTrait) -> TracersResult<ProviderSpecification> {
-        let probes = find_probes(item_trait)?;
+    pub fn from_trait(item_trait: ItemTrait) -> TracersResult<ProviderSpecification> {
+        let probes = find_probes(&item_trait)?;
         let token_stream = quote! { #item_trait };
-        let hash = crate::hashing::hash_token_stream(&token_stream);
+        let hash = crate::hashing::hash(&item_trait);
         Ok(ProviderSpecification {
             name: Self::provider_name_from_trait(&item_trait.ident),
             hash,
-            item_trait: item_trait.clone(),
+            item_trait,
             token_stream,
             probes,
         })
@@ -145,15 +145,20 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
             //First pass through to the default impl
             syn::visit::visit_item_trait(self, i);
 
-            //Check for the `tracer` or `tracers::tracer` attribute
-            if i.attrs
-                .iter()
-                .any(|attr| match attr.path.segments.iter().last() {
+            fn is_tracer_attribute(attr: &syn::Attribute) -> bool {
+                match attr.path.segments.iter().last() {
                     Some(syn::PathSegment { ident, .. }) if *ident == "tracer" => true,
                     _ => false,
-                })
-            {
-                //This looks like a provider trait
+                }
+            }
+
+            //Check for the `tracer` or `tracers::tracer` attribute
+            if i.attrs.iter().any(is_tracer_attribute) {
+                //This looks like a provider trait.  Strip the `tracer` attribute to ensure the
+                //hash matches the same hash computed by the proc macro when it's invoked on this
+                //trait during the compile stage
+                let mut i = i.clone();
+                i.attrs.retain(|attr| !is_tracer_attribute(attr));
                 if let Ok(provider) = ProviderSpecification::from_trait(i) {
                     self.providers.push(provider)
                 }
@@ -307,6 +312,56 @@ mod test {
 
             let probes = find_probes(&item_trait).unwrap();
             assert_eq!(probes, test_trait.probes.unwrap_or(Vec::new()));
+        }
+    }
+
+    #[test]
+    fn found_providers_have_same_hash() {
+        //There are two ways for us to get a ProviderSpecification:
+        // The first is from a TokenStream in an attribute proc macro.  That's how the `#[tracer]`
+        // macro works.
+        // The second is in calling `find_providers` to discover providers in a source file
+        //
+        // A fundamental assumption made in this project is that the hashes of a given provider
+        // will be identical regardless of which of the two ways it was obtained.
+        //
+        // However, the attribute proc macro gets a token stream which does not include the
+        // `#[tracer]` attribute itself.  The `find_providers` code must see this attribute because
+        // that's how it identifies a provider trait.  This test ensures the hashes are always
+        // corrected to match
+        for test_trait in get_filtered_test_traits(false) {
+            let trait_decl = test_trait.tokenstream;
+
+            //Note: we remove the `#[tracer]` attribute from the token stream because that's what
+            //the proc macro infrastructure does.  All other attributes are preserved, but the
+            //attribute that triggers the macro is provided in a separate token stream which we
+            //ignore
+            let token_stream = quote! {
+                /// This is a provider trait
+                #trait_decl
+            };
+            let provider_from_ts = ProviderSpecification::from_token_stream(token_stream).unwrap();
+            let file: syn::File = parse_quote! {
+                mod foo {
+                    fn useless_func() -> bool { false }
+                }
+
+                trait NotAProvider {
+                    fn probe0(not_a_probe_arg: usize);
+                }
+
+                /// This is a provider trait
+                #[tracer]
+                #trait_decl
+            };
+
+            let providers = find_providers(&file);
+
+            assert_eq!(1, providers.len());
+            let provider_from_file = providers.get(0).unwrap();
+
+            assert_eq!(provider_from_ts.name(), provider_from_file.name());
+            assert_eq!(provider_from_ts.hash(), provider_from_file.hash());
         }
     }
 

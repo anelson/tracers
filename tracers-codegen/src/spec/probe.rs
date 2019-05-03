@@ -15,7 +15,7 @@ use syn::spanned::Spanned;
 use syn::Visibility;
 use syn::{FnArg, Ident, ItemTrait, ReturnType, TraitItemMethod};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct ProbeSpecification {
     pub name: String,
     #[serde(with = "serde_helpers::syn")]
