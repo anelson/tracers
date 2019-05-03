@@ -46,10 +46,9 @@ pub(crate) fn add_hash_to_path(path: &Path, hash: HashCode) -> PathBuf {
         .expect("file name contains invalid UTF-8");
     let ext = path
         .extension()
-        .unwrap_or_else(|| OsStr::new(""))
-        .to_str()
-        .expect("file extension contains invalid UTF-8");
-    let new_name = &format!("{}-{:x}.{}", name, hash, ext);
+        .map(|ext| format!(".{}", ext.to_str().unwrap()))
+        .unwrap_or_else(|| "".to_owned());
+    let new_name = &format!("{}-{:x}{}", name, hash, ext);
 
     path.set_file_name(OsStr::new(new_name));
 
