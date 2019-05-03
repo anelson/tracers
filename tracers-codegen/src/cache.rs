@@ -144,10 +144,12 @@ pub(crate) fn get_cache_path(root: &Path) -> PathBuf {
         "-",
         env!("CARGO_PKG_VERSION")
     ));
+    root.push("cache");
     root
 }
 
 fn load_cached_results<T: Serialize + DeserializeOwned>(results_path: &Path) -> Fallible<T> {
+    println!("Loading cached results from {}", results_path.display());
     let file = File::open(results_path)?;
     let reader = BufReader::new(file);
 
