@@ -8,7 +8,7 @@
 use crate::build_rs::BuildInfo;
 use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::gen::r#static::native_code::{self, ProcessedProviderTrait};
-use crate::spec::{ProbeSpecification, ProviderSpecification,ProbeArgSpecification};
+use crate::spec::{ProbeArgSpecification, ProbeSpecification, ProviderSpecification};
 use crate::TracersResult;
 use crate::TracingImplementation;
 use crate::{TracingTarget, TracingType};
@@ -480,7 +480,7 @@ mod test {
             .into_iter()
             {
                 let item_trait = test_case.get_item_trait();
-                let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
+                let spec = ProviderSpecification::from_trait(item_trait).expect(&format!(
                     "Failed to create specification from test trait '{}'",
                     test_case.description
                 ));
@@ -509,7 +509,7 @@ mod test {
         {
             for implementation in vec![TracingImplementation::StaticStap].into_iter() {
                 let item_trait = test_case.get_item_trait();
-                let spec = ProviderSpecification::from_trait(&item_trait).expect(&format!(
+                let spec = ProviderSpecification::from_trait(item_trait).expect(&format!(
                     "Failed to create specification from test trait '{}'",
                     test_case.description
                 ));
