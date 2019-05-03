@@ -6,12 +6,14 @@ extern crate tracers_macros;
 pub trait TestProbes {
     fn probe0();
     fn probe1(foo: &str);
+    fn probe2(foo: &str, bar: usize);
 }
 
 #[test]
 pub fn probe_firing() {
     probe!(TestProbes::probe0());
     probe!(TestProbes::probe1("foo bar baz"));
+    probe!(TestProbes::probe2("foo bar baz", 5));
 }
 
 #[test]
