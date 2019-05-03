@@ -60,7 +60,7 @@ pub(crate) fn get_processed_provider_info(
     provider: &ProviderSpecification,
 ) -> TracersResult<ProcessedProviderTrait> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?);
-    let cache_dir = cache_dir(&out_dir);
+    let cache_dir = cache::get_cache_path(&out_dir);
     cache::get_cached_object_computation(
         &cache_dir,
         provider.name(),
@@ -102,7 +102,7 @@ pub(super) fn generate_native_code(
 fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, file: &Path) {
     //Find the dependent files and providers in this source file, retrieving that info from cache
     //if we've done this before
-    let cache_dir = cache_dir(out_dir);
+    let cache_dir = cache::get_cache_path(out_dir);
     let result =
         cache::cache_file_computation(&cache_dir, file, "processed-file", |file_contents| {
             writeln!(
@@ -155,7 +155,7 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, 
             for provider in processed_file.providers.into_iter() {
                 //Call `process_provider` for each provider in the file.  If it fails, log the failure
                 //in a way that will cause Cargo to report a warning, and continue on
-                process_provider(build_info, stdout, out_dir, file, provider);
+                process_provider(build_info, stdout, out_dir, provider);
             }
         }
         Err(e) => {
@@ -182,10 +182,9 @@ fn process_provider(
     build_info: &BuildInfo,
     stdout: &mut dyn Write,
     out_dir: &Path,
-    _file: &Path,
     provider: ProviderSpecification,
 ) {
-    let cache_dir = cache_dir(out_dir);
+    let cache_dir = cache::get_cache_path(out_dir);
 
     // For this trait, generate native code for the probes.  If this trait was processed before
     // and hasn't changed, even if the source file it's in has changed, then we can skip that
@@ -264,13 +263,9 @@ fn create_native_code_generator(
     }
 }
 
-fn cache_dir(out_dir: &Path) -> PathBuf {
-    out_dir.join("cache")
-}
-
 #[cfg(test)]
 #[cfg(target_os = "linux")]
-mod test {
+mod stap_tests {
     use super::*;
     use crate::testdata;
     use crate::testdata::*;
@@ -285,7 +280,7 @@ mod test {
         for implementation in [TracingImplementation::StaticStap].iter() {
             let build_info = BuildInfo::new((*implementation).clone());
             let temp_dir = tempfile::tempdir().unwrap();
-            let cache_dir = temp_dir.path().join("cache");
+            let out_dir = temp_dir.path().join("out");
 
             for first_run in [true, false].into_iter() {
                 //Generate code for all of the crates.
@@ -296,6 +291,7 @@ mod test {
                         ("TARGET", "x86_64-linux-gnu"),
                         ("HOST", "x86_64-linux-gnu"),
                         ("OPT_LEVEL", "1"),
+                        ("OUT_DIR", out_dir.to_str().unwrap()),
                     ]);
 
                     for target in case.targets.iter() {
@@ -304,7 +300,7 @@ mod test {
                         process_file(
                             &build_info,
                             &mut stdout,
-                            &cache_dir,
+                            &out_dir,
                             &case.root_directory.join(target.entrypoint),
                         );
 
@@ -349,6 +345,53 @@ mod test {
 
                     drop(guard); //unset the env vars
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn generates_processed_provider_trait() {
+        //Run through all of our test traits, invoking the code generator for each
+        //If the implementation is "real", not "disabled" or "noop", a library should be generated
+        //and metadata about that library stored in the cache for proc macros to retrieve at
+        //compile time.
+        for test_trait in
+            get_test_provider_traits(|t: &TestProviderTrait| t.expected_error.is_none())
+        {
+            let provider =
+                ProviderSpecification::from_token_stream(test_trait.tokenstream.clone()).unwrap();
+
+            //TODO: Run process_provider on each one, then verify the correct cargo commands are
+            //output, and then call get_processed_provider_info to confirm the results are
+            //persisted to the cache
+            for implementation in [TracingImplementation::StaticStap].iter() {
+                let build_info = BuildInfo::new((*implementation).clone());
+                let temp_dir = tempfile::tempdir().unwrap();
+                let out_dir = temp_dir.path().join("out");
+                let guard = testdata::with_env_vars(vec![
+                    ("TARGET", "x86_64-linux-gnu"),
+                    ("HOST", "x86_64-linux-gnu"),
+                    ("OPT_LEVEL", "1"),
+                    ("OUT_DIR", out_dir.to_str().unwrap()),
+                ]);
+                let mut stdout = Vec::new();
+
+                process_provider(&build_info, &mut stdout, &out_dir, provider.clone());
+
+                let processed_provider = get_processed_provider_info(&provider)
+                    .expect("There should be a processed provider");
+
+                let output = String::from_utf8(stdout).unwrap();
+                assert!(output.contains(
+                    processed_provider
+                        .lib_path
+                        .parent()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                ));
+
+                drop(guard);
             }
         }
     }
