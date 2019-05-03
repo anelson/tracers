@@ -6,26 +6,21 @@
 //! fast hashing algorithm is used.  This doesn't need to be cryptographically secure but it does
 //! need to be very fast.
 
-use proc_macro2::TokenStream;
 use std::ffi::OsStr;
-use std::hash::Hasher;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use twox_hash::XxHash;
 
 pub(crate) type HashCode = u64;
 
-pub(crate) fn hash_string(string: &str) -> HashCode {
-    hash_buf(string.as_bytes())
-}
-
 pub(crate) fn hash_buf(buf: &[u8]) -> HashCode {
-    let mut hasher = XxHash::with_seed(42);
-    hasher.write(buf);
-    hasher.finish()
+    hash(buf)
 }
 
-pub(crate) fn hash_token_stream(stream: &TokenStream) -> HashCode {
-    hash_string(&stream.to_string())
+pub(crate) fn hash<T: Hash>(something: T) -> HashCode {
+    let mut hasher = XxHash::with_seed(42);
+    something.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// Helper method with takes a path (eg `foo/bar/baz.lib`) and a hash code (eg `0xBADF00D`), and
@@ -64,45 +59,15 @@ pub(crate) fn add_hash_to_path(path: &Path, hash: HashCode) -> PathBuf {
 #[cfg(test)]
 mod test {
     use super::*;
-    use quote::quote;
 
     #[test]
-    fn hash_string_equality() {
-        assert_eq!(hash_string("foo"), hash_string(&"foo".to_owned()));
+    fn hash_equality() {
+        assert_eq!(hash("foo"), hash(&"foo".to_owned()));
     }
 
     #[test]
-    fn hash_string_inequality() {
-        assert_ne!(hash_string("foo"), hash_string("foo1"));
-    }
-
-    #[test]
-    fn hash_token_stream_equality() {
-        let code1 = quote! {
-            #[foo(bar baz boo)]
-            trait MyTrait {}
-        };
-        let code2 = quote! {
-            #[foo(bar baz boo)]
-            trait MyTrait {}
-        };
-
-        assert_eq!(hash_token_stream(&code1), hash_token_stream(&code2));
-    }
-
-    #[test]
-    fn hash_token_stream_inequality() {
-        let code1 = quote! {
-            #[foo(bar baz boo)]
-            trait MyTrait {}
-        };
-        let code2 = quote! {
-            #[foo(bar baz boo)]
-            // Even comments will cause a mismatch
-            trait MyTrait {}
-        };
-
-        assert_eq!(hash_token_stream(&code1), hash_token_stream(&code2));
+    fn hash_inequality() {
+        assert_ne!(hash("foo"), hash("foo1"));
     }
 
     #[test]
