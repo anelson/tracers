@@ -6,7 +6,7 @@
 //! module.  When there is target-specific logic, it is selected based on the `BuildInfo` in effect
 //! at the time of the code generation
 use crate::build_rs::BuildInfo;
-use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
+use crate::gen::common::{self, ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::gen::r#static::native_code::{self, ProcessedProviderTrait};
 use crate::spec::{ProbeArgSpecification, ProbeSpecification, ProviderSpecification};
 use crate::TracersResult;
@@ -163,6 +163,10 @@ impl<'bi> ProviderTraitGenerator<'bi> {
             .probes
             .iter()
             .map(|p| p.generate_native_declaration(&self));
+        let wrapper_funcs = self
+            .probes
+            .iter()
+            .map(ProbeGenerator::generate_wrapper_func);
 
         // These imports aren't always used but it's easier to always import than to detect when
         // probe arg types need `libc`
@@ -190,6 +194,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 quote_spanned! {span=>
                     #vis mod #mod_name {
                         #mod_imports
+
+                        #(#wrapper_funcs)*
 
                         #(#native_declarations)*
                     }
@@ -219,6 +225,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 quote_spanned! {span=>
                     #vis mod #mod_name {
                         #mod_imports
+
+                        #(#wrapper_funcs)*
 
                         #[link(name = #lib_name)]
                         extern "C" {
@@ -470,6 +478,72 @@ impl ProbeGenerator {
 
             #semaphore_attrs
             pub static #semaphore_ident: u16 #semaphore_initializer
+        }
+    }
+
+    /// Each probe will have a corresponding wrapper function called `__$PROBENAME_wrap` which
+    /// takes as input all of the probe's Rust arguments, and returns a tuple containing a
+    /// `ProbeArgWrapper` for each of the arguments.
+    ///
+    /// This is required because at probe firing time we don't have enough information about the
+    /// actual data types of the parameters to avoid ambiguity when invoking the wrapper.
+    fn generate_wrapper_func(&self) -> TokenStream {
+        if self.spec.args.is_empty() {
+            //Don't generate a wrapper if there are no args to wrap
+            quote! {}
+        } else {
+            let func_name = syn::Ident::new(
+                &format!("__{}_wrap", self.spec.name),
+                self.spec.original_method.span(),
+            );
+
+            // If any of the probe arguments are reference types, we need to deal with the mess of
+            // difference reference lifetimes by taking one lifetime parameter for every reference
+            // type used by any of the probe args, and explicitly tie the return wrapper types to
+            // the corresponding lifetimes
+            let lifetime_params = self.args_lifetime_parameters();
+            let function_type_params = if lifetime_params.is_empty() {
+                quote! {}
+            } else {
+                quote! { <#(#lifetime_params),*> }
+            };
+
+            let args = self.spec.args.iter().map(|arg| {
+                let arg_name = arg.ident();
+                let rust_typ = arg.syn_typ_with_lifetimes();
+                let span = arg.ident().span();
+                quote_spanned! {span=>
+                    #arg_name: #rust_typ
+                }
+            });
+
+            let return_types = self.spec.args.iter().map(|arg| {
+                let rust_typ = arg.syn_typ_with_lifetimes();
+                let span = arg.ident().span();
+                quote_spanned! {span=>
+                    <#rust_typ as ::tracers::runtime::ProbeArgType<#rust_typ>>::WrapperType
+                }
+            });
+
+            let return_type = common::generate_tuple(return_types);
+
+            let wrap_expressions = self.spec.args.iter().map(|arg| {
+                let arg_name = arg.ident();
+                let span = arg.ident().span();
+                quote_spanned! {span=>
+                    ::tracers::runtime::wrap(#arg_name)
+                }
+            });
+
+            let result_expression = common::generate_tuple(wrap_expressions);
+
+            let span = self.spec.original_method.span();
+            quote_spanned! {span=>
+                #[allow(clippy::needless_lifetimes)] //if there's only one lifetime clippy triggers this lint
+                pub fn #func_name #function_type_params (#(#args),*) -> #return_type {
+                    #result_expression
+                }
+            }
         }
     }
 }

@@ -1,9 +1,7 @@
 //!Code in this module processes the provider trait decorated with the `tracers` attribute, and
 //!replaces it with an implementation using libstapsdt.
 use crate::build_rs::BuildInfo;
-use crate::gen::common::ProbeGeneratorBase;
-use crate::gen::common::ProviderTraitGeneratorBase;
-use crate::spec::ProbeArgSpecification;
+use crate::gen::common::{ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderSpecification;
 use crate::syn_helpers;
@@ -528,86 +526,6 @@ impl ProbeGenerator {
         quote_spanned! {span=>
             #name_ident: #provider.get_probe::<#args_tuple>(#name_literal)
                 .map_err(|e| format!(concat!("Error getting probe '", #name_literal, "': {}"), e))?
-        }
-    }
-
-    /// Gets all of the lifetime parameters for all of the reference args for this probe, in a
-    /// `Vec` for convenient post-processing.
-    ///
-    /// For example:
-    ///
-    /// ```noexecute
-    /// fn probe(arg0: &str, arg1: usize, arg2: Option<Result<(), &String>>;
-    ///
-    /// // results in vec!['probe_arg0_1, 'probe_arg2, _1]
-    /// ```
-    pub(crate) fn args_lifetime_parameters(&self) -> Vec<syn::Lifetime> {
-        self.spec
-            .args
-            .iter()
-            .map(ProbeArgSpecification::lifetimes)
-            .flatten()
-            .collect::<Vec<syn::Lifetime>>()
-    }
-
-    /// Build a tuple value expression, consisting of the names of the probe arguments in a tuple.
-    /// For example:
-    ///
-    /// ```noexecute
-    /// fn probe(arg0: &str, arg1: usize); //results in tuple: (arg0, arg1,)
-    /// ```
-    pub(crate) fn args_as_tuple_value(&self) -> TokenStream {
-        let names = self.spec.args.iter().map(ProbeArgSpecification::ident);
-
-        if self.spec.args.is_empty() {
-            quote! { () }
-        } else {
-            let span = self.spec.original_method.sig.decl.inputs.span();
-            quote_spanned! {span=>
-                ( #(#names),* ,)
-            }
-        }
-    }
-
-    /// Build a tuple type expression whose elements correspond to the arguments of this probe.
-    /// This includes only the type of each argument, and has no explicit lifetimes specified.  For
-    /// that there is `args_as_tuple_type_with_lifetimes`
-    pub(crate) fn args_as_tuple_type_without_lifetimes(&self) -> TokenStream {
-        //When the probe spec is constructed lifetime parameters are added, so to construct a tuple
-        //type without them they need to be stripped
-        if self.spec.args.is_empty() {
-            let span = self.spec.original_method.sig.decl.inputs.span();
-            quote_spanned! {span=> () }
-        } else {
-            // Build alist of all of the arg types, but use the version without lifetimes
-            let args = self.spec.args.iter().map(ProbeArgSpecification::syn_typ);
-
-            //Now make a tuple type with the types
-            let span = self.spec.span;
-            quote_spanned! {span=>
-                ( #(#args),* ,)
-            }
-        }
-    }
-
-    /// Like the method above constructs a tuple type corresponding to the types of the arguments of this probe.
-    ///  Unlike the above method, this tuple type is also annotated with explicit lifetime
-    ///  parameters for all reference types in the tuple.
-    pub(crate) fn args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
-        // same as the above method, but use the version with lifetime annotations
-        let types = self
-            .spec
-            .args
-            .iter()
-            .map(ProbeArgSpecification::syn_typ_with_lifetimes);
-
-        if self.spec.args.is_empty() {
-            quote! { () }
-        } else {
-            let span = self.spec.original_method.sig.decl.inputs.span();
-            quote_spanned! {span=>
-                ( #(#types),* ,)
-            }
         }
     }
 }

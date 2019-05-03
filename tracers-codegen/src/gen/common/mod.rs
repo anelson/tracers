@@ -1,12 +1,14 @@
 //! This module contains some code which is shared between the different code generation
 //! implementations.  It does not contain a working code generator implementation itself.
 use crate::build_rs::BuildInfo;
+use crate::spec::ProbeArgSpecification;
 use crate::spec::ProbeSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
 use crate::TracersResult;
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 
@@ -200,12 +202,84 @@ TODO: No other platforms supported yet
 
         generate_multiline_comments(&probe_comment)
     }
+
+    /// Gets all of the lifetime parameters for all of the reference args for this probe, in a
+    /// `Vec` for convenient post-processing.
+    ///
+    /// For example:
+    ///
+    /// ```noexecute
+    /// fn probe(arg0: &str, arg1: usize, arg2: Option<Result<(), &String>>;
+    ///
+    /// // results in vec!['probe_arg0_1, 'probe_arg2, _1]
+    /// ```
+    fn args_lifetime_parameters(&self) -> Vec<syn::Lifetime> {
+        self.spec()
+            .args
+            .iter()
+            .map(ProbeArgSpecification::lifetimes)
+            .flatten()
+            .collect::<Vec<syn::Lifetime>>()
+    }
+
+    /// Build a tuple value expression, consisting of the names of the probe arguments in a tuple.
+    /// For example:
+    ///
+    /// ```noexecute
+    /// fn probe(arg0: &str, arg1: usize); //results in tuple: (arg0, arg1,)
+    /// ```
+    fn args_as_tuple_value(&self) -> TokenStream {
+        let names = self.spec().args.iter().map(ProbeArgSpecification::ident);
+
+        generate_tuple(names)
+    }
+
+    /// Build a tuple type expression whose elements correspond to the arguments of this probe.
+    /// This includes only the type of each argument, and has no explicit lifetimes specified.  For
+    /// that there is `args_as_tuple_type_with_lifetimes`
+    fn args_as_tuple_type_without_lifetimes(&self) -> TokenStream {
+        //When the probe spec is constructed lifetime parameters are added, so to construct a tuple
+        //type without them they need to be stripped
+        let args = self.spec().args.iter().map(ProbeArgSpecification::syn_typ);
+        generate_tuple(args)
+    }
+
+    /// Like the method above constructs a tuple type corresponding to the types of the arguments of this probe.
+    ///  Unlike the above method, this tuple type is also annotated with explicit lifetime
+    ///  parameters for all reference types in the tuple.
+    fn args_as_tuple_type_with_lifetimes(&self) -> TokenStream {
+        // same as the above method, but use the version with lifetime annotations
+        let types = self
+            .spec()
+            .args
+            .iter()
+            .map(ProbeArgSpecification::syn_typ_with_lifetimes);
+
+        generate_tuple(types)
+    }
 }
 
 /// Returns the name of the module in which most of the implementation code for this trait will be
 /// located.
 pub(super) fn get_provider_impl_mod_name(trait_ident: &syn::Ident) -> String {
     format!("__{}", format!("{}Provider", trait_ident).to_snake_case())
+}
+
+/// Given an iterable sequence of `TokenStream`s, produces a new `TokenStream` which will be a
+/// tuple expression with each element of the tuple corresponding to a stream in the iterator.
+///
+/// This handles the special-case syntax whereby an empty iterator is `()` but all others have a
+/// trailing comma
+pub(super) fn generate_tuple<T: ToTokens, I: IntoIterator<Item = T>>(elements: I) -> TokenStream {
+    let mut elements = elements.into_iter().peekable();
+
+    //If this is empty, the tuple expression is `()`, but if it's not then there should be a
+    //trailing comma at the end
+    if elements.peek().is_none() {
+        quote! { () }
+    } else {
+        quote! { ( #(#elements),*, )}
+    }
 }
 
 /// Generates the standard provider init call.  Some implementations may use a different one but
