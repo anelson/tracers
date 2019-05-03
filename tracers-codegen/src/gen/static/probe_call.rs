@@ -16,7 +16,7 @@ pub(crate) fn generate_probe_call(
     call: ProbeCallSpecification,
 ) -> TracersResult<TokenStream> {
     //It's a bug to use this function to generate code for a dynamic implementation
-    assert!(build_info.implementation.is_static());
+    assert!(!build_info.implementation.is_dynamic());
 
     match call {
         ProbeCallSpecification::FireOnly(details) => {
