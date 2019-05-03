@@ -455,7 +455,7 @@ impl ProbeGenerator {
         let span = self.spec.original_method.span();
         quote_spanned! {span=>
             #func_attrs
-            pub fn  #func_ident( #(#args)* ) #func_body
+            pub fn  #func_ident( #(#args),* ) #func_body
 
             #semaphore_attrs
             pub static #semaphore_ident: u16 #semaphore_initializer
