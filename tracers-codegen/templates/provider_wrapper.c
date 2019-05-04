@@ -9,22 +9,10 @@
  * {{spec.token_stream().to_string()}}
  * ```
  */
-{%- macro probe(spec, probe_spec) -%}
+#define _SDT_HAS_SEMAPHORES 1
 
-/* A C function which fires the {{spec.name()}} probe {{probe_spec.name}} */
-void {{spec.name_with_hash()}}_{{probe_spec.name}}(
-    {%for arg in probe_spec.args %}{{ arg.arg_type_info().get_c_type_str() }} {{ arg.name() }}{% if !loop.last %}, {% endif %}{%endfor%}
-) {
-    STAP_PROBE{% if probe_spec.args.len() > 0 %}{{ probe_spec.args.len() }}{% endif %}(
-	{{ spec.name() }},
-	{{ probe_spec.name }}
-	{% for arg in probe_spec.args %}, {{ arg.name() }}{%endfor%}
-    );
-}
 
-/* The semaphore which will be incremented if the probe is enabled */
-__extension__ unsigned short {{spec.name()}}_{{probe_spec.name}}_semaphore __attribute__ ((unused)) __attribute__ ((section (".probes"))) __attribute__ ((visibility ("hidden")));
-{%- endmacro -%}
+#define STAP_HAS_SEMAPHORES 1 /* deprecated */
 
 {% include "sys_sdt.h" %}
 
@@ -32,7 +20,19 @@ __extension__ unsigned short {{spec.name()}}_{{probe_spec.name}}_semaphore __att
 extern "C" {
 {% for probe_spec in spec.probes() %}
 
-{%- call probe(spec, probe_spec) -%}
+    /* A C function which fires the {{spec.name()}} probe {{probe_spec.name}} */
+    void {{spec.name_with_hash()}}_{{probe_spec.name}}(
+	{%for arg in probe_spec.args %}{{ arg.arg_type_info().get_c_type_str() }} {{ arg.name() }}{% if !loop.last %}, {% endif %}{%endfor%}
+    ) {
+	STAP_PROBE{% if probe_spec.args.len() > 0 %}{{ probe_spec.args.len() }}{% endif %}(
+	    {{ spec.name() }},
+	    {{ probe_spec.name }}
+	    {% for arg in probe_spec.args %}, {{ arg.name() }}{%endfor%}
+	);
+    }
+
+    /* The semaphore which will be incremented if the probe is enabled */
+    __extension__ unsigned short {{spec.name()}}_{{probe_spec.name}}_semaphore __attribute__ ((unused)) __attribute__ ((section (".probes"))) __attribute__ ((visibility ("hidden")));
 
 {% endfor %}
 }
