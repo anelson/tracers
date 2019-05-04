@@ -212,17 +212,6 @@ fn process_provider(
                 .lib_path
                 .parent()
                 .expect("lib must have a parent");
-            let lib_filename = processed_provider
-                .lib_path
-                .file_stem()
-                .expect("lib must have a file name");
-
-            writeln!(
-                stdout,
-                "cargo:rustc-link-lib=static={}",
-                lib_filename.to_str().expect("filename isn't valid")
-            )
-            .unwrap();
             writeln!(
                 stdout,
                 "cargo:rustc-link-search=native={}",
