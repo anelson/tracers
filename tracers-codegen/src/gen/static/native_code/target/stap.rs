@@ -92,6 +92,8 @@ impl NativeCodeGenerator for StapNativeCodeGenerator {
                 )
             })?;
 
+        println!("Compiled native wrapper library {}", lib_path.display());
+
         Ok(lib_path)
     }
 
