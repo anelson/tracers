@@ -67,7 +67,7 @@ pub(crate) fn generate_probe_call(
 
                         //TODO: if the `unlikely` intrinsic is ever stabilized, use that here so
                         //the optimizer knows this will be false most of the time
-                        quote! { unsafe { #mod_path::#semaphore_name != 0 } }
+                        quote! { unsafe { std::ptr::read_volatile(&#mod_path::#semaphore_name as *const u16) != 0 } }
                     };
 
                     //For each argument, which is some arbitrary Rust expression, generate a
