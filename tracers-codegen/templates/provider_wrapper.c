@@ -14,12 +14,6 @@
 
 #define STAP_HAS_SEMAPHORES 1 /* deprecated */
 
-#if __has_attribute(always_inline)
-#define ALWAYS_INLINE __attribute__((always_inline)) inline
-#else
-#define ALWAYS_INLINE inline
-#endif
-
 {% include "sys_sdt.h" %}
 
 /* The C-callable wrapper functions which the Rust bindings will invoke in order to fire the probes */
