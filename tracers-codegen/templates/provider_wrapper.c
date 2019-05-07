@@ -15,9 +15,9 @@
 #define STAP_HAS_SEMAPHORES 1 /* deprecated */
 
 #if __has_attribute(always_inline)
-#define ALWAYS_INLINE __attribute__((always_inline))
+#define ALWAYS_INLINE __attribute__((always_inline)) inline
 #else
-#define ALWAYS_INLINE
+#define ALWAYS_INLINE inline
 #endif
 
 {% include "sys_sdt.h" %}
