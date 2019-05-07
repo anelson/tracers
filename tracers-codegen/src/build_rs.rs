@@ -223,18 +223,15 @@ impl BuildInfo {
 /// }
 /// ```
 pub fn build() {
-    let stdout = std::io::stdout();
-    let stderr = std::io::stderr();
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
 
-    let mut out_handle = stdout.lock();
-    let mut err_handle = stderr.lock();
-
-    match build_internal(&mut out_handle) {
-        Ok(_) => writeln!(out_handle, "probes build succeeded").unwrap(),
+    match build_internal(&mut stdout) {
+        Ok(_) => writeln!(stdout, "probes build succeeded").unwrap(),
         Err(e) => {
             //An error that propagates all the way up to here is serious enough that it means we
             //cannot proceed.  Fail the build by exiting the process forcefully
-            writeln!(err_handle, "Error building probes: {}", e).unwrap();
+            writeln!(stderr, "Error building probes: {}", e).unwrap();
 
             std::process::exit(-1);
         }
@@ -260,21 +257,18 @@ fn build_internal<OUT: Write>(out: &mut OUT) -> TracersResult<()> {
 /// other information about the target sytem and the local build environment selects an
 /// implementation to use, or panics if no suitable implementation is possible
 pub fn tracers_build() {
-    let stdout = std::io::stdout();
-    let stderr = std::io::stderr();
-
-    let mut out_handle = stdout.lock();
-    let mut err_handle = stderr.lock();
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
 
     let features = FeatureFlags::from_env().expect("Invalid feature flags");
 
-    match tracers_build_internal(&mut out_handle, features) {
+    match tracers_build_internal(&mut stdout, features) {
         Ok(_) => {}
         Err(e) => {
             //failure here doesn't just mean one of the tracing impls failed to compile; when that
             //happens we can always fall back to the no-op impl.  This means something happened
             //which prevents us from proceeding with the build
-            writeln!(err_handle, "{}", e).unwrap();
+            writeln!(stderr, "{}", e).unwrap();
             panic!("tracers build failed: {}", e);
         }
     }
