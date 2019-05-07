@@ -1,4 +1,4 @@
-session_name: probe-rs
+session_name: tracers
 start_directory: ./
 windows:
     - window_name: editor
