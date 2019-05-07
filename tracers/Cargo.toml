@@ -65,5 +65,8 @@ failure = "0.1.5"
 [dev-dependencies]
 # Our integration tests and examples assume the tracers-macros are available
 tracers-macros = { path = "../tracers-macros", version = "0.1.0" }
+criterion = "0.2"
 
-
+[[bench]]
+name = "probe_firing"
+harness = false
