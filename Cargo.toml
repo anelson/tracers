@@ -15,13 +15,12 @@ members = [
 ]
 
 [profile.bench]
-# Compile benchmark builds with debug symbols
 debug = true
+lto = true
 
 [profile.test]
-# Compile test builds with debug symbols
 debug = true
 
 [profile.release]
-# Compile release builds with debug symbols
 debug = true
+lto = true
