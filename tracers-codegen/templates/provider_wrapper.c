@@ -21,7 +21,7 @@ extern "C" {
 {% for probe_spec in spec.probes() %}
 
     /* A C function which fires the {{spec.name()}} probe {{probe_spec.name}} */
-    ALWAYS_INLINE void {{spec.name_with_hash()}}_{{probe_spec.name}}(
+    void {{spec.name_with_hash()}}_{{probe_spec.name}}(
 	{%for arg in probe_spec.args %}{{ arg.arg_type_info().get_c_type_str() }} {{ arg.name() }}{% if !loop.last %}, {% endif %}{%endfor%}
     ) {
 	STAP_PROBE{% if probe_spec.args.len() > 0 %}{{ probe_spec.args.len() }}{% endif %}(
