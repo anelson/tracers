@@ -7,7 +7,7 @@ use crate::gen;
 use crate::spec::ProbeCallSpecification;
 use crate::spec::ProviderInitSpecification;
 use crate::spec::ProviderSpecification;
-use crate::spec::TracerArgs;
+use crate::spec::TracerAttributeArgs;
 use crate::TracersResult;
 use proc_macro2::TokenStream;
 use std::fmt::Display;
@@ -60,7 +60,7 @@ pub fn init_provider_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
 /// more testable
 pub fn tracer_impl(attr_tokens: TokenStream, tokens: TokenStream) -> TracersResult<TokenStream> {
     gen::code_generator()?.handle_provider_trait(ProviderSpecification::from_token_stream(
-        TracerArgs::from_token_stream(attr_tokens)?,
+        TracerAttributeArgs::from_token_stream(attr_tokens)?,
         tokens,
     )?)
 }

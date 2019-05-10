@@ -24,7 +24,7 @@ pub(crate) use probe_arg::ProbeArgSpecification;
 #[cfg(test)]
 pub(crate) use probe_call::ProbeCallDetails;
 pub(crate) use probe_call::ProbeCallSpecification;
-pub(crate) use provider::TracerArgs;
 #[cfg(test)]
 pub(crate) use provider::TracerAttribute;
+pub(crate) use provider::TracerAttributeArgs;
 pub(crate) use provider::{find_providers, ProviderSpecification};

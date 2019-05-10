@@ -19,7 +19,7 @@ use syn::{ItemTrait, TraitItem};
 
 /// Struct which contains the parsed and processed contents of the `tracer` attribute.
 #[derive(Debug, FromMeta, Clone, Serialize, Deserialize)]
-pub(crate) struct TracerArgs {
+pub(crate) struct TracerAttributeArgs {
     #[darling(default)]
     provider_name: Option<String>,
 }
@@ -27,7 +27,7 @@ pub(crate) struct TracerArgs {
 /// Implement parsing the arguments portion of a `#[tracer]` attribute.  This does _not_ parse the
 /// whole attribute.  It parses only the part after the `tracer` name, which contains optional
 /// parameters that control the behavior of the generated provider.
-impl Parse for TracerArgs {
+impl Parse for TracerAttributeArgs {
     fn parse(input: ParseStream) -> ParseResult<Self> {
         //This implementation mostly copied from
         //https://github.com/dtolnay/syn/blob/master/src/parse_macro_input.rs which for some reason
@@ -46,11 +46,11 @@ impl Parse for TracerArgs {
             input.parse::<Token![,]>()?;
         }
 
-        TracerArgs::from_list(&metas).map_err(|e| input.error(e))
+        TracerAttributeArgs::from_list(&metas).map_err(|e| input.error(e))
     }
 }
 
-impl TracerArgs {
+impl TracerAttributeArgs {
     pub(crate) fn from_token_stream(attr: TokenStream) -> TracersResult<Self> {
         syn::parse2(attr).map_err(|e| TracersError::syn_error("Error parsing attribute args", e))
     }
@@ -65,13 +65,13 @@ impl TracerArgs {
 /// So this does that, though it assumes it's only ever used on a `#[tracer]` attribute because it
 /// attempts to parse possible `tracer` parameters in the attribute`
 pub(crate) struct TracerAttribute {
-    args: TracerArgs,
+    args: TracerAttributeArgs,
 }
 
 impl TracerAttribute {
     fn from_attribute(attr: syn::Attribute) -> TracersResult<Self> {
         Ok(TracerAttribute {
-            args: TracerArgs::from_attribute(attr)?,
+            args: TracerAttributeArgs::from_attribute(attr)?,
         })
     }
 }
@@ -98,7 +98,7 @@ pub struct ProviderSpecification {
     item_trait: ItemTrait,
     #[serde(with = "serde_helpers::token_stream")]
     token_stream: TokenStream,
-    args: TracerArgs,
+    args: TracerAttributeArgs,
     probes: Vec<ProbeSpecification>,
 }
 
@@ -121,7 +121,10 @@ impl fmt::Debug for ProviderSpecification {
 }
 
 impl ProviderSpecification {
-    fn new(args: TracerArgs, item_trait: ItemTrait) -> TracersResult<ProviderSpecification> {
+    fn new(
+        args: TracerAttributeArgs,
+        item_trait: ItemTrait,
+    ) -> TracersResult<ProviderSpecification> {
         let probes = find_probes(&item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash(&item_trait);
@@ -136,7 +139,7 @@ impl ProviderSpecification {
     }
 
     pub(crate) fn from_token_stream(
-        args: TracerArgs,
+        args: TracerAttributeArgs,
         tokens: TokenStream,
     ) -> TracersResult<ProviderSpecification> {
         match syn::parse2::<syn::ItemTrait>(tokens) {
