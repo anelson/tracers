@@ -1,6 +1,8 @@
 #![deny(warnings)]
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion, Fun};
 use failure::{bail, format_err, Fallible, ResultExt};
+use nix::sys::signal::{self, Signal};
+use nix::unistd::Pid;
 use std::env;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -153,19 +155,9 @@ fn bench_fire_disabled(c: &mut Criterion) {
 fn bench_fire_enabled(c: &mut Criterion) {
     match enable_tracing() {
         Err(e) => eprintln!("Unable to run benchmarks with probes enabled: {}", e),
-        Ok(mut trace) => {
+        Ok(trace) => {
             bench_fire(c, true);
-
-            //If this works normally, `bpftrace` will run until it's killed.  If there's some error, it
-            //will fail.  Run `try_wait` to check if it failed, before we kill it outright
-            match trace.try_wait() {
-                Ok(Some(status)) => panic!("`funccount` command failed: {}", status),
-                Ok(None) => {
-                    println!("Benchmark completed; terminating `funccount`");
-                    trace.kill().expect("Failed to kill funccount process");
-                }
-                Err(e) => panic!("Error while checking status of funccount process: {}", e),
-            };
+            disable_tracing(trace);
         }
     }
 }
@@ -240,6 +232,20 @@ fn enable_tracing() -> Fallible<Child> {
     }?;
 
     Ok(trace)
+}
+
+/// Disables tracing previously enabled by invoking `funccount`.  When this function returns the
+/// `funccount` process will have been terminated
+fn disable_tracing(mut child: Child) {
+    //Send SIGTERM to the child process, and collect it's stdoutput waiting for it to die
+    //That way we can see the function counts it prints and visually confirm the probes fired as
+    //expected
+    let pid = Pid::from_raw(child.id() as i32);
+    signal::kill(pid, Signal::SIGINT).expect("Failed to send SIGINT to child process");
+
+    child
+        .wait()
+        .expect("waiting for child process to terminate");
 }
 
 fn bench_fire(c: &mut Criterion, enabled: bool) {

@@ -49,6 +49,11 @@ name = "testfire"
 path = "src/bin/testfire.rs"
 required-features = [ "binaries" ]
 
+[[bin]]
+name = "profile_target"
+path = "src/bin/profile_target.rs"
+required-features = [ "binaries" ]
+
 [dependencies]
 once_cell = { version = "0.1.8", optional = true }
 tracers-core = { path = "../tracers-core", version = "0.1.0", optional = true }
@@ -67,6 +72,7 @@ failure = "0.1.5"
 tracers-macros = { path = "../tracers-macros", version = "0.1.0" }
 criterion = "0.2"
 failure = "0.1"
+nix = "0.13"
 
 [[bench]]
 name = "probe_firing"
