@@ -6,13 +6,89 @@ use crate::hashing::HashCode;
 use crate::serde_helpers;
 use crate::spec::ProbeSpecification;
 use crate::{TracersError, TracersResult};
+use darling::FromMeta;
 use heck::SnakeCase;
 use proc_macro2::TokenStream;
 use quote::quote;
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use syn::parse::{Parse, ParseStream, Result as ParseResult};
 use syn::visit::Visit;
+use syn::Token;
 use syn::{ItemTrait, TraitItem};
+
+/// Struct which contains the parsed and processed contents of the `tracer` attribute.
+#[derive(Debug, FromMeta, Clone, Serialize, Deserialize)]
+pub(crate) struct TracerArgs {
+    #[darling(default)]
+    provider_name: Option<String>,
+}
+
+/// Implement parsing the arguments portion of a `#[tracer]` attribute.  This does _not_ parse the
+/// whole attribute.  It parses only the part after the `tracer` name, which contains optional
+/// parameters that control the behavior of the generated provider.
+impl Parse for TracerArgs {
+    fn parse(input: ParseStream) -> ParseResult<Self> {
+        //This implementation mostly copied from
+        //https://github.com/dtolnay/syn/blob/master/src/parse_macro_input.rs which for some reason
+        //is hidden and only works with `proc_macro` not `proc_macro2`
+        let mut metas: Vec<syn::NestedMeta> = vec![];
+
+        loop {
+            if input.is_empty() {
+                break;
+            }
+            let value = input.parse()?;
+            metas.push(value);
+            if input.is_empty() {
+                break;
+            }
+            input.parse::<Token![,]>()?;
+        }
+
+        TracerArgs::from_list(&metas).map_err(|e| input.error(e))
+    }
+}
+
+impl TracerArgs {
+    pub(crate) fn from_token_stream(attr: TokenStream) -> TracersResult<Self> {
+        syn::parse2(attr).map_err(|e| TracersError::syn_error("Error parsing attribute args", e))
+    }
+
+    pub(crate) fn from_attribute(attr: syn::Attribute) -> TracersResult<Self> {
+        Self::from_token_stream(attr.tts)
+    }
+}
+
+/// A bit of a hack to work around a limitation in the `syn` crate.  It doesn't expose an API to
+/// parse an attribute directly; it expects you to implement the `Parse` trait to do it yourself.
+/// So this does that, though it assumes it's only ever used on a `#[tracer]` attribute because it
+/// attempts to parse possible `tracer` parameters in the attribute`
+pub(crate) struct TracerAttribute {
+    args: TracerArgs,
+}
+
+impl TracerAttribute {
+    fn from_attribute(attr: syn::Attribute) -> TracersResult<Self> {
+        Ok(TracerAttribute {
+            args: TracerArgs::from_attribute(attr)?,
+        })
+    }
+}
+
+impl Parse for TracerAttribute {
+    fn parse(input: ParseStream) -> ParseResult<Self> {
+        let mut attrs: Vec<syn::Attribute> = input.call(syn::Attribute::parse_outer)?;
+
+        if let Some(tracer_attr) = attrs.pop() {
+            Ok(TracerAttribute {
+                args: syn::parse2(tracer_attr.tts)?,
+            })
+        } else {
+            return Err(input.error("Expected exactly one attribute, `#[tracer]`"));
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ProviderSpecification {
@@ -22,6 +98,7 @@ pub struct ProviderSpecification {
     item_trait: ItemTrait,
     #[serde(with = "serde_helpers::token_stream")]
     token_stream: TokenStream,
+    args: TracerArgs,
     probes: Vec<ProbeSpecification>,
 }
 
@@ -44,14 +121,7 @@ impl fmt::Debug for ProviderSpecification {
 }
 
 impl ProviderSpecification {
-    pub fn from_token_stream(tokens: TokenStream) -> TracersResult<ProviderSpecification> {
-        match syn::parse2::<syn::ItemTrait>(tokens) {
-            Ok(item_trait) => Self::from_trait(item_trait),
-            Err(e) => Err(TracersError::syn_error("Expected a trait", e)),
-        }
-    }
-
-    pub fn from_trait(item_trait: ItemTrait) -> TracersResult<ProviderSpecification> {
+    fn new(args: TracerArgs, item_trait: ItemTrait) -> TracersResult<ProviderSpecification> {
         let probes = find_probes(&item_trait)?;
         let token_stream = quote! { #item_trait };
         let hash = crate::hashing::hash(&item_trait);
@@ -60,8 +130,26 @@ impl ProviderSpecification {
             hash,
             item_trait,
             token_stream,
+            args,
             probes,
         })
+    }
+
+    pub(crate) fn from_token_stream(
+        args: TracerArgs,
+        tokens: TokenStream,
+    ) -> TracersResult<ProviderSpecification> {
+        match syn::parse2::<syn::ItemTrait>(tokens) {
+            Ok(item_trait) => Self::new(args, item_trait),
+            Err(e) => Err(TracersError::syn_error("Expected a trait", e)),
+        }
+    }
+
+    pub(crate) fn from_trait(
+        attr: TracerAttribute,
+        item_trait: ItemTrait,
+    ) -> TracersResult<ProviderSpecification> {
+        Self::new(attr.args, item_trait)
     }
 
     /// Computes the name of a provider given the name of the provider's trait.
@@ -119,6 +207,7 @@ impl ProviderSpecification {
                 hash: self.hash,
                 item_trait: self.item_trait,
                 token_stream: self.token_stream,
+                args: self.args,
                 probes: Vec::new(),
             },
             probes,
@@ -152,14 +241,25 @@ pub(crate) fn find_providers(ast: &syn::File) -> Vec<ProviderSpecification> {
                 }
             }
 
-            //Check for the `tracer` or `tracers::tracer` attribute
-            if i.attrs.iter().any(is_tracer_attribute) {
-                //This looks like a provider trait.  Strip the `tracer` attribute to ensure the
-                //hash matches the same hash computed by the proc macro when it's invoked on this
-                //trait during the compile stage
-                let mut i = i.clone();
-                i.attrs.retain(|attr| !is_tracer_attribute(attr));
-                if let Ok(provider) = ProviderSpecification::from_trait(i) {
+            //Check for the `tracer` or `tracers::tracer` attribute, splitting it out from the rest
+            //of the attributes if present to ensure the
+            //hash matches the same hash computed by the proc macro when it's invoked on this
+            //trait during the compile stage
+            let mut i = i.clone();
+            let (mut tracer_attrs, other_attrs) = i
+                .attrs
+                .into_iter()
+                .partition::<Vec<syn::Attribute>, _>(is_tracer_attribute);
+            if let Some(tracer_attr) = tracer_attrs.pop() {
+                //This looks like a provider trait.
+                //Normally there should be only one `#[tracer]` but that's for the full compiler to
+                //sort out.  We'll just assume the first one is the one we want
+                i.attrs = other_attrs;
+                if let Ok(provider) = ProviderSpecification::from_trait(
+                    TracerAttribute::from_attribute(tracer_attr)
+                        .expect("Failed parsing attribute metadata"),
+                    i,
+                ) {
                     self.providers.push(provider)
                 }
             }
@@ -256,9 +356,10 @@ mod test {
     #[test]
     fn find_providers_finds_valid_traits() {
         for test_trait in get_filtered_test_traits(false) {
+            let trait_attr = test_trait.attr_tokenstream.clone();
             let trait_decl = test_trait.tokenstream.clone();
             let test_file: syn::File = parse_quote! {
-                #[tracer]
+                #trait_attr
                 #trait_decl
             };
 
@@ -340,7 +441,11 @@ mod test {
                 /// This is a provider trait
                 #trait_decl
             };
-            let provider_from_ts = ProviderSpecification::from_token_stream(token_stream).unwrap();
+            let provider_from_ts = ProviderSpecification::from_trait(
+                syn::parse2(test_trait.attr_tokenstream).unwrap(),
+                syn::parse2(token_stream).unwrap(),
+            )
+            .unwrap();
             let file: syn::File = parse_quote! {
                 mod foo {
                     fn useless_func() -> bool { false }
@@ -370,8 +475,9 @@ mod test {
         //Go through all of the valid test traits, parse them in to a provider, then serialize and
         //deserialize to json to make sure the round trip serialization works
         for test_trait in get_filtered_test_traits(false) {
-            let provider =
-                ProviderSpecification::from_token_stream(test_trait.tokenstream).unwrap();
+            println!("Parsing attribute: {}", test_trait.attr_tokenstream);
+            let (attr, item_trait) = test_trait.get_attr_and_item_trait();
+            let provider = ProviderSpecification::from_trait(attr, item_trait).unwrap();
             let mut buffer = Vec::new();
             let writer = BufWriter::new(&mut buffer);
             serde_json::to_writer(writer, &provider).unwrap();
@@ -398,6 +504,16 @@ mod test {
                 "test case: {}",
                 test_trait.description
             );
+        }
+    }
+
+    #[test]
+    fn parses_tracer_attributes_test() {
+        //Make sure the `#[tracer]` attribute on all valid test cases can parse correctly
+        for test_trait in get_filtered_test_traits(false) {
+            println!("Parsing attribute: {}", test_trait.attr_tokenstream);
+            let _attribute: TracerAttribute =
+                syn::parse2(test_trait.attr_tokenstream).expect("Expected valid tracer attribute");
         }
     }
 }

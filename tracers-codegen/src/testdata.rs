@@ -9,6 +9,7 @@
 
 use crate::spec::ProbeCallDetails;
 use crate::spec::ProbeCallSpecification;
+use crate::spec::TracerAttribute;
 #[cfg(target_os = "windows")]
 use dunce::canonicalize; //on Windows the dunce implementation avoids UNC paths which break things
 use fs_extra::{copy_items, dir};
@@ -158,6 +159,7 @@ pub(crate) struct TestCrate {
 pub(crate) struct TestProviderTrait {
     pub description: &'static str,
     pub provider_name: &'static str,
+    pub attr_tokenstream: TokenStream,
     pub tokenstream: TokenStream,
     pub expected_error: Option<&'static str>,
     pub probes: Option<Vec<TestProbe>>,
@@ -189,12 +191,14 @@ impl TestProviderTrait {
     fn new_invalid(
         description: &'static str,
         provider_name: &'static str,
+        attr_tokenstream: TokenStream,
         tokenstream: TokenStream,
         expected_error: &'static str,
     ) -> TestProviderTrait {
         TestProviderTrait {
             description,
             provider_name,
+            attr_tokenstream,
             tokenstream,
             expected_error: Some(expected_error),
             probes: None,
@@ -204,20 +208,25 @@ impl TestProviderTrait {
     fn new_valid(
         description: &'static str,
         provider_name: &'static str,
+        attr_tokenstream: TokenStream,
         tokenstream: TokenStream,
         probes: Vec<TestProbe>,
     ) -> TestProviderTrait {
         TestProviderTrait {
             description,
             provider_name,
+            attr_tokenstream,
             tokenstream,
             expected_error: None,
             probes: Some(probes),
         }
     }
 
-    pub fn get_item_trait(&self) -> syn::ItemTrait {
-        syn::parse2(self.tokenstream.clone()).expect("Expected a valid trait")
+    pub fn get_attr_and_item_trait(&self) -> (TracerAttribute, syn::ItemTrait) {
+        (
+            syn::parse2(self.attr_tokenstream.clone()).expect("Expected valid tracer args"),
+            syn::parse2(self.tokenstream.clone()).expect("Expected a valid trait"),
+        )
     }
 }
 
@@ -280,10 +289,12 @@ macro_rules! probe_arg {
 pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
     filter: impl Into<Option<F>>,
 ) -> Vec<TestProviderTrait> {
+    let default_attr_tokenstream = quote! { #[tracer] };
     let traits = vec![
         TestProviderTrait::new_valid(
             "empty trait",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {}
             },
@@ -292,6 +303,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_valid(
             "simple trait",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: i32);
@@ -311,6 +323,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_valid(
             "valid with many refs",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                     trait TestTrait {
                         fn probe0(arg0: i32);
@@ -340,6 +353,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has trait type param",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait<T: Debug> {
                 }
@@ -349,6 +363,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has const",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: i32);
@@ -360,6 +375,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has type alias",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: i32);
@@ -371,6 +387,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has macro invocation",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     println!("WTF");
@@ -383,6 +400,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has const function",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     const fn probe0(arg0: i32);
@@ -393,6 +411,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has unsafe function",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     unsafe fn probe0(arg0: i32);
@@ -403,6 +422,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has extern function",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     extern "C" fn probe0(arg0: i32);
@@ -413,6 +433,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has fn type param",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0<T: Debug>(arg0: T);
@@ -423,6 +444,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has explicit unit retval",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: usize) -> ();
@@ -433,6 +455,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has non-unit retval",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: usize) -> bool;
@@ -443,6 +466,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has default impl",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: i32) { prinln!("{}", arg0); }
@@ -453,6 +477,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has self method",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(&self, arg0: i32);
@@ -463,6 +488,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has mut self method",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(&mut self, arg0: i32);
@@ -473,6 +499,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has self by-val method",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(self, arg0: i32);
@@ -483,6 +510,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has mut self by-val method",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(mut self, arg0: i32);
@@ -493,6 +521,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has a nested Option parameter which is not supported",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: &Option<Option<&str>>);
@@ -503,6 +532,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
         TestProviderTrait::new_invalid(
             "has a Result parameter which is not supported",
             "test_trait",
+            default_attr_tokenstream.clone(),
             quote! {
                 trait TestTrait {
                     fn probe0(arg0: &Result<&str, &str>);

@@ -554,8 +554,8 @@ mod test {
             ]
             .into_iter()
             {
-                let item_trait = test_case.get_item_trait();
-                let spec = ProviderSpecification::from_trait(item_trait).expect(&format!(
+                let (attr, item_trait) = test_case.get_attr_and_item_trait();
+                let spec = ProviderSpecification::from_trait(attr, item_trait).expect(&format!(
                     "Failed to create specification from test trait '{}'",
                     test_case.description
                 ));

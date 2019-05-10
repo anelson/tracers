@@ -22,6 +22,7 @@ strum = "0.15"
 strum_macros = "0.15"
 serde_str = "0.1.0"
 cc = "1.0"
+darling = "0.9"
 
 tracers-core = { path = "../tracers-core", version = "0.1.0" }
 

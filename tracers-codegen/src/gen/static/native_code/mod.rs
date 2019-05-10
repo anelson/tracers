@@ -347,8 +347,8 @@ mod stap_tests {
         for test_trait in
             get_test_provider_traits(|t: &TestProviderTrait| t.expected_error.is_none())
         {
-            let provider =
-                ProviderSpecification::from_token_stream(test_trait.tokenstream.clone()).unwrap();
+            let (attr, item_trait) = test_trait.get_attr_and_item_trait();
+            let provider = ProviderSpecification::from_trait(attr, item_trait).unwrap();
 
             //TODO: Run process_provider on each one, then verify the correct cargo commands are
             //output, and then call get_processed_provider_info to confirm the results are

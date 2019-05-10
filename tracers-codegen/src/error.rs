@@ -4,6 +4,7 @@
 //! compiler error with the text of whatever the error message was.  That's how the proc macros
 //! communicate failure details back to the compiler at compile time.
 
+use darling::Error as DarlingError;
 use failure::{Error, Fail};
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -11,6 +12,7 @@ use quote::ToTokens;
 use std::fmt;
 use std::fmt::Display;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Fail)]
 pub enum TracersError {
@@ -24,6 +26,11 @@ pub enum TracersError {
         message: String,
         #[fail(cause)]
         syn_error: Error,
+    },
+
+    DarlingError {
+        message: String,
+        darling_error: Arc<Mutex<DarlingError>>,
     },
 
     InvalidCallExpression {
@@ -77,6 +84,7 @@ impl Display for TracersError {
         match self {
             TracersError::InvalidProvider { message, .. } => write!(f, "{}", message),
             TracersError::SynError { message, .. } => write!(f, "{}", message),
+            TracersError::DarlingError { message, .. } => write!(f, "{}", message),
             TracersError::InvalidCallExpression { message, .. } => write!(f, "{}", message),
             TracersError::OtherError { message, .. } => write!(f, "{}", message),
             TracersError::MissingCallInBuildRs => write!(f, "Build environment is incomplete; make sure you are calling `tracers_build::build()` in your `build.rs` build script"),
@@ -128,6 +136,15 @@ impl TracersError {
         TracersError::SynError {
             message,
             syn_error: e,
+        }
+    }
+
+    pub fn darling_error(e: DarlingError) -> TracersError {
+        let message = e.to_string();
+
+        TracersError::DarlingError {
+            message,
+            darling_error: Arc::new(Mutex::new(e)),
         }
     }
 
@@ -223,7 +240,21 @@ impl TracersError {
     /// was used to report the error.  For those error types that don't have a corresponding
     /// element, the call site of the macro will be used
     pub fn into_compiler_error(self) -> TokenStream {
-        self.into_syn_error().to_compile_error()
+        //Darling's error type already produces a token stream for errors with useful context into,
+        //so preserve that, otherwise build our own compiler error
+        if let TracersError::DarlingError { darling_error, .. } = self {
+            //Unwrap this error object from Arc and Mutex (it's not Send + Sync natively)
+            //and use the write_error() method to generate a helpful TokenStream
+            let lock =
+                Arc::try_unwrap(darling_error).expect("Somehow a lock is still held on this error");
+            let darling_error = lock
+                .into_inner()
+                .expect("The mutex can't possibly be locked");
+
+            darling_error.write_errors()
+        } else {
+            self.into_syn_error().to_compile_error()
+        }
     }
 
     fn new_syn_error<T: ToTokens, U: Display>(message: U, tokens: T) -> Error {
