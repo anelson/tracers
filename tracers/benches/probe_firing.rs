@@ -1,12 +1,9 @@
 #![deny(warnings)]
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion, Fun};
-use failure::{bail, format_err, Fallible, ResultExt};
+use failure::{bail, Fallible};
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
-use std::env;
-use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
-use std::process::{self, Child, Command};
+use std::process::Child;
 use tracers_macros::{init_provider, probe, tracer};
 
 static INT_ARG: usize = 324;
@@ -162,33 +159,39 @@ fn bench_fire_enabled(c: &mut Criterion) {
     }
 }
 
-fn is_root() -> bool {
-    env::var("USER")
-        .map(|user| user == "root")
-        .unwrap_or_default()
-}
-
-fn find_executable<P>(exe_name: P) -> Option<PathBuf>
-where
-    P: AsRef<Path>,
-{
-    env::var_os("PATH").and_then(|paths| {
-        env::split_paths(&paths)
-            .filter_map(|dir| {
-                let full_path = dir.join(&exe_name);
-                if full_path.is_file() {
-                    Some(full_path)
-                } else {
-                    None
-                }
-            })
-            .next()
-    })
-}
-
 /// Invokes an external command that will enable the tracing probes in this process.
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", any(static_stap_enabled, dynamic_stap_enabled)))]
 fn enable_tracing() -> Fallible<Child> {
+    use failure::{format_err, ResultExt};
+    use std::env;
+    use std::io::ErrorKind;
+    use std::path::{Path, PathBuf};
+    use std::process::{self, Command};
+
+    fn is_root() -> bool {
+        env::var("USER")
+            .map(|user| user == "root")
+            .unwrap_or_default()
+    }
+
+    fn find_executable<P>(exe_name: P) -> Option<PathBuf>
+    where
+        P: AsRef<Path>,
+    {
+        env::var_os("PATH").and_then(|paths| {
+            env::split_paths(&paths)
+                .filter_map(|dir| {
+                    let full_path = dir.join(&exe_name);
+                    if full_path.is_file() {
+                        Some(full_path)
+                    } else {
+                        None
+                    }
+                })
+                .next()
+        })
+    }
+
     //This should be done with `bpftrace`, however as of this writing (2019-05-10) this bug:
     //https://github.com/iovisor/bpftrace/issues/612 prevents USDT probes using semaphore from
     //functioning properly.  Thankfully the older `funccount` utility in the `bcc` toolkit does
@@ -202,7 +205,7 @@ fn enable_tracing() -> Fallible<Child> {
 
     let provider_info = init_provider!(ProbeBenchmarks).expect("Provider init failed");
 
-    if !provider_info.contains("static_stap") {
+    if !provider_info.contains("static_stap") && !provider_info.contains("dynamic_stap") {
         bail!("Don't know how to enable {}", provider_info);
     }
 
@@ -233,6 +236,14 @@ fn enable_tracing() -> Fallible<Child> {
     }?;
 
     Ok(trace)
+}
+
+#[cfg(all(
+    target_os = "linux",
+    not(any(static_stap_enabled, dynamic_stap_enabled))
+))]
+fn enable_tracing() -> Fallible<Child> {
+    bail!("No supported tracing implementations are enabled")
 }
 
 #[cfg(not(target_os = "linux"))]
