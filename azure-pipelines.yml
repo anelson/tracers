@@ -52,10 +52,10 @@ jobs:
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
       - script: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD \
-          echo "deb https://repo.iovisor.org/apt/$(lsb_release -cs) $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/iovisor.list \
-          sudo apt-get update \
-          sudo apt-get install build-essential m4  \
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 4052245BD4284CDD
+          echo "deb https://repo.iovisor.org/apt/$(lsb_release -cs) $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/iovisor.list
+          sudo apt-get update
+          sudo apt-get install build-essential m4
           sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
         displayName: install Ubuntu dependencies
         condition: eq( variables['Agent.OS'], 'Linux' )
@@ -72,14 +72,15 @@ jobs:
           TRACERS_EXPECTED_DYNAMIC_IMPL=dyn_stap \
           TRACERS_EXPECTED_PROVIDER=test_probes::dynamic/dyn_stap::0.1.0 \
           scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing -vv
-          cargo bench --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing -vv
+          cargo bench --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing --no-run
+          sudo cargo bench --manifest-path tracers/Cargo.toml --no-default-features --features=dynamic-tracing
         displayName: Cargo test dynamic SystemTap implementation (Linux)
         condition: eq( variables['Agent.OS'], 'Linux' )
 
       - script: |
           TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
           TRACERS_EXPECTED_PROVIDER=test_probes::static/static_noop::0.1.0 \
-          scripts/test.sh --manifest-path tracers/Cargo.toml -vv \
+          scripts/test.sh --manifest-path tracers/Cargo.toml -vv
           cargo bench --manifest-path tracers/Cargo.toml
         displayName: Cargo test default Static NoOp implementation (non-Windows)
         condition: ne( variables['Agent.OS'], 'Windows_NT' )
@@ -87,7 +88,7 @@ jobs:
       - script: |
           TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
           TRACERS_EXPECTED_PROVIDER=test_probes::disabled::0.1.0 \
-          scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features -vv \
+          scripts/test.sh --manifest-path tracers/Cargo.toml --no-default-features -vv
           cargo bench --manifest-path tracers/Cargo.toml --no-default-features
         displayName: Cargo test tracing disabled (non-Windows)
         condition: ne( variables['Agent.OS'], 'Windows_NT' )
@@ -96,7 +97,9 @@ jobs:
           TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
           TRACERS_EXPECTED_PROVIDER=test_probes::static/static_stap::0.1.0 \
           scripts/test.sh --manifest-path tracers/Cargo.toml --features=force-static-stap -vv
-          cargo bench --manifest-path tracers/Cargo.toml --features=force-static-stap -vv
+          cargo bench --manifest-path tracers/Cargo.toml --features=force-static-stap --no-run
+          # Must run as root in order to enable probes
+          sudo cargo bench --manifest-path tracers/Cargo.toml --features=force-static-stap
         displayName: Cargo test Static Stap implementation (Linux)
         condition: eq( variables['Agent.OS'], 'Linux' )
 
