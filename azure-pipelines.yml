@@ -60,11 +60,11 @@ jobs:
         displayName: install Ubuntu dependencies
         condition: eq( variables['Agent.OS'], 'Linux' )
 
-      - script: scripts/build.sh --release -vv
+      - script: scripts/build.sh --release --all --features binaries -vv
         displayName: Cargo build (non-Windows)
         condition: ne( variables['Agent.OS'], 'Windows_NT' )
 
-      - script: scripts\build.bat --release -vv
+      - script: scripts\build.bat --release --all --features binaries -vv
         displayName: Cargo build (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
