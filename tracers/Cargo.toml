@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
+autobenches = false
 
 # This is a hack.  Or maybe a workaround for a bug.
 #
@@ -54,6 +55,10 @@ name = "profile_target"
 path = "src/bin/profile_target.rs"
 required-features = [ "binaries" ]
 
+[[bench]]
+name = "probe_firing"
+harness = false
+
 [dependencies]
 once_cell = { version = "0.1.8", optional = true }
 tracers-core = { path = "../tracers-core", version = "0.1.0", optional = true }
@@ -74,6 +79,3 @@ criterion = "0.2"
 failure = "0.1"
 nix = "0.13"
 
-[[bench]]
-name = "probe_firing"
-harness = false
