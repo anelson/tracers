@@ -187,6 +187,7 @@ where
 }
 
 /// Invokes an external command that will enable the tracing probes in this process.
+#[cfg(target_os = "linux")]
 fn enable_tracing() -> Fallible<Child> {
     //This should be done with `bpftrace`, however as of this writing (2019-05-10) this bug:
     //https://github.com/iovisor/bpftrace/issues/612 prevents USDT probes using semaphore from
@@ -232,6 +233,11 @@ fn enable_tracing() -> Fallible<Child> {
     }?;
 
     Ok(trace)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn enable_tracing() -> Fallible<Child> {
+    bail!("Enabling probes on non-Linux targets is not yet supported")
 }
 
 /// Disables tracing previously enabled by invoking `funccount`.  When this function returns the
