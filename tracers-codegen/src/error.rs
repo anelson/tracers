@@ -139,6 +139,16 @@ impl TracersError {
         }
     }
 
+    /// When we need to raise an error that is attached to a `syn` type (meaning the span of the
+    /// error will correctly be associated with that type), this method is used.  There is no
+    /// actual `syn` error, we're just reporting a logic error of our own while processing some
+    /// `syn` types.
+    pub fn syn_like_error<T: ToTokens, U: Display>(message: U, tokens: T) -> TracersError {
+        let message = message.to_string();
+
+        Self::syn_error(&message, syn::Error::new_spanned(tokens, &message))
+    }
+
     pub fn darling_error(e: DarlingError) -> TracersError {
         let message = e.to_string();
 

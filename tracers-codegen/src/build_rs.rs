@@ -112,12 +112,16 @@ impl FeatureFlags {
 /// tracing implementation they should use.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub(crate) struct BuildInfo {
+    pub package_name: String,
     pub implementation: TracingImplementation,
 }
 
 impl BuildInfo {
-    pub fn new(implementation: TracingImplementation) -> BuildInfo {
-        BuildInfo { implementation }
+    pub fn new(package_name: String, implementation: TracingImplementation) -> BuildInfo {
+        BuildInfo {
+            package_name,
+            implementation,
+        }
     }
 
     pub fn load() -> TracersResult<BuildInfo> {
@@ -300,7 +304,7 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
             //This decision needs to be saved to the OUT_DIR somewhere, so that all of our tests,
             //examples, binaries, and benchmarks which use the proc macros will be able to generate
             //the correct runtime tracing code to match the implementation we've chosen here
-            let build_info = BuildInfo::new(implementation);
+            let build_info = BuildInfo::new(env::var("CARGO_PKG_NAME").expect("CARGO_PKG_NAME"), implementation);
             match build_info.save() {
                 Ok(build_info_path) => {
                     //The above statements set compile-time features to the compiler knows which modules to

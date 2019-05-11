@@ -555,12 +555,14 @@ mod test {
             .into_iter()
             {
                 let (attr, item_trait) = test_case.get_attr_and_item_trait();
-                let spec = ProviderSpecification::from_trait(attr, item_trait).expect(&format!(
-                    "Failed to create specification from test trait '{}'",
-                    test_case.description
-                ));
+                let spec =
+                    ProviderSpecification::from_trait(testdata::TEST_CRATE_NAME, attr, item_trait)
+                        .expect(&format!(
+                            "Failed to create specification from test trait '{}'",
+                            test_case.description
+                        ));
 
-                let build_info = BuildInfo::new(implementation);
+                let build_info = BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
                 let generator = ProviderTraitGenerator::new(&build_info, spec);
                 generator.generate().expect(&format!(
                     "Failed to generate test trait '{}'",

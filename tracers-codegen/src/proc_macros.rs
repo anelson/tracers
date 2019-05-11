@@ -60,10 +60,8 @@ pub fn init_provider_impl(tokens: TokenStream) -> TracersResult<TokenStream> {
 /// more testable
 pub fn tracer_impl(attr_tokens: TokenStream, tokens: TokenStream) -> TracersResult<TokenStream> {
     gen::code_generator()?.handle_provider_trait(ProviderSpecification::from_token_stream(
+        &std::env::var("CARGO_PKG_NAME").expect("CARGO_PKG_NAME"),
         TracerAttributeArgs::from_token_stream(attr_tokens)?,
         tokens,
     )?)
 }
-
-#[cfg(test)]
-mod test {}

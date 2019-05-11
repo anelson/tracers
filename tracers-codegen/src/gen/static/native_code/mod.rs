@@ -122,7 +122,7 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, 
             let dependencies = deps::get_dependencies(&file);
 
             //Scan the AST for provider traits
-            let providers = spec::find_providers(&file);
+            let providers = spec::find_providers(&build_info.package_name, &file);
 
             Ok(ProcessedFile {
                 dependencies,
@@ -267,7 +267,7 @@ mod stap_tests {
         // produce no debug output for crates that are valid, but for crates with missing dependencies the
         // missing dependency error info should be output again
         for implementation in [TracingImplementation::StaticStap].iter() {
-            let build_info = BuildInfo::new((*implementation).clone());
+            let build_info = BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
             let temp_dir = tempfile::tempdir().unwrap();
             let out_dir = temp_dir.path().join("out");
 
@@ -348,13 +348,15 @@ mod stap_tests {
             get_test_provider_traits(|t: &TestProviderTrait| t.expected_error.is_none())
         {
             let (attr, item_trait) = test_trait.get_attr_and_item_trait();
-            let provider = ProviderSpecification::from_trait(attr, item_trait).unwrap();
+            let provider =
+                ProviderSpecification::from_trait(testdata::TEST_CRATE_NAME, attr, item_trait)
+                    .unwrap();
 
             //TODO: Run process_provider on each one, then verify the correct cargo commands are
             //output, and then call get_processed_provider_info to confirm the results are
             //persisted to the cache
             for implementation in [TracingImplementation::StaticStap].iter() {
-                let build_info = BuildInfo::new((*implementation).clone());
+                let build_info = BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
                 let temp_dir = tempfile::tempdir().unwrap();
                 let out_dir = temp_dir.path().join("out");
                 let guard = testdata::with_env_vars(vec![
