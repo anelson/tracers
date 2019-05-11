@@ -1,4 +1,4 @@
-extern crate tracers;
+#![deny(warnings)]
 
 use tracers_macros::probe;
 use tracers_macros::tracer;
@@ -7,6 +7,7 @@ use tracers_macros::tracer;
 trait SimpleTestProbes {
     fn probe0();
     fn probe1(foo: &str);
+    fn unused_probe();
 }
 
 fn main() {

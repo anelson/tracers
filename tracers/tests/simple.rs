@@ -1,23 +1,23 @@
+#![deny(warnings)]
 use tracers_macros::{init_provider, probe, tracer};
 
-extern crate tracers_macros;
-
 #[tracer]
-pub trait TestProbes {
+trait TestProbes {
     fn probe0();
     fn probe1(foo: &str);
     fn probe2(foo: &str, bar: usize);
+    fn unused_probe();
 }
 
 #[test]
-pub fn probe_firing() {
+fn probe_firing() {
     probe!(TestProbes::probe0());
     probe!(TestProbes::probe1("foo bar baz"));
     probe!(TestProbes::probe2("foo bar baz", 5));
 }
 
 #[test]
-pub fn expected_impl() {
+fn expected_impl() {
     //This very simple test checks the TRACERS_EXPECTED_PROVIDER env var, and if set, asserts that
     //the tracing implementation compiled into this library matches the expected one.  In
     //practice this is only used by the CI builds to verify that the compile-time magic always

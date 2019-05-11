@@ -1,6 +1,7 @@
 //! it's also possible to declare a provider struct in one module and fire the probes from another.
 //! the only requirement is that the visibility of the provider struct be such that the struct type
 //! is accessible from the code that is firing the probe
+#![deny(warnings)]
 use tracers_macros::probe;
 
 mod submodule_with_struct {
