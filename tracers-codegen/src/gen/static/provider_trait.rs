@@ -170,15 +170,20 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
         // These imports aren't always used but it's easier to always import than to detect when
         // probe arg types need `libc`
-        let mod_imports = quote! {
-            #[allow(unused_imports)]
-            use ::tracers::runtime::libc;
+        let mod_imports = if self.build_info.implementation.is_enabled() {
+            quote! {
+                #[allow(unused_imports)]
+                use ::tracers::runtime::libc;
+            }
+        } else {
+            //When tracing is completely disabled then there will be no `tracers` dependency to use
+            quote! {}
         };
 
         match self.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => {
-                //When tracing is disabled we can't assume the `tracers::runtime` is available so
-                //there is no implementation module in that case
+                //When tracing is disabled we can't assume the `tracers::runtime` is available to
+                //even the code in the `noop` version won't work.
                 quote! {}
             }
             TracingTarget::NoOp => {

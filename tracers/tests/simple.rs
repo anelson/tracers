@@ -6,7 +6,6 @@ trait TestProbes {
     fn probe0();
     fn probe1(foo: &str);
     fn probe2(foo: &str, bar: usize);
-    fn unused_probe();
 }
 
 #[test]

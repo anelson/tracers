@@ -22,15 +22,16 @@ pub(crate) fn generate_probe_call(
         ProbeCallSpecification::FireOnly(details) => {
             match build_info.implementation.tracing_target() {
                 TracingTarget::Disabled => {
-                    //When tracing is disabled there is no generated implementation.  Just touch
-                    //each of the args to avoid a warning about unused variables
-                    let vars = details.call.args.iter().map(|arg| {
-                        quote! { let _ = #arg; }
-                    });
-                    let span = details.call.span();
-                    Ok(quote_spanned! {span=>
+                    //When tracing is disabled there is no actual implementation, and each of the
+                    //probe methods on the struct are empty.  However we still need to call them,
+                    //because otherwise the compiler will warn about an unused method.  Since the
+                    //probe methods are deliberately marked as `deprecated`, we'll also have to
+                    //suppress the warning about calling a deprecated function
+                    let call = details.call;
+                    Ok(quote! {
                         if false {
-                            #(#vars)*
+                            #[allow(deprecated)]
+                            #call
                         }
                     })
                 }

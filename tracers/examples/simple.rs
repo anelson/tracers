@@ -7,7 +7,6 @@ use tracers_macros::tracer;
 trait SimpleTestProbes {
     fn probe0();
     fn probe1(foo: &str);
-    fn unused_probe();
 }
 
 fn main() {
