@@ -105,7 +105,7 @@ jobs:
 
       - script: |
           echo ##vso[task.setvariable variable=TRACERS_EXPECTED_DYNAMIC_IMPL;]DISABLED
-          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]test_probes::static/static_noop::0.1.0
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]tracers_test_probes::static/static_noop::0.1.0
         displayName: Set env vars to test default Static NoOp implementation (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
@@ -117,7 +117,7 @@ jobs:
 
       - script: |
           echo ##vso[task.setvariable variable=TRACERS_EXPECTED_DYNAMIC_IMPL;]DISABLED
-          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]test_probes::disabled::0.1.0
+          echo ##vso[task.setvariable variable=TRACERS_EXPECTED_PROVIDER;]tracers_test_probes::disabled::0.1.0
         displayName: Set env vars to  test tracing disabled (Windows)
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
 
