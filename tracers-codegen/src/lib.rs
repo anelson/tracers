@@ -51,6 +51,8 @@ pub(crate) enum TracingTarget {
     Disabled,
     #[strum(serialize = "stap")]
     Stap,
+    #[strum(serialize = "lttng")]
+    Lttng,
     #[strum(serialize = "noop")]
     NoOp,
 }
@@ -70,6 +72,9 @@ pub(crate) enum TracingImplementation {
 
     #[strum(serialize = "static_stap", props(type = "static", target = "stap"))]
     StaticStap,
+
+    #[strum(serialize = "static_lttng", props(type = "static", target = "lttng"))]
+    StaticLttng,
 
     #[strum(serialize = "static_noop", props(type = "static", target = "noop"))]
     StaticNoOp,

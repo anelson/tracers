@@ -89,7 +89,7 @@ pub(super) fn generate_native_code(
             )
             .unwrap();
         }
-        TracingTarget::Stap => {
+        TracingTarget::Stap | TracingTarget::Lttng => {
             for target in targets.into_iter() {
                 let target_path = manifest_dir.join(&target);
                 writeln!(stdout, "Processing target {}", target_path.display()).unwrap();
@@ -249,6 +249,7 @@ fn create_native_code_generator(
         TracingTarget::Stap => Box::new(target::stap::StapNativeCodeGenerator::new(
             out_dir, provider,
         )),
+        TracingTarget::Lttng => unimplemented!(),
     }
 }
 
@@ -356,7 +357,8 @@ mod stap_tests {
             //output, and then call get_processed_provider_info to confirm the results are
             //persisted to the cache
             for implementation in [TracingImplementation::StaticStap].iter() {
-                let build_info = BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
+                let build_info =
+                    BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
                 let temp_dir = tempfile::tempdir().unwrap();
                 let out_dir = temp_dir.path().join("out");
                 let guard = testdata::with_env_vars(vec![

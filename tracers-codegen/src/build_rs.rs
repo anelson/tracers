@@ -23,6 +23,7 @@ struct FeatureFlags {
     force_dyn_stap: bool,
     force_dyn_noop: bool,
     force_static_stap: bool,
+    force_static_lttng: bool,
     force_static_noop: bool,
 }
 
@@ -37,6 +38,7 @@ impl FeatureFlags {
             Self::is_feature_enabled("force-dyn-stap"),
             Self::is_feature_enabled("force-dyn-noop"),
             Self::is_feature_enabled("force-static-stap"),
+            Self::is_feature_enabled("force-static-lttng"),
             Self::is_feature_enabled("force-static-noop"),
         )
     }
@@ -48,6 +50,7 @@ impl FeatureFlags {
         force_dyn_stap: bool,
         force_dyn_noop: bool,
         force_static_stap: bool,
+        force_static_lttng: bool,
         force_static_noop: bool,
     ) -> TracersResult<FeatureFlags> {
         if enable_dynamic_tracing && enable_static_tracing {
@@ -62,12 +65,17 @@ impl FeatureFlags {
             return Err(TracersError::code_generation_error("The features `force-static-stap` and `force_static_noop` are mutually exclusive; please choose one"));
         }
 
+        if force_static_lttng && force_static_noop {
+            return Err(TracersError::code_generation_error("The features `force-static-lttng` and `force_static_noop` are mutually exclusive; please choose one"));
+        }
+
         Ok(FeatureFlags {
             enable_dynamic_tracing,
             enable_static_tracing,
             force_dyn_stap,
             force_dyn_noop,
             force_static_stap,
+            force_static_lttng,
             force_static_noop,
         })
     }
@@ -97,6 +105,11 @@ impl FeatureFlags {
     pub fn force_static_stap(&self) -> bool {
         //Should the staticamic stap be required on pain of build failure?
         self.force_static_stap
+    }
+
+    pub fn force_static_lttng(&self) -> bool {
+        //Should the static lttng be required on pain of build failure?
+        self.force_static_lttng
     }
 
     fn is_feature_enabled(name: &str) -> bool {
@@ -365,6 +378,8 @@ fn select_implementation(features: &FeatureFlags) -> TracersResult<TracingImplem
         //TODO: Be a bit smarter about this
         if features.force_static_stap() {
             Ok(TracingImplementation::StaticStap)
+        } else if features.force_static_lttng() {
+            Ok(TracingImplementation::StaticLttng)
         } else {
             Ok(TracingImplementation::StaticNoOp)
         }

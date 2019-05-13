@@ -130,7 +130,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
         let implementation = match self.build_info.implementation.tracing_target() {
             TracingTarget::Disabled => TracingType::Disabled.as_ref().to_string(),
-            TracingTarget::NoOp | TracingTarget::Stap => format!(
+            TracingTarget::NoOp | TracingTarget::Stap | TracingTarget::Lttng => format!(
                 "{}/{}",
                 self.build_info.implementation.tracing_type().as_ref(),
                 self.build_info.implementation.as_ref()
@@ -206,7 +206,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                     }
                 }
             }
-            TracingTarget::Stap => {
+            TracingTarget::Stap | TracingTarget::Lttng => {
                 //The implementations which depend upon a generated C++ wrapper library work a bit
                 //differently than `NoOp`.  The implementation mod will declare `extern` functions
                 //for each wrapper function, and also `extern static` variables for each probe's
@@ -336,7 +336,7 @@ impl ProbeGenerator {
                     #(#args)*
                 })
             }
-            target @ TracingTarget::NoOp | target @ TracingTarget::Stap => {
+            target @ TracingTarget::NoOp | target @ TracingTarget::Stap | target @ TracingTarget::Lttng => {
                 //This is a `real` impl with a C wrapper underneath (or in the case of `noop` a
                 //Rust function with the same signature as a C wrapper).
                 //The implementation is in the impl mod, with each probe as a function named the

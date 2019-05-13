@@ -35,7 +35,9 @@ pub(crate) fn generate_probe_call(
                         }
                     })
                 }
-                target @ TracingTarget::NoOp | target @ TracingTarget::Stap => {
+                target @ TracingTarget::NoOp
+                | target @ TracingTarget::Stap
+                | target @ TracingTarget::Lttng => {
                     //There is a low-level wrapper function with the same name as the probe, in the
                     //impl module for the trait.
                     //Need to rewrite the path to the provider trait, replacing the trait with the

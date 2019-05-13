@@ -40,6 +40,8 @@ force-static-noop = ["static-tracing"]
 
 force-static-stap = ["static-tracing"]
 
+force-static-lttng = ["static-tracing"]
+
 # An optional feature will build binaries which are used to interact with the probing framework.  These are only useful
 # as part of our CI tests, or when troubleshooting unexpected behavior with the probes.  If you are using this crate as a dependency,
 # you should not activate this feature as it will add `tracers-macros` to the runtime-dependencies of `tracers`
