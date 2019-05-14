@@ -61,6 +61,12 @@ impl TracingTarget {
     pub fn is_enabled(&self) -> bool {
         *self != TracingTarget::Disabled && *self != TracingTarget::NoOp
     }
+
+    pub fn has_native_enabled_func(&self) -> bool {
+        //Thus far only LTTng provides a native version of a function to call to test for
+        //enablement.  All others use a semaphore variable that can be queried directly
+        *self == TracingTarget::Lttng
+    }
 }
 
 /// All possible tracing implementations.  Every supported linear combination of `TracingType` and

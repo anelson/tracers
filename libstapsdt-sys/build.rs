@@ -37,9 +37,9 @@ fn main() {
             if fail_on_error {
                 panic!("libstapsdt-sys build failed: {}", e);
             } else {
-                println!("cargo:WARNING=libstapsdt-sys build failed: {}", e);
+                println!("cargo:warning=libstapsdt-sys build failed: {}", e);
                 println!(
-                    "cargo:WARNING=the libstapsdt-sys bindings will not be included in the crate"
+                    "cargo:warning=the libstapsdt-sys bindings will not be included in the crate"
                 );
             }
         }

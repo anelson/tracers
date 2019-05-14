@@ -158,7 +158,7 @@ fn process_file(
                     // successful either
                     Err(_) => {
                         writeln!(stdout,
-                             "cargo:WARNING=Unable to resove dependency {:?} in {}; any tracing providers it may contain will not be processed",
+                             "cargo:warning=Unable to resove dependency {:?} in {}; any tracing providers it may contain will not be processed",
                              dependency,
                              file.display()
                              ).unwrap();
@@ -179,14 +179,14 @@ fn process_file(
             //will handle reporting any errors
             writeln!(
                 stdout,
-                "cargo:WARNING=Error processing '{}': {}",
+                "cargo:warning=Error processing '{}': {}",
                 file.display(),
                 e
             )
             .unwrap();
             writeln!(
                 stdout,
-                "cargo:WARNING=Code generation failed for '{}'.  Tracing may not be available.",
+                "cargo:warning=Code generation failed for '{}'.  Tracing may not be available.",
                 file.display()
             )
             .unwrap();
@@ -233,13 +233,13 @@ fn process_provider(
         Err(e) => {
             writeln!(
                 stdout,
-                "cargo:WARNING=Error generating tracing code for '{}': {}",
+                "cargo:warning=Error generating tracing code for '{}': {}",
                 ident, e
             )
             .unwrap();
             writeln!(
                 stdout,
-                "cargo:WARNING=Tracing may not be available for {}",
+                "cargo:warning=Tracing may not be available for {}",
                 ident
             )
             .unwrap();

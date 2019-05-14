@@ -44,8 +44,8 @@ fn main() {
             if fail_on_error {
                 panic!("libelf-sys build failed: {}", e);
             } else {
-                println!("cargo:WARNING=libelf-sys build failed: {}", e);
-                println!("cargo:WARNING=the libelf-sys bindings will not be included in the crate");
+                println!("cargo:warning=libelf-sys build failed: {}", e);
+                println!("cargo:warning=the libelf-sys bindings will not be included in the crate");
             }
         }
     }

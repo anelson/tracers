@@ -57,20 +57,24 @@ pub(crate) fn generate_probe_call(
 
                     let probe = &details.probe;
 
-                    let conditional_expression = if target == TracingTarget::NoOp {
-                        //No-op always hard-codes the condition to `false`, which the compiler will
-                        //optimize away to nothing
-                        quote! { false }
-                    } else {
-                        //For a real impl the conditional is the semaphore for the probe
-                        let semaphore_name = syn::Ident::new(
-                            &format!("{}_semaphore", &details.probe.ident).to_uppercase(),
-                            details.probe.span(),
-                        );
+                    let conditional_expression = match target {
+                        TracingTarget::NoOp => {
+                            //No-op always hard-codes the condition to `false`, which the compiler will
+                            //optimize away to nothing
+                            quote! { false }
+                        }
+                        TracingTarget::Stap | TracingTarget::Lttng => {
+                            //All of the "real" implementations have a `..._enabled` function
+                            let func_name = syn::Ident::new(
+                                &format!("{}_enabled", &details.probe.ident),
+                                details.probe.span(),
+                            );
 
-                        //TODO: if the `unlikely` intrinsic is ever stabilized, use that here so
-                        //the optimizer knows this will be false most of the time
-                        quote! { unsafe { std::ptr::read_volatile(&#mod_path::#semaphore_name as *const u16) != 0 } }
+                            //TODO: if the `unlikely` intrinsic is ever stabilized, use that here so
+                            //the optimizer knows this will be false most of the time
+                            quote! { unsafe { #mod_path::#func_name() } }
+                        }
+                        _ => unreachable!(),
                     };
 
                     //For each argument, which is some arbitrary Rust expression, generate a

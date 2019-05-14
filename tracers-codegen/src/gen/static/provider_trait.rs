@@ -164,6 +164,10 @@ impl<'bi> ProviderTraitGenerator<'bi> {
             .probes
             .iter()
             .map(|p| p.generate_native_declaration(&self));
+        let is_enabled_funcs = self
+            .probes
+            .iter()
+            .map(|p| p.generate_rust_is_enabled(&self));
         let wrapper_funcs = self
             .probes
             .iter()
@@ -221,6 +225,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                     .processed_provider
                     .as_ref()
                     .expect("stap requires successful codegen");
+
                 //There may or may not be a static wrapper lib.  If there is, add it as a `#[link`
                 //attribute
                 let lib_name = processed_provider
@@ -246,6 +251,8 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                         #mod_imports
 
                         #(#wrapper_funcs)*
+
+                        #(#is_enabled_funcs)*
 
                         #link_attr
                         extern "C" {
@@ -404,9 +411,22 @@ impl ProbeGenerator {
     /// implementation.
     ///
     /// For real implementations (anything but `StaticNoOp` and `Disabled`), generates an `extern
-    /// "C"` block which declares the native wrapper functions, which will be linked in a static
+    /// "C"` declaration which declares the native wrapper function, which will be linked in a static
     /// library generated already at build time in `build.rs`.
     fn generate_native_declaration(&self, provider: &ProviderTraitGenerator) -> TokenStream {
+        let func = self.generate_native_probe_func(provider);
+        let is_enabled = self.generate_native_is_enabled(provider);
+
+        quote! {
+            #func
+
+            #is_enabled
+        }
+    }
+
+    /// Generates just the "native" (in the `Disabled` or `NoOp` case it's actually just an empty
+    /// Rust function) function that fires the probe
+    fn generate_native_probe_func(&self, provider: &ProviderTraitGenerator) -> TokenStream {
         //Because of limitations in the tracing system, the name of the provider needs to
         //be fairly simple (no punctuation for example).  So we use the name of the trait,
         //converted to snake case.  Thus it's theoretically possible for there to be name
@@ -415,19 +435,12 @@ impl ProbeGenerator {
         //collision they will be disambiguated by the different implementation.  And, if
         //two crates happen to have the same exact provider trait declaration, then they'll
         //be treated as the same for tracing purposes.
-        //
-        //The only exception is the semaphore, because the C tracing macros make
-        //assumptions about its name based on the provider and probe names.  Fortunately
-        //even if there is a collission here, it won't result in any UB; it just means a
-        //probe might think it's enabled when it's not, leading to a slightly inefficient
-        //call into the wrapper function which will end up being a no-op
         assert!(provider.build_info.implementation != TracingImplementation::Disabled);
         let is_real = provider
             .build_info
             .implementation
             .tracing_target()
             .is_enabled();
-        let provider_name = provider.spec.name();
         let provider_name_with_hash = provider.spec.name_with_hash();
 
         let native_func_name = format!("{}_{}", provider_name_with_hash, self.spec.name);
@@ -437,18 +450,6 @@ impl ProbeGenerator {
             quote! {}
         };
         let func_ident = &self.spec.method_name;
-
-        let native_semaphore_name = format!("{}_{}_semaphore", provider_name, self.spec.name);
-        let semaphore_name = format!("{}_semaphore", self.spec.name).to_uppercase();
-        let semaphore_ident = syn::Ident::new(&semaphore_name, self.spec.original_method.span());
-        let semaphore_attrs = if is_real {
-            quote! {
-               #[link_name = #native_semaphore_name]
-               #[link_section = ".probes"]
-            }
-        } else {
-            quote! {}
-        };
 
         let args = self.spec.args.iter().map(|arg| {
             let arg_name = arg.ident();
@@ -487,18 +488,107 @@ impl ProbeGenerator {
             }
         };
 
-        let semaphore_initializer = if is_real {
-            quote! { ; }
-        } else {
-            quote! { = 0; }
-        };
         let span = self.spec.original_method.span();
         quote_spanned! {span=>
             #func_attrs
             pub fn  #func_ident( #(#args),* ) #func_body
+        }
+    }
 
-            #semaphore_attrs
-            pub static #semaphore_ident: u16 #semaphore_initializer
+    /// Generates something which indicates if the probe is enabled or not.  In some cases it's a
+    /// static `u16`, in others it's a function that returns a bool.
+    ///
+    /// Note that this will be _either_ a native C++ function that returns a bool, or an extern
+    /// static C++ semaphore variable.  If it's the latter, `generate_rust_is_enabled` will also
+    /// generate a corresponding Rust wrapper function around that variable
+    fn generate_native_is_enabled(&self, provider: &ProviderTraitGenerator) -> TokenStream {
+        //The only exception to the `providername-providerhash` naming convention is the semaphore,
+        //because the C tracing macros make assumptions about its name based on the provider and
+        //probe names.  Fortunately even if there is a collission here, it won't result in any UB;
+        //it just means a probe might think it's enabled when it's not, leading to a slightly
+        //inefficient call into the wrapper function which will end up being a no-op
+        assert!(provider.build_info.implementation != TracingImplementation::Disabled);
+        let is_real = provider
+            .build_info
+            .implementation
+            .tracing_target()
+            .is_enabled();
+        let provider_name = provider.spec.name();
+
+        let native_func_name = format!("{}_{}_enabled", provider_name, self.spec.name);
+        let func_name = format!("{}_enabled", self.spec.name);
+        let func_ident = syn::Ident::new(&func_name, self.spec.original_method.span());
+
+        match provider.build_info.implementation.tracing_target() {
+            TracingTarget::Disabled | TracingTarget::Stap | TracingTarget::NoOp => {
+                let native_semaphore_name =
+                    format!("{}_{}_semaphore", provider_name, self.spec.name);
+                let semaphore_name = format!("{}_semaphore", self.spec.name).to_uppercase();
+                let semaphore_ident =
+                    syn::Ident::new(&semaphore_name, self.spec.original_method.span());
+                let semaphore_attrs = if is_real {
+                    quote! {
+                       #[link_name = #native_semaphore_name]
+                       #[link_section = ".probes"]
+                    }
+                } else {
+                    quote! {}
+                };
+
+                let semaphore_initializer = if is_real {
+                    quote! { ; }
+                } else {
+                    quote! { = 0; }
+                };
+                let span = self.spec.original_method.span();
+                quote_spanned! {span=>
+                    #semaphore_attrs
+                    pub static #semaphore_ident: u16 #semaphore_initializer
+                }
+            }
+            TracingTarget::Lttng => {
+                //LTTng does not provide a simple semaphore flag, because it uses some fancy RCU
+                //trickery that can't be expressed as an external variable declaration in Rust.
+                //Instead generate a declaration for the native wrapper function which exposes the
+                //is_enabled flag
+
+                quote! {
+                    #[link_name = #native_func_name]
+                    pub fn #func_ident() -> bool;
+                }
+            }
+        }
+    }
+
+    /// Some tracing implementations will use a C++ native function that tests if a probe is
+    /// enabled or not.  Others use a static variable that the Rust code can query directly.  In
+    /// that latter case, we need to generate a Rust function in the impl mod to query this
+    /// variable.
+    ///
+    /// Only the LTTng tracing target right now provides a native `_enabled` func, all others need
+    /// this Rust version
+    fn generate_rust_is_enabled(&self, provider: &ProviderTraitGenerator) -> TokenStream {
+        if provider
+            .build_info
+            .implementation
+            .tracing_target()
+            .has_native_enabled_func()
+        {
+            quote! {}
+        } else {
+            let func_name = format!("{}_enabled", self.spec.name);
+            let func_ident = syn::Ident::new(&func_name, self.spec.original_method.span());
+
+            let semaphore_name = format!("{}_semaphore", self.spec.name).to_uppercase();
+            let semaphore_ident =
+                syn::Ident::new(&semaphore_name, self.spec.original_method.span());
+
+            quote! {
+                #[inline(always)]
+                pub fn #func_ident() -> bool {
+                    unsafe { std::ptr::read_volatile(&#semaphore_ident) != 0 }
+                }
+            }
         }
     }
 

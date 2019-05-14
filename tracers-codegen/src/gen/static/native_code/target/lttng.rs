@@ -69,7 +69,7 @@ impl LttngUstLibInfo {
             &mut self
                 .link_paths
                 .into_iter()
-                .map(|p| NativeLib::SupportLibPath(p))
+                .map(NativeLib::SupportLibPath)
                 .collect::<Vec<NativeLib>>(),
         );
 
@@ -77,7 +77,7 @@ impl LttngUstLibInfo {
             &mut self
                 .libs
                 .into_iter()
-                .map(|l| NativeLib::DynamicSupportLib(l))
+                .map(NativeLib::DynamicSupportLib)
                 .collect::<Vec<NativeLib>>(),
         );
 
@@ -291,14 +291,19 @@ impl NativeCodeGenerator for LttngNativeCodeGenerator {
             Ok(output) => Ok(output),
         }?;
 
-        println!(
-            "{}",
-            String::from_utf8(output.stdout).expect("Expected valid UTF-8 output")
-        );
-        eprintln!(
-            "{}",
-            String::from_utf8(output.stderr).expect("Expected valid UTF-8 output")
-        );
+        //Echo the output to our stdout/stderr, with errors output as a warning
+        for line in String::from_utf8(output.stdout)
+            .expect("Expected valid UTF-8 output")
+            .lines()
+        {
+            println!("{}", line);
+        }
+        for line in String::from_utf8(output.stderr)
+            .expect("Expected valid UTF-8 output")
+            .lines()
+        {
+            eprintln!("cargo:warning={}", line);
+        }
 
         if !output.status.success() {
             return Err(TracersError::native_code_generation_error::<
@@ -306,7 +311,7 @@ impl NativeCodeGenerator for LttngNativeCodeGenerator {
                 failure::Error,
             >(
                 "Error generating provider code with `lttng-gen-tp`",
-                format_err!("lttng-gen-tp failed with exit code {}", output.status).into(),
+                format_err!("lttng-gen-tp failed with exit code {}", output.status),
             ));
         }
 
@@ -320,6 +325,7 @@ impl NativeCodeGenerator for LttngNativeCodeGenerator {
         let mut cc = cc::Build::new();
         cc.cpp(true)
             .cpp_link_stdlib(None) //The wrapper code doesn't use any of the C++ std lib
+            .cargo_metadata(false) //Don't instruct cargo to link this lib
             .static_flag(true)
             .out_dir(&lib_dir)
             .file(&code_path)
@@ -332,7 +338,7 @@ impl NativeCodeGenerator for LttngNativeCodeGenerator {
         }
 
         for (key, value) in lttng_ust_info.defines.iter() {
-            let opt_value = value.as_ref().map(|v| v.as_ref());
+            let opt_value = value.as_ref().map(std::convert::AsRef::as_ref);
             cc.define(&key, opt_value);
         }
 

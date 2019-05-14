@@ -31,7 +31,7 @@ extern "C" {
     }
 
     /* A C function which tests if  the {{spec.name()}} probe {{probe_spec.name}} is enabled */
-    int {{spec.name_with_hash()}}_{{probe_spec.name}}_enabled() {
+    bool {{spec.name()}}_{{probe_spec.name}}_enabled() {
 	return tracepoint_enabled(
 	    {{ spec.name() }},
 	    {{ probe_spec.name }}

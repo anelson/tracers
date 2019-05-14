@@ -79,6 +79,7 @@ impl NativeCodeGenerator for StapNativeCodeGenerator {
         cc::Build::new()
             .cpp(true)
             .cpp_link_stdlib(None) //The wrapper code doesn't use any of the C++ std lib
+            .cargo_metadata(false) //Don't instruct cargo to link this lib
             .static_flag(true)
             .out_dir(&lib_dir)
             .file(code_path)

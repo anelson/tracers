@@ -330,7 +330,7 @@ fn tracers_build_internal<OUT: Write>(out: &mut OUT, features: FeatureFlags) -> 
                     writeln!(out, "cargo:build-info-path={}", build_info_path.display()).unwrap();
                 }
                 Err(e) => {
-                    writeln!(out, "cargo:WARNING=Error saving build info file; some targets may fail to build.  Error details: {}", e).unwrap();
+                    writeln!(out, "cargo:warning=Error saving build info file; some targets may fail to build.  Error details: {}", e).unwrap();
                 }
             }
     })?;

@@ -39,9 +39,9 @@ fn main() {
             if fail_on_error {
                 panic!("tracers-dyn-stap build failed: {}", e);
             } else {
-                println!("cargo:WARNING=tracers-dyn-stap build failed: {}", e);
+                println!("cargo:warning=tracers-dyn-stap build failed: {}", e);
                 println!(
-                    "cargo:WARNING=the tracers-dyn-stap bindings will not be included in the crate"
+                    "cargo:warning=the tracers-dyn-stap bindings will not be included in the crate"
                 );
             }
         }
