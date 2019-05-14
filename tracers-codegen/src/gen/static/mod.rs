@@ -17,6 +17,7 @@
 //! The only reason the `dynamic` implementation exists is that I wrote it first, before I figured
 //! out how to make `static` work reliable.
 
+use super::NativeLib;
 use crate::build_rs::BuildInfo;
 use crate::gen::common;
 use crate::spec::ProbeCallSpecification;
@@ -63,7 +64,7 @@ impl CodeGenerator for StaticGenerator {
         out_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
-    ) {
+    ) -> Vec<NativeLib> {
         //Native code gen is only used for static, not for disabled
         if self.build_info.implementation.is_static() {
             native_code::generate_native_code(
@@ -73,7 +74,10 @@ impl CodeGenerator for StaticGenerator {
                 out_dir,
                 package_name,
                 targets,
-            );
+            )
+        } else {
+            //When disabled, there's by definition no native code generated and thus no libs
+            vec![]
         }
     }
 }

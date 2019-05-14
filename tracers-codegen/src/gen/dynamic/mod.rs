@@ -8,6 +8,7 @@
 //! does more work at compile time and fits much better in the SystemTap/DTrace/ETW style of
 //! tracing.  However, this remains in case a use for it emerges, perhaps on another platform with
 //! more intrinsic support for dynamic style tracing.
+use super::NativeLib;
 use crate::build_rs::BuildInfo;
 use crate::gen::common;
 use crate::spec::ProbeCallSpecification;
@@ -53,12 +54,14 @@ impl CodeGenerator for DynamicGenerator {
         _out_dir: &Path,
         _package_name: &str,
         _targets: Vec<PathBuf>,
-    ) {
+    ) -> Vec<NativeLib> {
         // The nice thing about this implementation is that no build-time code generation is
         // required
         let _ = writeln!(
             stdout,
             "dynamic generator doesn't require any build.rs code generation"
         );
+
+        vec![]
     }
 }

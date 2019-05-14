@@ -1,6 +1,7 @@
 //! Contains the native C++ code generator and the Rust bindings generator to support Linux
 //! SystemTap user-mode tracing
 use crate::gen::r#static::native_code::NativeCodeGenerator;
+use crate::gen::NativeLib;
 use crate::spec::ProviderSpecification;
 use crate::TracersError;
 use crate::TracersResult;
@@ -11,16 +12,16 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 #[derive(Template)]
-#[template(path = "provider_wrapper.c", escape = "none")]
-struct NativeProviderTemplate<'a> {
+#[template(path = "stap/provider_wrapper.cpp", escape = "none")]
+struct NativeProviderWrapperTemplate<'a> {
     spec: &'a ProviderSpecification,
 }
 
-impl<'a> NativeProviderTemplate<'a> {
+impl<'a> NativeProviderWrapperTemplate<'a> {
     fn from_provider_spec<'b: 'a>(
         provider: &'b ProviderSpecification,
-    ) -> NativeProviderTemplate<'a> {
-        NativeProviderTemplate { spec: provider }
+    ) -> NativeProviderWrapperTemplate<'a> {
+        NativeProviderWrapperTemplate { spec: provider }
     }
 }
 
@@ -39,8 +40,8 @@ impl StapNativeCodeGenerator {
 }
 
 impl NativeCodeGenerator for StapNativeCodeGenerator {
-    fn generate_native_lib(&self) -> TracersResult<PathBuf> {
-        let wrapper_code = NativeProviderTemplate::from_provider_spec(&self.provider)
+    fn generate_native_lib(&self) -> TracersResult<Vec<NativeLib>> {
+        let wrapper_code = NativeProviderWrapperTemplate::from_provider_spec(&self.provider)
             .render()
             .map_err(|e| {
                 TracersError::native_code_generation_error("Rendering native wrapper template", e)
@@ -94,7 +95,10 @@ impl NativeCodeGenerator for StapNativeCodeGenerator {
 
         println!("Compiled native wrapper library {}", lib_path.display());
 
-        Ok(lib_path)
+        Ok(vec![
+            NativeLib::StaticWrapperLib(lib_name),
+            NativeLib::StaticWrapperLibPath(lib_dir),
+        ])
     }
 
     fn out_dir(&self) -> &Path {

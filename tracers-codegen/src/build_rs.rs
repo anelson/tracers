@@ -5,6 +5,7 @@
 use crate::cargo;
 use crate::error::{TracersError, TracersResult};
 use crate::gen;
+use crate::gen::NativeLib;
 use crate::TracingImplementation;
 use failure::ResultExt;
 use serde::{Deserialize, Serialize};
@@ -396,13 +397,44 @@ fn generate_native_code(out: &mut dyn Write) -> TracersResult<()> {
     let targets = cargo::get_targets(&manifest_path, &package_name).context("get_targets")?;
     let out_path = &PathBuf::from(env::var("OUT_DIR").context("OUT_DIR")?);
 
-    gen::code_generator()?.generate_native_code(
+    let mut native_libs = gen::code_generator()?.generate_native_code(
         out,
         &Path::new(&manifest_path),
         &out_path,
         &package_name,
         targets,
     );
+
+    //There is usually some repetition when multiple providers are generated.  Filter that out for
+    //better build performance
+    native_libs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    native_libs.dedup();
+
+    //Scan through all of the native libs output and send the info to cargo as applicable
+    for native_lib in native_libs.into_iter() {
+        match native_lib {
+            NativeLib::StaticWrapperLib(_) => {
+                //This is the name of a generated native wrapper.  Ignore it here; the `tracers`
+                //attribute macro will use this to generate a `link` attribute at the actual call
+                //site
+            }
+            NativeLib::StaticWrapperLibPath(path) | NativeLib::SupportLibPath(path) => {
+                //This is the path to a directory where either the static wrapper or a support lib
+                //will be found.  Make sure cargo adds that to the library path
+                println!("cargo:rustc-link-search=native={}", path.display());
+            }
+            NativeLib::DynamicSupportLib(lib) => {
+                //This is a dynamically-linked support library which should be linked exactly once
+                //for the crate, to support any number of generated native wrappers
+                println!("cargo:rustc-link-lib=dylib={}", lib);
+            }
+            NativeLib::StaticSupportLib(lib) => {
+                //This is a statically-linked support library which should be linked exactly once
+                //for the crate, to support any number of generated native wrappers
+                println!("cargo:rustc-link-lib=static={}", lib);
+            }
+        };
+    }
 
     Ok(())
 }
@@ -441,28 +473,33 @@ mod tests {
             //features, expected_impl
             (
                 // Tracing disabled entirely
-                FeatureFlags::new(false, false, false, false, false, false).unwrap(),
+                FeatureFlags::new(false, false, false, false, false, false, false).unwrap(),
                 TracingImplementation::Disabled,
             ),
             (
                 // Tracing enabled, dynamic mode enabled with auto-detect, static disabled
-                FeatureFlags::new(true, false, false, false, false, false).unwrap(),
+                FeatureFlags::new(true, false, false, false, false, false, false).unwrap(),
                 TracingImplementation::DynamicNoOp,
             ),
             (
                 // Tracing enabled, dynamic disabled, static enabled with auto-detect
-                FeatureFlags::new(false, true, false, false, false, false).unwrap(),
+                FeatureFlags::new(false, true, false, false, false, false, false).unwrap(),
                 TracingImplementation::StaticNoOp,
             ),
             (
                 // Tracing enabled, dynamic disabled, static enabled with force-static-noop
-                FeatureFlags::new(false, true, false, false, false, true).unwrap(),
+                FeatureFlags::new(false, true, false, false, false, false, true).unwrap(),
                 TracingImplementation::StaticNoOp,
             ),
             (
                 // Tracing enabled, dynamic disabled, static enabled with force-static-stap
-                FeatureFlags::new(false, true, false, false, true, false).unwrap(),
+                FeatureFlags::new(false, true, false, false, true, false, false).unwrap(),
                 TracingImplementation::StaticStap,
+            ),
+            (
+                // Tracing enabled, dynamic disabled, static enabled with force-static-lttng
+                FeatureFlags::new(false, true, false, false, false, true, false).unwrap(),
+                TracingImplementation::StaticLttng,
             ),
         ];
 

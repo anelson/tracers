@@ -8,6 +8,7 @@
 use crate::build_rs::BuildInfo;
 use crate::gen::common::{self, ProbeGeneratorBase, ProviderTraitGeneratorBase};
 use crate::gen::r#static::native_code::{self, ProcessedProviderTrait};
+use crate::gen::NativeLib;
 use crate::spec::{ProbeArgSpecification, ProbeSpecification, ProviderSpecification};
 use crate::TracersResult;
 use crate::TracingImplementation;
@@ -220,12 +221,25 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                     .processed_provider
                     .as_ref()
                     .expect("stap requires successful codegen");
+                //There may or may not be a static wrapper lib.  If there is, add it as a `#[link`
+                //attribute
                 let lib_name = processed_provider
-                    .lib_path
-                    .file_stem()
-                    .expect("expected valid lib file name")
-                    .to_str()
-                    .expect("lib file name is not a valid Rust string");
+                    .native_libs
+                    .iter()
+                    .filter_map(|l| {
+                        if let NativeLib::StaticWrapperLib(lib) = l {
+                            Some(lib)
+                        } else {
+                            None
+                        }
+                    })
+                    .next();
+
+                let link_attr = if let Some(lib_name) = lib_name {
+                    quote! { #[link(name = #lib_name)] }
+                } else {
+                    quote! {}
+                };
 
                 quote_spanned! {span=>
                     #vis mod #mod_name {
@@ -233,7 +247,7 @@ impl<'bi> ProviderTraitGenerator<'bi> {
 
                         #(#wrapper_funcs)*
 
-                        #[link(name = #lib_name)]
+                        #link_attr
                         extern "C" {
                             #(#native_declarations)*
                         }
@@ -336,7 +350,9 @@ impl ProbeGenerator {
                     #(#args)*
                 })
             }
-            target @ TracingTarget::NoOp | target @ TracingTarget::Stap | target @ TracingTarget::Lttng => {
+            target @ TracingTarget::NoOp
+            | target @ TracingTarget::Stap
+            | target @ TracingTarget::Lttng => {
                 //This is a `real` impl with a C wrapper underneath (or in the case of `noop` a
                 //Rust function with the same signature as a C wrapper).
                 //The implementation is in the impl mod, with each probe as a function named the
@@ -585,7 +601,8 @@ mod test {
                             test_case.description
                         ));
 
-                let build_info = BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
+                let build_info =
+                    BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
                 let generator = ProviderTraitGenerator::new(&build_info, spec);
                 generator.generate().expect(&format!(
                     "Failed to generate test trait '{}'",
@@ -616,7 +633,8 @@ mod test {
                             test_case.description
                         ));
 
-                let build_info = BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
+                let build_info =
+                    BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
                 let generator = ProviderTraitGenerator::new(&build_info, spec);
                 assert_eq!(
                     TracingImplementation::StaticNoOp,

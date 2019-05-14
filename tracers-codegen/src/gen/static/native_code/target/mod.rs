@@ -2,3 +2,4 @@
 //! implementation of `NativeCodeGenerator` to support that particular target.
 
 pub(super) mod stap;
+pub(super) mod lttng;

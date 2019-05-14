@@ -7,6 +7,7 @@ use crate::error::TracersResult;
 use crate::spec::{ProbeCallSpecification, ProviderInitSpecification, ProviderSpecification};
 use crate::TracingType;
 use proc_macro2::TokenStream;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -14,6 +15,42 @@ use std::path::{Path, PathBuf};
 pub(crate) mod common;
 pub(crate) mod dynamic;
 pub(crate) mod r#static;
+
+/// The native code generation step produces one or more libraries that the tracing application
+/// must link to in order to function properly.
+///
+/// These can be different kinds of libraries which must be handled differently.
+///
+/// If it's a library that contains C wrapper functions around the native tracing API, that is a
+/// static library that is linked via the `#[link]` attribute on the `extern` declaration produced
+/// by the code generator.
+///
+/// However the native tracing API sometimes requires supporting libraries, either static or
+/// dynamic.  These must be linked explicitly by printing specially formated links to stdout in the
+/// `build.rs` script so Cargo knows where to find the libs.
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd)]
+pub(crate) enum NativeLib {
+    /// The name (minus `lib` prefix and `.a` or `.lib` suffix) of the generated static wrapper
+    /// lib.  This should be linked by the `#[tracer]` macro so it will not be passed to cargo to
+    /// link
+    StaticWrapperLib(String),
+
+    /// A path where the static wrapper lib should be looked for.  This will be passed to cargo as
+    /// one of the native library search paths
+    StaticWrapperLibPath(PathBuf),
+
+    /// The name of a dynamically-linked support lib.  This will be explicitly linked to all
+    /// targets of the package
+    DynamicSupportLib(String),
+
+    /// The name of a statically-linked support lib.  This will be explicitly linked to all
+    /// targets of the package
+    StaticSupportLib(String),
+
+    /// A path where support libs can be found.  This will be passed to cargo as
+    /// one of the native library search paths
+    SupportLibPath(PathBuf),
+}
 
 /// Each probing implementation must implement this trait, which has components which are called at
 /// build-time from `build.rs` and also components invoked by the macros at compile time.  Though
@@ -46,7 +83,7 @@ pub(crate) trait CodeGenerator {
         out_dir: &Path,
         package_name: &str,
         targets: Vec<PathBuf>,
-    );
+    ) -> Vec<NativeLib>;
 }
 
 /// Loads the `BuildInfo` and based on its contents creates and returns the applicable

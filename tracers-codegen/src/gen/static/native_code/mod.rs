@@ -5,6 +5,7 @@
 use crate::build_rs::BuildInfo;
 use crate::cache;
 use crate::deps::{self, SourceDependency};
+use crate::gen::NativeLib;
 use crate::spec::{self, ProviderSpecification};
 use crate::{TracersError, TracersResult, TracingTarget, TracingType};
 use failure::ResultExt;
@@ -26,13 +27,13 @@ pub(crate) struct ProcessedFile {
 /// trait
 #[derive(Serialize, Deserialize)]
 pub(crate) struct ProcessedProviderTrait {
-    pub lib_path: PathBuf,
+    pub native_libs: Vec<NativeLib>,
 }
 
 trait NativeCodeGenerator {
     /// Generates a native static library that wraps the platform-speciifc probing calls in
     /// something that Rust's FFI can handle
-    fn generate_native_lib(&self) -> TracersResult<PathBuf>;
+    fn generate_native_lib(&self) -> TracersResult<Vec<NativeLib>>;
 
     fn out_dir(&self) -> &Path;
 
@@ -77,7 +78,7 @@ pub(super) fn generate_native_code(
     out_dir: &Path,
     _package_name: &str,
     targets: Vec<PathBuf>,
-) {
+) -> Vec<NativeLib> {
     assert!(build_info.implementation.tracing_type() == TracingType::Static);
 
     match build_info.implementation.tracing_target() {
@@ -88,18 +89,27 @@ pub(super) fn generate_native_code(
                 build_info.implementation.tracing_target().as_ref()
             )
             .unwrap();
+            vec![]
         }
         TracingTarget::Stap | TracingTarget::Lttng => {
+            let mut libs = Vec::new();
             for target in targets.into_iter() {
                 let target_path = manifest_dir.join(&target);
                 writeln!(stdout, "Processing target {}", target_path.display()).unwrap();
-                process_file(build_info, stdout, out_dir, &target_path);
+                libs.append(&mut process_file(build_info, stdout, out_dir, &target_path));
             }
+
+            libs
         }
-    };
+    }
 }
 
-fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, file: &Path) {
+fn process_file(
+    build_info: &BuildInfo,
+    stdout: &mut dyn Write,
+    out_dir: &Path,
+    file: &Path,
+) -> Vec<NativeLib> {
     //Find the dependent files and providers in this source file, retrieving that info from cache
     //if we've done this before
     let cache_dir = cache::get_cache_path(out_dir);
@@ -134,10 +144,14 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, 
         Ok(processed_file) => {
             //Maybe cached maybe not, we got the info for this file
             //Generate code for the providers, and recursively process all dependent files
+            let mut libs = Vec::new();
+
             for dependency in processed_file.dependencies.into_iter() {
                 match deps::resolve_dependency(file, &dependency) {
                     // Dependency resolved; recursively process this one also
-                    Ok(dep_file) => process_file(build_info, stdout, out_dir, &dep_file),
+                    Ok(dep_file) => {
+                        libs.append(&mut process_file(build_info, stdout, out_dir, &dep_file))
+                    }
 
                     // Failed to resolve dependency.  This code probably won't compile anyway, but log
                     // a warning through Cargo so the user understands the generation step wasn't
@@ -155,8 +169,10 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, 
             for provider in processed_file.providers.into_iter() {
                 //Call `process_provider` for each provider in the file.  If it fails, log the failure
                 //in a way that will cause Cargo to report a warning, and continue on
-                process_provider(build_info, stdout, out_dir, provider);
+                libs.append(&mut process_provider(build_info, stdout, out_dir, provider));
             }
+
+            libs
         }
         Err(e) => {
             //Failures to process a single file should not fail this call.  The proc macros
@@ -174,8 +190,11 @@ fn process_file(build_info: &BuildInfo, stdout: &mut dyn Write, out_dir: &Path, 
                 file.display()
             )
             .unwrap();
+
+            //On error there won't be any generated native libs obviously
+            vec![]
         }
-    };
+    }
 }
 
 fn process_provider(
@@ -183,7 +202,7 @@ fn process_provider(
     stdout: &mut dyn Write,
     out_dir: &Path,
     provider: ProviderSpecification,
-) {
+) -> Vec<NativeLib> {
     let cache_dir = cache::get_cache_path(out_dir);
 
     // For this trait, generate native code for the probes.  If this trait was processed before
@@ -199,25 +218,17 @@ fn process_provider(
         move || {
             let generator = create_native_code_generator(build_info, out_dir, provider);
 
-            let lib_path = generator.generate_native_lib()?;
-
-            Ok(ProcessedProviderTrait { lib_path })
+            Ok(ProcessedProviderTrait {
+                native_libs: generator.generate_native_lib()?,
+            })
         },
     );
 
     match result {
         Ok(processed_provider) => {
-            //Output commands to cargo to ensure it can locate this static library.
-            let lib_directory = processed_provider
-                .lib_path
-                .parent()
-                .expect("lib must have a parent");
-            writeln!(
-                stdout,
-                "cargo:rustc-link-search=native={}",
-                lib_directory.display()
-            )
-            .unwrap();
+            //Generation succeeded, so return the info to the caller.  It needs to be aggregated
+            //and deduped before being printed out to cargo
+            processed_provider.native_libs
         }
         Err(e) => {
             writeln!(
@@ -232,6 +243,9 @@ fn process_provider(
                 ident
             )
             .unwrap();
+
+            //No native libs generated in the error case
+            vec![]
         }
     }
 }
@@ -249,13 +263,15 @@ fn create_native_code_generator(
         TracingTarget::Stap => Box::new(target::stap::StapNativeCodeGenerator::new(
             out_dir, provider,
         )),
-        TracingTarget::Lttng => unimplemented!(),
+        TracingTarget::Lttng => Box::new(target::lttng::LttngNativeCodeGenerator::new(
+            out_dir, provider,
+        )),
     }
 }
 
 #[cfg(test)]
 #[cfg(target_os = "linux")]
-mod stap_tests {
+mod tests {
     use super::*;
     use crate::testdata;
     use crate::testdata::*;
@@ -267,7 +283,12 @@ mod stap_tests {
         // and then again.  The first time should produce some output.  The second time should
         // produce no debug output for crates that are valid, but for crates with missing dependencies the
         // missing dependency error info should be output again
-        for implementation in [TracingImplementation::StaticStap].iter() {
+        for implementation in [
+            TracingImplementation::StaticStap,
+            TracingImplementation::StaticLttng,
+        ]
+        .iter()
+        {
             let build_info = BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
             let temp_dir = tempfile::tempdir().unwrap();
             let out_dir = temp_dir.path().join("out");
@@ -356,11 +377,17 @@ mod stap_tests {
             //TODO: Run process_provider on each one, then verify the correct cargo commands are
             //output, and then call get_processed_provider_info to confirm the results are
             //persisted to the cache
-            for implementation in [TracingImplementation::StaticStap].iter() {
+            for implementation in [
+                TracingImplementation::StaticStap,
+                TracingImplementation::StaticLttng,
+            ]
+            .iter()
+            {
                 let build_info =
                     BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
                 let temp_dir = tempfile::tempdir().unwrap();
                 let out_dir = temp_dir.path().join("out");
+                let lib_dir = temp_dir.path().join("output");
                 let guard = testdata::with_env_vars(vec![
                     ("TARGET", "x86_64-linux-gnu"),
                     ("HOST", "x86_64-linux-gnu"),
@@ -374,15 +401,24 @@ mod stap_tests {
                 let processed_provider = get_processed_provider_info(&provider)
                     .expect("There should be a processed provider");
 
-                let output = String::from_utf8(stdout).unwrap();
-                assert!(output.contains(
+                //There should at least be a static wrapper lib and static wrapper search path
+                assert_eq!(
+                    vec![
+                        NativeLib::StaticWrapperLib(provider.name_with_hash()),
+                        NativeLib::StaticWrapperLibPath(lib_dir)
+                    ],
                     processed_provider
-                        .lib_path
-                        .parent()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                ));
+                        .native_libs
+                        .into_iter()
+                        .filter_map(|l| {
+                            match l {
+                                lib @ NativeLib::StaticWrapperLib(_) => Some(lib),
+                                lib_path @ NativeLib::StaticWrapperLibPath(_) => Some(lib_path),
+                                _ => None,
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                );
 
                 drop(guard);
             }
