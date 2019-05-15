@@ -319,15 +319,20 @@ fn enable_tracing() -> Fallible<()> {
     bail!("No supported tracing implementations are enabled")
 }
 
+#[cfg(all(
+    target_os = "linux",
+    not(any(static_lttng_enabled, static_stap_enabled, dynamic_stap_enabled))
+))]
+fn disable_tracing(_unused: ()) {
+    unreachable!()
+}
+
 #[cfg(not(target_os = "linux"))]
 fn enable_tracing() -> Fallible<()> {
     bail!("Enabling probes on non-Linux targets is not yet supported")
 }
 
-#[cfg(all(
-    target_os = "linux",
-    not(any(static_lttng_enabled, static_stap_enabled, dynamic_stap_enabled))
-))]
+#[cfg(not(target_os = "linux"))]
 fn disable_tracing(_unused: ()) {
     unreachable!()
 }
