@@ -354,7 +354,7 @@ fn bench_fire(c: &mut Criterion, enabled: bool) {
 
     c.bench_functions(
         &format!(
-            "Firing {}abled probes on '{}'",
+            "{}abled '{}'",
             if enabled { "en" } else { "dis" },
             provider_info
         ),
