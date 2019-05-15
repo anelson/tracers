@@ -206,7 +206,7 @@ fn enable_tracing() -> Fallible<Child> {
 
     let provider_info = init_provider!(ProbeBenchmarks).expect("Provider init failed");
 
-    if !provider_info.contains("static_stap") && !provider_info.contains("dynamic_stap") {
+    if !provider_info.contains("static_stap") && !provider_info.contains("dyn_stap") {
         bail!("Don't know how to enable {}", provider_info);
     }
 
