@@ -101,7 +101,7 @@ jobs:
           TRACERS_EXPECTED_DYNAMIC_IMPL=DISABLED \
           TRACERS_EXPECTED_PROVIDER=tracers_test_probes::static/static_lttng::0.1.0 \
           scripts/test.sh --manifest-path tracers/Cargo.toml --features=force-static-lttng -vv
-          cargo bench --manifest-path tracers/Cargo.toml --features=force-static-lttng --no-run
+          cargo bench --manifest-path tracers/Cargo.toml --features=force-static-lttng
         displayName: Cargo test Static LTTng implementation (Linux)
         condition: eq( variables['Agent.OS'], 'Linux' )
 
