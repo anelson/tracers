@@ -1,8 +1,9 @@
 #![deny(warnings)]
 use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion, Fun};
-use failure::{bail, Fallible};
-use nix::sys::signal::{self, Signal};
-use nix::unistd::Pid;
+#[allow(unused_imports)] //Depending on the build config this might be unused
+use failure::bail;
+use failure::Fallible;
+#[allow(unused_imports)] //Depending on the build config this might be unused
 use std::process::Child;
 use tracers_macros::{init_provider, probe, tracer};
 
@@ -238,22 +239,13 @@ fn enable_tracing() -> Fallible<Child> {
     Ok(trace)
 }
 
-#[cfg(all(
-    target_os = "linux",
-    not(any(static_stap_enabled, dynamic_stap_enabled))
-))]
-fn enable_tracing() -> Fallible<Child> {
-    bail!("No supported tracing implementations are enabled")
-}
-
-#[cfg(not(target_os = "linux"))]
-fn enable_tracing() -> Fallible<Child> {
-    bail!("Enabling probes on non-Linux targets is not yet supported")
-}
-
 /// Disables tracing previously enabled by invoking `funccount`.  When this function returns the
 /// `funccount` process will have been terminated
+#[cfg(all(target_os = "linux", any(static_stap_enabled, dynamic_stap_enabled)))]
 fn disable_tracing(mut child: Child) {
+    use nix::sys::signal::{self, Signal};
+    use nix::unistd::Pid;
+
     //Send SIGTERM to the child process, and collect it's stdoutput waiting for it to die
     //That way we can see the function counts it prints and visually confirm the probes fired as
     //expected
@@ -263,6 +255,81 @@ fn disable_tracing(mut child: Child) {
     child
         .wait()
         .expect("waiting for child process to terminate");
+}
+
+/// Invokes an external command that will enable the tracing probes in this process.
+#[cfg(all(target_os = "linux", static_lttng_enabled))]
+fn enable_tracing() -> Fallible<()> {
+    //The lttng command line tool doesn't require superuser privs so it's much easier than the
+    //dtract or systemtap versions
+    lttng(&["create"])?;
+    lttng(&["enable-event", "--userspace", "tracers_probe_benchmarks:*"])?;
+    lttng(&["start"])?;
+
+    Ok(())
+}
+
+/// Invokes the lttng CLI with specified args, as the current user
+#[cfg(all(target_os = "linux", static_lttng_enabled))]
+fn lttng(args: &[&str]) -> Fallible<()> {
+    use failure::format_err;
+    use std::io::ErrorKind;
+    use std::process::{Command, Stdio};
+
+    print!("lttng ");
+    for arg in args.iter() {
+        print!(" {}", arg);
+    }
+    println!();
+
+    match Command::new("lttng")
+        .args(args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output()
+    {
+        Err(ref e) if e.kind() == ErrorKind::NotFound => Err(format_err!(
+            "The `lttng` executable was not found; is the lttng-tools package installed?"
+        )),
+        Err(e) => Err(e.into()),
+        Ok(output) => {
+            if output.status.success() {
+                Ok(())
+            } else {
+                Err(format_err!(
+                    "The lttng command failed with exit code {}",
+                    output.status
+                ))
+            }
+        }
+    }
+}
+
+/// Disables a previously enabled lttng tracing session
+#[cfg(all(target_os = "linux", static_lttng_enabled))]
+fn disable_tracing(_unused: ()) {
+    lttng(&["destroy"]).expect("failed to destroy LTTng session");
+}
+
+#[cfg(all(
+    target_os = "linux",
+    not(any(static_lttng_enabled, static_stap_enabled, dynamic_stap_enabled))
+))]
+fn enable_tracing() -> Fallible<()> {
+    bail!("No supported tracing implementations are enabled")
+}
+
+#[cfg(not(target_os = "linux"))]
+fn enable_tracing() -> Fallible<()> {
+    bail!("Enabling probes on non-Linux targets is not yet supported")
+}
+
+#[cfg(all(
+    target_os = "linux",
+    not(any(static_lttng_enabled, static_stap_enabled, dynamic_stap_enabled))
+))]
+fn disable_tracing(_unused: ()) {
+    unreachable!()
 }
 
 fn bench_fire(c: &mut Criterion, enabled: bool) {

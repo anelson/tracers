@@ -592,9 +592,9 @@ impl ProbeGenerator {
         }
     }
 
-    /// Each probe will have a corresponding wrapper function called `__$PROBENAME_wrap` which
-    /// takes as input all of the probe's Rust arguments, and returns a tuple containing a
-    /// `ProbeArgWrapper` for each of the arguments.
+    /// For the `Disabled` target, each probe will have a corresponding wrapper function called
+    /// `__$PROBENAME_wrap` which takes as input all of the probe's Rust arguments, and returns a
+    /// tuple containing a `ProbeArgWrapper` for each of the arguments.
     ///
     /// This is required because at probe firing time we don't have enough information about the
     /// actual data types of the parameters to avoid ambiguity when invoking the wrapper.
