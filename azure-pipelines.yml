@@ -59,6 +59,7 @@ jobs:
           sudo apt-get install build-essential m4
           sudo apt-get install bcc-tools libbcc-examples linux-headers-$(uname -r)
           sudo apt-get install lttng-tools lttng-modules-dkms liblttng-ust-dev
+          echo "##vso[task.setvariable variable=PATH;]$PATH:/usr/share/bcc/tools"
         displayName: install Ubuntu dependencies
         condition: eq( variables['Agent.OS'], 'Linux' )
 
