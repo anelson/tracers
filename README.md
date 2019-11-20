@@ -1,5 +1,6 @@
 # tracers - Rust instrumentation library
 
+[![Crates.io](https://img.shields.io/crates/v/tracers?style=plastic)](https://crates.io/crates/tracers)
 [![Azure Build Status - Linux/macOS/Windows](https://dev.azure.com/anelson-open-source/tracers/_apis/build/status/anelson.tracers?branchName=master)](https://dev.azure.com/anelson-open-source/tracers/_build/latest?definitionId=4&branchName=master)
 [![Cirrus CI - FreeBSD](https://img.shields.io/cirrus/github/anelson/tracers)](https://cirrus-ci.com/github/anelson/tracers)
 
