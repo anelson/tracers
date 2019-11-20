@@ -1,6 +1,6 @@
 //! Implements the `ProviderBuilder` and `Provider` traits for SystemTap
 use failure::{Fail, Fallible};
-use libstapsdt_sys::*;
+use tracers_libstapsdt_sys::*;
 use std::collections::HashMap;
 use std::ffi::CString;
 use std::ptr;

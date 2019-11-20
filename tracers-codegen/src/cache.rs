@@ -111,7 +111,7 @@ pub(crate) fn get_cached_object_computation<T: Serialize + DeserializeOwned>(
 ///
 /// If the closure returns an error, or if it returns success but the file still doesn't exist,
 /// this function fails
-pub(crate) fn cache_generated_file<F: FnOnce(PathBuf) -> Fallible<(PathBuf)>>(
+pub(crate) fn cache_generated_file<F: FnOnce(PathBuf) -> Fallible<PathBuf>>(
     cache_path: &Path,
     results_path: &Path,
     f: F,

@@ -178,9 +178,9 @@ impl<'bi> ProviderTraitGenerator<'bi> {
                 unsafe impl<#struct_type_params> Send for #struct_type_name<#struct_type_params> {}
                 unsafe impl<#struct_type_params> Sync for #struct_type_name <#struct_type_params>{}
 
-                static #instance_var_name: OnceCell<Fallible<SystemProvider>> = OnceCell::INIT;
-                static #struct_var_name: OnceCell<Result<#struct_type_name, String>> = OnceCell::INIT;
-                static IMPL_OPT: OnceCell<Result<&'static #struct_type_name, &'static str>> = OnceCell::INIT;
+                static #instance_var_name: OnceCell<Fallible<SystemProvider>> = OnceCell::new();
+                static #struct_var_name: OnceCell<Result<#struct_type_name, String>> = OnceCell::new();
+                static IMPL_OPT: OnceCell<Result<&'static #struct_type_name, &'static str>> = OnceCell::new();
 
                 impl<#struct_type_params> #struct_type_name<#struct_type_params> {
                    #[allow(dead_code)]
