@@ -23,6 +23,7 @@ links = "tracers"
 
 [badges]
 maintenance = { status = "experimental" }
+azure-devops = { project = "anelson-open-source/tracers", pipeline = "anelson.tracers", build="4" }
 
 [features]
 # By default, tracing is enabled and set to an automatically selected static implementation
