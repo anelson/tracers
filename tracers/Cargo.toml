@@ -1,6 +1,6 @@
 [package]
 name = "tracers"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -70,20 +70,20 @@ harness = false
 
 [dependencies]
 once_cell = { version = "1.2.0", optional = true }
-tracers-core = { path = "../tracers-core", version = "0.1.0", optional = true }
-tracers-dyn-noop = { path = "../tracers-dyn-noop", version = "0.1.0", optional = true }
-tracers-dyn-stap = { path = "../tracers-dyn-stap", version = "0.1.0", optional = true }
+tracers-core = { path = "../tracers-core", version = "0.2.0", optional = true }
+tracers-dyn-noop = { path = "../tracers-dyn-noop", version = "0.2.0", optional = true }
+tracers-dyn-stap = { path = "../tracers-dyn-stap", version = "0.2.0", optional = true }
 
 nom = { version = "5.0.1", optional = true }
-tracers-macros = { path = "../tracers-macros", version = "0.1.0", optional = true }
+tracers-macros = { path = "../tracers-macros", version = "0.2.0", optional = true }
 
 [build-dependencies]
-tracers-build = { path = "../tracers-build", version = "0.1.0" }
+tracers-build = { path = "../tracers-build", version = "0.2.0" }
 failure = "0.1.6"
 
 [dev-dependencies]
 # Our integration tests and examples assume the tracers-macros are available
-tracers-macros = { path = "../tracers-macros", version = "0.1.0" }
+tracers-macros = { path = "../tracers-macros", version = "0.2.0" }
 criterion = "0.3.0"
 failure = "0.1.6"
 nix = "0.15.0"

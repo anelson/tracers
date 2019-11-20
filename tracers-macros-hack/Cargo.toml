@@ -1,6 +1,6 @@
 [package]
 name = "tracers-macros-hack"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -24,8 +24,8 @@ once_cell = "1.2.0"
 proc-macro2 = "1.0.6"
 heck = "0.3.1"
 proc-macro-hack = "0.5.11"
-tracers-codegen = { path = "../tracers-codegen", version = "0.1.0" }
-tracers-core = { path = "../tracers-core", version = "0.1.0" }
+tracers-codegen = { path = "../tracers-codegen", version = "0.2.0" }
+tracers-core = { path = "../tracers-core", version = "0.2.0" }
 
 [dependencies.syn]
 # We need some optional features of syn in order to implement the macro

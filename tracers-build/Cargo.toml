@@ -1,6 +1,6 @@
 [package]
 name = "tracers-build"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -11,5 +11,5 @@ description = """
 repository = "https://github.com/anelson/tracers"
 
 [dependencies]
-tracers-codegen = { path = "../tracers-codegen", version = "0.1.0" }
+tracers-codegen = { path = "../tracers-codegen", version = "0.2.0" }
 

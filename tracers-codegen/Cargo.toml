@@ -1,6 +1,6 @@
 [package]
 name = "tracers-codegen"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
@@ -32,7 +32,7 @@ strum_macros = "0.16.0"
 tempfile = "3.1.0"
 twox-hash = "1.5.0"
 
-tracers-core = { path = "../tracers-core", version = "0.1.0" }
+tracers-core = { path = "../tracers-core", version = "0.2.0" }
 
 [dependencies.syn]
 # We need some optional features of syn in order to implement the macro
