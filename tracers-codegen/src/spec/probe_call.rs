@@ -143,10 +143,7 @@ impl ProbeCallDetails {
                         args,
                     })
                 } else {
-                            return Err(TracersError::invalid_call_expression(format!(
-                            "Unexpected expression for function call: {}",
-                            syn_helpers::convert_to_string(&func)),
-                                    func));
+                    Err(TracersError::invalid_call_expression(format!("Unexpected expression for function call: {}", syn_helpers::convert_to_string(&func)), func))
                 }
             },
             _ => {

@@ -56,10 +56,11 @@ impl ProbeArgSpecification {
                 return Self::from_ident_type_pair(probe_method, ordinal, pat_ident, ty);
             }
         }
-        return Err(TracersError::invalid_provider(
+
+        Err(TracersError::invalid_provider(
             format!("Probe method arguments should be in the form `name: TypeName`; {} is not an expected argument", syn_helpers::convert_to_string(arg)),
             arg,
-            ));
+            ))
     }
 
     /// Constructs a `ProbeArgSpecification` from information from a decomposed fn arg once it's
@@ -87,9 +88,9 @@ impl ProbeArgSpecification {
                 arg_type_info,
             })
         } else {
-            return Err(TracersError::invalid_provider(
+            Err(TracersError::invalid_provider(
                     format!("The argument type '{}' of argument '{}' on probe '{}' is not supported for probing.  Generally only the standard string, integer, and bool types, as well as references and Option's of the same, are supported", syn_helpers::convert_to_string(typ), ident.ident, probe_method.sig.ident), typ,
-            ));
+            ))
         }
     }
 

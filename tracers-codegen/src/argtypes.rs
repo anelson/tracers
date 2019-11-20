@@ -73,7 +73,7 @@ macro_rules! maybe_types {
 ///
 /// This function has a massive cyclomatic complexity due to all of the macro-generated code, but
 /// in this case it's safe to ignore the clippy lint.
-#[allow(clippy::cyclomatic_complexity)]
+#[allow(clippy::cognitive_complexity)]
 pub(crate) fn from_syn_type(ty: &syn::Type) -> Option<ArgTypeInfo> {
     //TODO: There HAS to be a better and more performant way to do this, but working with the syn
     //type hierarchy directly is just agony

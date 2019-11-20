@@ -134,7 +134,7 @@ impl Parse for TracerAttribute {
                     .map_err(TracersError::into_syn_error)?,
             })
         } else {
-            return Err(input.error("Expected exactly one attribute, `#[tracer]`"));
+            Err(input.error("Expected exactly one attribute, `#[tracer]`"))
         }
     }
 }
