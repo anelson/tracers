@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = "Macros which generate tracers and the code that fires the tracers.  See the 'tracers' crate for further instructions"
+repository = "https://github.com/anelson/tracers"
 
 [dependencies]
 proc-macro-hack = "0.5.11"

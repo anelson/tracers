@@ -4,6 +4,12 @@ version = "0.1.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = """
+    Contains the compile-time code generation logic which powers the `probe` and `tracers` macros.
+
+    Do not use this crate directly; see "tracers" for more information.
+"""
+repository = "https://github.com/anelson/tracers"
 
 [dependencies]
 askama = "0.8.0"

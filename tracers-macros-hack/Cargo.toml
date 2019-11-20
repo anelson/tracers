@@ -5,6 +5,8 @@ authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 description = """
+Do not reference this crate directly; see the "tracers" crate for further instructions.
+
 This crate contains the actual `proc-macro=true` crate which implements the probing macros.  Because the
 `probe!` macro is actually a procedural macro but is used in expression position, we must use the `proc_macro_hack` crate
 to work around the fact that Rust doesn't natively support this usage yet.  That hack requires that the actual macro be implemented
@@ -13,6 +15,7 @@ we make `tracers_macros` the re-exporting crate and this one, `tracers_macros_ha
 
 Confused?  Me too.
 """
+repository = "https://github.com/anelson/tracers"
 
 [dependencies]
 quote = "1.0.2"

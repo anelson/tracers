@@ -5,8 +5,10 @@ authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 description = """
-This crate should be a `build-dependencies` dependency of alll crates that use `tracers`.
+    Implements the compile-time code generation of the tracers in a crate.  This crate should be a `build-dependencies`
+    dependency of alll crates that use `tracers`.  See the `tracers` crate for documentation and instructions.
 """
+repository = "https://github.com/anelson/tracers"
 
 [dependencies]
 tracers-codegen = { path = "../tracers-codegen", version = "0.1.0" }

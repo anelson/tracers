@@ -10,6 +10,7 @@ Implements the dynamic probing API using `libstapsdt`, which in turn uses Linux 
 Do not use this crate directly.  Always use the `tracers` crate and let it auto-detect which implementation
 to use.
 """
+repository = "https://github.com/anelson/tracers"
 
 # This is a hack.  Or maybe a workaround for a bug.
 #
