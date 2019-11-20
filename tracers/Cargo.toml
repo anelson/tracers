@@ -62,22 +62,22 @@ name = "probe_firing"
 harness = false
 
 [dependencies]
-once_cell = { version = "0.1.8", optional = true }
+once_cell = { version = "1.2.0", optional = true }
 tracers-core = { path = "../tracers-core", version = "0.1.0", optional = true }
 tracers-dyn-noop = { path = "../tracers-dyn-noop", version = "0.1.0", optional = true }
 tracers-dyn-stap = { path = "../tracers-dyn-stap", version = "0.1.0", optional = true }
 
-nom = { version = "4.2.3", optional = true, features = ["verbose-errors"] }
+nom = { version = "5.0.1", optional = true }
 tracers-macros = { path = "../tracers-macros", version = "0.1.0", optional = true }
 
 [build-dependencies]
 tracers-build = { path = "../tracers-build", version = "0.1.0" }
-failure = "0.1.5"
+failure = "0.1.6"
 
 [dev-dependencies]
 # Our integration tests and examples assume the tracers-macros are available
 tracers-macros = { path = "../tracers-macros", version = "0.1.0" }
-criterion = "0.2"
-failure = "0.1"
-nix = "0.13"
+criterion = "0.3.0"
+failure = "0.1.6"
+nix = "0.15.0"
 

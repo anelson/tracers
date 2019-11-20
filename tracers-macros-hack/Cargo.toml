@@ -15,23 +15,23 @@ Confused?  Me too.
 """
 
 [dependencies]
-quote = "0.6.11"
-failure = "0.1.5"
-once_cell = "0.1.8"
-proc-macro2 = "0.4"
-heck = "0.3"
-proc-macro-hack = "0.5"
+quote = "1.0.2"
+failure = "0.1.6"
+once_cell = "1.2.0"
+proc-macro2 = "1.0.6"
+heck = "0.3.1"
+proc-macro-hack = "0.5.11"
 tracers-codegen = { path = "../tracers-codegen", version = "0.1.0" }
 tracers-core = { path = "../tracers-core", version = "0.1.0" }
 
 [dependencies.syn]
 # We need some optional features of syn in order to implement the macro
-version = "0.15.27"
+version = "1.0.8"
 features = ["full"]
 
 [dev-dependencies]
-quickcheck = "0.8"
-quickcheck_macros = "0.8"
+quickcheck = "0.9.0"
+quickcheck_macros = "0.8.0"
 # The integration tests use the macro to generate probe impls so they need access to the type aliases in the top level
 # crate
 #tracers= { path = "..", version = "0.1.0" }

@@ -22,11 +22,11 @@ enabled = ["libz-sys", "libc"]
 required = ["libz-sys", "libc"]
 
 [dependencies]
-libz-sys = { version = ">= 0.1.2", optional = true }
-libc = { version = "0.2", optional = true }
+libz-sys = { version = "1.0.25", optional = true }
+libc = { version = "0.2.65", optional = true }
 
 [build-dependencies]
-pkg-config = "0.3.2"
-cc = "1.0"
-failure = "0.1"
+pkg-config = "0.3.17"
+cc = "1.0.47"
+failure = "0.1.6"
 

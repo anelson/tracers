@@ -6,6 +6,6 @@ edition = "2018"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-proc-macro-hack = "0.5"
+proc-macro-hack = "0.5.11"
 tracers-macros-hack = { path = "../tracers-macros-hack", version = "0.1.0" }
 

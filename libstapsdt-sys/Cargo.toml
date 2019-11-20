@@ -22,13 +22,13 @@ enabled = ["libelf-sys/enabled", "libc"]
 required = ["libelf-sys/required", "libc"]
 
 [dependencies]
-libc = { version = "0.2", optional = true }
+libc = { version = "0.2.65", optional = true }
 libelf-sys = { path = "../libelf-sys", version = "0.1.0", optional = true }
 
 [build-dependencies]
-pkg-config = "0.3.14"
-cc = "1.0"
-glob = "0.2.11"
-failure = "0.1"
+pkg-config = "0.3.17"
+cc = "1.0.47"
+glob = "0.3.0"
+failure = "0.1.6"
 
 

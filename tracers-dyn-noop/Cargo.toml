@@ -14,7 +14,7 @@ Never use this crate directly.  Always use `tracers` and let it select the suita
 """
 
 [dependencies]
-failure = "0.1.5"
+failure = "0.1.6"
 
 [dependencies.tracers-core]
 path = "../tracers-core"
@@ -22,5 +22,5 @@ version = "0.1.0"
 features = ["dynamic"]
 
 [build-dependencies]
-failure = "0.1.5"
+failure = "0.1.6"
 
