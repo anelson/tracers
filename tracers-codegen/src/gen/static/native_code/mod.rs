@@ -254,7 +254,7 @@ fn create_native_code_generator(
     build_info: &BuildInfo,
     out_dir: &Path,
     provider: ProviderSpecification,
-) -> Box<NativeCodeGenerator> {
+) -> Box<dyn NativeCodeGenerator> {
     match build_info.implementation.tracing_target() {
         TracingTarget::Disabled | TracingTarget::NoOp => panic!(
             "{} should never be passed to this function",
