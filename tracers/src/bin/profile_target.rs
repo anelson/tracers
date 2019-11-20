@@ -22,7 +22,9 @@ fn main() {
         unsafe {
             //TODO: use read_volatile to avoid compiler optimizations
             probe!(SimpleTestProbes::probe_no_args());
-            probe!(SimpleTestProbes::probe_str_arg(ptr::read_volatile(&STRING_ARG)));
+            probe!(SimpleTestProbes::probe_str_arg(ptr::read_volatile(
+                &STRING_ARG
+            )));
             probe!(SimpleTestProbes::probe_int_arg(ptr::read_volatile(
                 &INT_ARG
             )));

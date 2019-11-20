@@ -216,7 +216,7 @@ fn generate_unsafe_provider_probe_native_impl_trait() -> String {
         })
         .join(";\n");
         let probe_args =
-            xform_types_i(&type_params, |i, _| format!("wrapper{}.as_c_type()", i)).join(",");;
+            xform_types_i(&type_params, |i, _| format!("wrapper{}.as_c_type()", i)).join(",");
 
         decl += &format!(
             r##"
