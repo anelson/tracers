@@ -149,11 +149,7 @@ jobs:
         condition: eq( variables['Agent.OS'], 'Windows_NT' )
         continueOnError: ne( variables['rustup_toolchain', 'stable'])
 
-      # NB: Currently running with `--all-targets` causes a ICE due to this issue:
-      # https://github.com/rust-lang/rust-clippy/issues/3741
-      #
-      # Once it's fixed, put back `--all-targets --all-features` because otherwise clippy isn't running against tests
-      - script: rustup component add clippy && cargo clippy  -- -D warnings
+      - script: rustup component add clippy && cargo clippy --all-targets --all-features  -- -D warnings
         displayName: Run Clippy linter on Rust code (only on Rust stable)
         condition:  eq( variables['rustup_toolchain'], 'stable' )
 
