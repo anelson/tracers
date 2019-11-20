@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 autobenches = false
 description = "Generates very low overhead native trace points using stable Rust"
 repository = "https://github.com/anelson/tracers"
-readme = "README.md"
+readme = "../README.md"
 keywords = ["tracers", "systemtap", "ltt-ng", "ebpf", "tracing"]
 categories = ["os", "development-tools::profiling"]
 
