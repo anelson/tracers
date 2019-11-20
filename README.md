@@ -88,6 +88,24 @@ trait in the docs for additional hints on how to use each probe.
 
 The `examples/` directory has some simple examples.
 
+# Platforms
+
+The `tracers` crate and runtime components should compile and run on any supported Rust platform (although `no_std` is
+not yet supported).  Adding `tracers` as a dependency shouldn't break your project on any platform; if it does that's
+a bug and you're encouraged to open a GitHub issue.
+
+That said, the `tracers` crate by default doesn't actually trace anything; it compiles away to nothing.  To actually
+enable tracing you need a supported platform.  As of this writing that means:
+
+* Linux with System Tap (the `force_static_stap` feature)
+* Linux with LTT-ng (the `force_static_lttng`) feature
+
+There is work being done to support:
+
+* Windows (with the Event Tracing for Windows system API)
+* FreeBSD and macOS (with DTrace)
+
+
 # License
 
 Except where otherwise indicated, this project is licensed under either of
