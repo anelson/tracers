@@ -1,5 +1,5 @@
 [submodule "libstapsdt-sys/vendor/libstapsdt"]
-	path = libstapsdt-sys/vendor/libstapsdt
+	path = tracers-libstapsdt-sys/vendor/libstapsdt
 	url = https://github.com/sthima/libstapsdt.git
 
 [submodule "libelf-sys/vendor/libelf"]
