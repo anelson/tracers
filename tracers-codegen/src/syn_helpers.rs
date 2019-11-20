@@ -93,6 +93,13 @@ fn recurse_tree<F: FnMut(&syn::Type) -> TracersResult<syn::Type>>(
         | syn::Type::Verbatim(_) => {
             //Nothing to do here there's no type information to recurse
         }
+        _ => {
+            // the `Type` enum has a variant `__Nonexhaustive` which is hidden in the docs.  I
+            // think the intention here is to encourage users to maintain a default match arm so
+            // that as new kind of type expressions are added it doesn't break existing code.
+            // Based on that assumption, I'm leaving this here, separate from the above match arm
+            // which handles known type expressions which I don't care about
+        }
     };
 
     Ok(new_typ)

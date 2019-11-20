@@ -59,7 +59,7 @@ pub(super) fn generate_probe_call(call: ProbeCallSpecification) -> TracersResult
                 {
                     if let Some(__tracers_probe) = #provider::#probe_func_name() {
                         if __tracers_probe.is_enabled() {
-                            __tracers_probe.fire(#(#args),*);
+                            __tracers_probe.fire(#args);
                         }
                     }
                 }

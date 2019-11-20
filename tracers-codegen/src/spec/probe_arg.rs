@@ -51,19 +51,15 @@ impl ProbeArgSpecification {
         //Apologies for the crazy match expression.  Rust's AST is a complicated beast
         //Many things can be function arguments in Rust; we only support the very basic form of:
         //`arg_name: some_type`
-        if let syn::FnArg::Captured(syn::ArgCaptured {
-            pat: syn::Pat::Ident(pat_ident),
-            ty,
-            ..
-        }) = arg
-        {
-            Self::from_ident_type_pair(probe_method, ordinal, pat_ident, ty)
-        } else {
-            return Err(TracersError::invalid_provider(
+        if let syn::FnArg::Typed(syn::PatType { pat, ty, .. }) = arg {
+            if let syn::Pat::Ident(pat_ident) = pat.as_ref() {
+                return Self::from_ident_type_pair(probe_method, ordinal, pat_ident, ty);
+            }
+        }
+        return Err(TracersError::invalid_provider(
             format!("Probe method arguments should be in the form `name: TypeName`; {} is not an expected argument", syn_helpers::convert_to_string(arg)),
             arg,
-        ));
-        }
+            ));
     }
 
     /// Constructs a `ProbeArgSpecification` from information from a decomposed fn arg once it's
@@ -287,7 +283,6 @@ mod test {
         let method: syn::TraitItemMethod = parse_quote! { #tokens };
         let arg = method
             .sig
-            .decl
             .inputs
             .iter()
             .next()

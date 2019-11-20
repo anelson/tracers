@@ -525,7 +525,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
                     fn probe0(self, arg0: i32);
                 }
             },
-            "Probe methods must not have any `self`",
+            "Probe methods must not have any `&self`",
         ),
         TestProviderTrait::new_invalid(
             "has mut self by-val method",
@@ -536,7 +536,7 @@ pub(crate) fn get_test_provider_traits<F: FnMut(&TestProviderTrait) -> bool>(
                     fn probe0(mut self, arg0: i32);
                 }
             },
-            "Probe methods must not have any `self`",
+            "Probe methods must not have any `&self`",
         ),
         TestProviderTrait::new_invalid(
             "has a nested Option parameter which is not supported",

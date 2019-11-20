@@ -387,7 +387,7 @@ mod tests {
                     BuildInfo::new(TEST_CRATE_NAME.to_owned(), (*implementation).clone());
                 let temp_dir = tempfile::tempdir().unwrap();
                 let out_dir = temp_dir.path().join("out");
-                let lib_dir = temp_dir.path().join("output");
+                let lib_dir = out_dir.join("output");
                 let guard = testdata::with_env_vars(vec![
                     ("TARGET", "x86_64-linux-gnu"),
                     ("HOST", "x86_64-linux-gnu"),

@@ -360,8 +360,8 @@ impl ProbeGenerator {
         //Generate an _enabled method which tests if this probe is enabled at runtime
         let mut enabled_method = original_method.clone();
         enabled_method.ident = syn_helpers::add_suffix_to_ident(&enabled_method.ident, "_enabled");
-        enabled_method.decl.inputs = syn::punctuated::Punctuated::new();
-        enabled_method.decl.output = syn::ReturnType::Default;
+        enabled_method.inputs = syn::punctuated::Punctuated::new();
+        enabled_method.output = syn::ReturnType::Default;
 
         //Generate an get_(probe)_probe method which returns the raw Option<ProviderProbe>
         let mut probe_method = original_method.clone();
@@ -369,12 +369,11 @@ impl ProbeGenerator {
             &format!("get_{}_probe", probe_method.ident),
             probe_method.ident.span(),
         );
-        probe_method.decl.inputs = syn::punctuated::Punctuated::new();
-        probe_method.decl.output = syn::ReturnType::Default;
+        probe_method.inputs = syn::punctuated::Punctuated::new();
+        probe_method.output = syn::ReturnType::Default;
         let probe_method_ret_type = self.generate_provider_probe_type();
         let a_lifetime = syn::Lifetime::new("'a", self.spec.span);
         probe_method
-            .decl
             .generics
             .params
             .push(syn::GenericParam::Lifetime(syn::LifetimeDef::new(
@@ -382,7 +381,6 @@ impl ProbeGenerator {
             )));
         for param in self.args_lifetime_parameters().iter() {
             probe_method
-                .decl
                 .generics
                 .params
                 .push(syn::GenericParam::Lifetime(syn::LifetimeDef::new(
@@ -562,7 +560,8 @@ mod test {
                             test_case.description
                         ));
 
-                let build_info = BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
+                let build_info =
+                    BuildInfo::new(testdata::TEST_CRATE_NAME.to_owned(), implementation);
                 let generator = ProviderTraitGenerator::new(&build_info, spec);
                 generator.generate().expect(&format!(
                     "Failed to generate test trait '{}'",

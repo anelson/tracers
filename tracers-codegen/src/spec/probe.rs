@@ -1,4 +1,4 @@
-//! This module declares and implements the `ProbeSpecification` struct, which represents a single
+//! This module.res and implements the `ProbeSpecification` struct, which represents a single
 //! tracing probe corresponding to a single method on the trait which is marked with a `#[tracer]`
 //! attribute.
 //!
@@ -72,38 +72,33 @@ impl ProbeSpecification {
                 "Probe methods cannot be `const`, `unsafe`, `async`, or `extern \"C\"`",
                 method,
             ));
-        } else if method.sig.decl.generics.type_params().next() != None {
+        } else if method.sig.generics.type_params().next() != None {
             return Err(TracersError::invalid_provider(
             "Probe methods must not take any type parameters; generics are not supported in probes",
             method,
         ));
-        } else if method.sig.decl.variadic != None {
+        } else if method.sig.variadic != None {
             return Err(TracersError::invalid_provider(
                 "Probe methods cannot have variadic arguments",
                 method,
             ));
-        } else if method.sig.decl.output != ReturnType::Default {
+        } else if method.sig.output != ReturnType::Default {
             return Err(TracersError::invalid_provider(
                 "Probe methods must not have an explicit return type (they return `()` implicitly)",
                 method,
             ));
         };
 
-        let first_arg = method.sig.decl.inputs.iter().next();
-        if let Some(FnArg::SelfRef(_)) = first_arg {
+        let first_arg = method.sig.inputs.iter().next();
+        if let Some(FnArg::Receiver(_)) = first_arg {
             return Err(TracersError::invalid_provider(
-                "Probe methods must not have any `&self` args",
-                method,
-            ));
-        } else if let Some(FnArg::SelfValue(_)) = first_arg {
-            return Err(TracersError::invalid_provider(
-                "Probe methods must not have any `self` args",
+                "Probe methods must not have any `&self` or `self` args",
                 method,
             ));
         }
 
         let mut args: Vec<ProbeArgSpecification> = Vec::new();
-        for (idx, arg) in method.sig.decl.inputs.iter().enumerate() {
+        for (idx, arg) in method.sig.inputs.iter().enumerate() {
             args.push(ProbeArgSpecification::from_fnarg(method, idx, arg)?);
         }
 
@@ -194,7 +189,6 @@ mod test {
                 parse_quote! { fn probe0(self, arg0: i32); },
             ]
         }
-
     }
 
     #[test]

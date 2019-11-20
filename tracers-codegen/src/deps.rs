@@ -182,7 +182,7 @@ mod test {
                     Vec::<String>::new(),
                     unexpected_errors,
                     "Some unexpected errors were reported"
-                );;
+                );
                 let missing_errors = target
                     .expected_errors
                     .iter()
@@ -200,7 +200,7 @@ mod test {
                     Vec::<String>::new(),
                     missing_errors,
                     "Some expected errors were not reported"
-                );;
+                );
             }
         }
     }

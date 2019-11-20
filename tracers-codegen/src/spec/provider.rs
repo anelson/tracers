@@ -79,7 +79,7 @@ impl TracerAttributeArgs {
             .map_err(|e| TracersError::syn_error("Error parsing attribute metadata", e))?;
 
         let args = match meta {
-            syn::Meta::Word(_) =>
+            syn::Meta::Path(_) =>
             //This attribute is just the ident, `#[tracer]`, with no additional attributes
             {
                 Ok(TracerAttributeArgs::default())

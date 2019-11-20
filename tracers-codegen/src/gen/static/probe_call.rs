@@ -114,7 +114,7 @@ pub(crate) fn generate_probe_call(
                             details.probe.span(),
                         );
 
-                        quote! { let (#(#wrapped_var_names),*) = #mod_path::#wrap_func(#(#arg_names),*); }
+                        quote! { let (#wrapped_var_names) = #mod_path::#wrap_func(#(#arg_names),*); }
                     } else {
                         quote! {}
                     };
