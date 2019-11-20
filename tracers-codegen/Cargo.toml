@@ -1,9 +1,9 @@
 [package]
 name = "tracers-codegen"
 version = "0.1.0"
-authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
+authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 askama = "0.8.0"

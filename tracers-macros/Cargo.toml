@@ -3,7 +3,7 @@ name = "tracers-macros"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@users.noreply.github.com>"]
 edition = "2018"
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 proc-macro-hack = "0.5.11"
