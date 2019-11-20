@@ -23,6 +23,7 @@ links = "tracers"
 
 [badges]
 maintenance = { status = "experimental" }
+cirrus-ci = { repository = "github/anelson/tracers", branch = "master" }
 azure-devops = { project = "anelson-open-source/tracers", pipeline = "anelson.tracers", build="4" }
 
 [features]
