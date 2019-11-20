@@ -32,14 +32,14 @@ default = []
 #
 # The success or failure of the build will be communicated via a variable in cargo,
 # which dependent crates can resolve with DEP_TRACERS_STAP_SUCCEEDED
-enabled = ["libstapsdt-sys/enabled"]
+enabled = ["tracers-libstapsdt-sys/enabled"]
 
 # If this feature is enabled, it implies `enabled`, and also will cause the build to fail if
 # the stap provider cannot be built
-required = ["libstapsdt-sys/required"]
+required = ["tracers-libstapsdt-sys/required"]
 
 [dependencies]
-libstapsdt-sys = { path = "../libstapsdt-sys", version = "0.1.0", optional = true }
+tracers-libstapsdt-sys = { path = "../libstapsdt-sys", version = "0.1.0", optional = true }
 failure = "0.1.6"
 once_cell = "1.2.0"
 

@@ -1,9 +1,15 @@
 [package]
-name = "libstapsdt-sys"
+name = "tracers-libstapsdt-sys"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT"
+description = """
+    Exposes libstapsdt to Rust code for programmatic creation of SystemTap user mode probes.
+
+    Never use this crate directly; use `tracers` and let it determine the correct implementation at build time.
+"""
+repository = "https://github.com/anelson/tracers"
 links = "stapsdt"
 
 [features]
@@ -15,15 +21,15 @@ default = []
 #
 # The success or failure of the build will be communicated via a variable in cargo,
 # which dependent crates can resolve with DEP_LIBELF_SYS_SUCCEEDED
-enabled = ["libelf-sys/enabled", "libc"]
+enabled = ["tracers-libelf-sys/enabled", "libc"]
 
 # If this feature is enabled, it implies `enabled`, and also will cause the build to fail if
 # libstapsdt cannot be built
-required = ["libelf-sys/required", "libc"]
+required = ["tracers-libelf-sys/required", "libc"]
 
 [dependencies]
 libc = { version = "0.2.65", optional = true }
-libelf-sys = { path = "../libelf-sys", version = "0.1.0", optional = true }
+tracers-libelf-sys = { path = "../libelf-sys", version = "0.1.0", optional = true }
 
 [build-dependencies]
 pkg-config = "0.3.17"

@@ -1,10 +1,16 @@
 [package]
-name = "libelf-sys"
+name = "tracers-libelf-sys"
 version = "0.1.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "LGPL-3.0-or-later"
 links = "elf"
+description = """
+    Exposes libelf as a Rust crate to ensure libstapsdt-sys is able to find libelf in the path.
+
+    Never use this crate directly; use `tracers` and let it determine the correct implementation at build time.
+"""
+repository = "https://github.com/anelson/tracers"
 
 [features]
 # by default, building libelf is disabled.  It must be explicitly enabled

@@ -4,6 +4,11 @@ version = "0.1.0"
 authors = ["Adam Nelson <anelson@127.io>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = """
+    Contains the core runtime component for tracing.  You should not ever use this crate directly; use the "tracers"
+    crate instead
+"""
+repository = "https://github.com/anelson/tracers"
 
 [features]
 
