@@ -30,6 +30,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::blacklisted_name)] //`Foo`
     fn non_null_pointer() {
         struct Foo {
             _bar: i128,

@@ -195,6 +195,10 @@ mod test {
 
     #[test]
     fn test_type_support() {
+        // This is only complex because the macros expand into complex code.  For readability
+        // it's fine
+        #![allow(clippy::cognitive_complexity)]
+
         test_type!(@primitive i8, CType::Char, "std::os::raw::c_char");
         test_type!(@primitive u8, CType::UChar, "std::os::raw::c_uchar");
         test_type!(@primitive i16, CType::Short, "std::os::raw::c_short");

@@ -149,8 +149,7 @@ mod test {
                         let (self_arg_name, self_arg_type) = (self_arg.ident(), self_arg.syn_typ());
                         let (spec_arg_name, spec_arg_type, _) = spec_arg;
 
-                        self_arg_name.ident.to_string() == *spec_arg_name
-                            && self_arg_type == spec_arg_type
+                        self_arg_name.ident == *spec_arg_name && self_arg_type == spec_arg_type
                     })
         }
     }
@@ -196,10 +195,12 @@ mod test {
         for input in data::valid_test_cases().iter() {
             let input_string = quote! { #input }.to_string();
 
-            ProbeSpecification::from_method(&data::trait_item(), input).expect(&format!(
-                "This should be treated as a valid method: {}",
-                input_string
-            ));
+            ProbeSpecification::from_method(&data::trait_item(), input).unwrap_or_else(|_| {
+                panic!(format!(
+                    "This should be treated as a valid method: {}",
+                    input_string
+                ))
+            });
         }
     }
 
@@ -210,10 +211,12 @@ mod test {
 
             ProbeSpecification::from_method(&data::trait_item(), input)
                 .err()
-                .expect(&format!(
-                    "This should be treated as an invalid method: {}",
-                    input_string
-                ));
+                .unwrap_or_else(|| {
+                    panic!(format!(
+                        "This should be treated as an invalid method: {}",
+                        input_string
+                    ))
+                });
         }
     }
 
@@ -246,11 +249,13 @@ mod test {
         ];
 
         for (method, expected) in test_cases.iter() {
-            let probe =
-                ProbeSpecification::from_method(&data::trait_item(), method).expect(&format!(
-                    "This method should be valid: {}",
-                    syn_helpers::convert_to_string(method)
-                ));
+            let probe = ProbeSpecification::from_method(&data::trait_item(), method)
+                .unwrap_or_else(|_| {
+                    panic!(format!(
+                        "This method should be valid: {}",
+                        syn_helpers::convert_to_string(method)
+                    ))
+                });
 
             //Re-construct the probe method using the args as they've been computed in the
             //ProbeSpecification.  The lifetimes should be present

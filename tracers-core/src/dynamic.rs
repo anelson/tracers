@@ -202,7 +202,7 @@ mod test {
     fn c_and_back_again(arg: &str) -> String {
         CString::new(arg)
             .map(|s| s.to_str().expect("Invalid UTF-8").to_string())
-            .unwrap_or("(null)".to_string()) //when we pass a NULL to sprintf with %s fmt it outputs"(null)"
+            .unwrap_or_else(|_| "(null)".to_string()) //when we pass a NULL to sprintf with %s fmt it outputs"(null)"
     }
 
     include!(concat!(env!("OUT_DIR"), "/probe_args_tests.rs"));

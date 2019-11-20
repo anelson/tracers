@@ -525,16 +525,19 @@ mod tests {
 
             let mut stdout = Vec::new();
 
-            tracers_build_internal(&mut stdout, features.clone())
-                .expect(&format!("Unexpected failure with features: {:?}", features));
+            tracers_build_internal(&mut stdout, features.clone()).unwrap_or_else(|_| {
+                panic!(format!("Unexpected failure with features: {:?}", features))
+            });
 
             //That worked.  The resulting build info should have been written out
             let build_info_path = BuildInfo::get_build_path().unwrap();
 
-            let step1_build_info = BuildInfo::load().expect(&format!(
-                "Failed to load build info for features: {:?}",
-                features
-            ));
+            let step1_build_info = BuildInfo::load().unwrap_or_else(|_| {
+                panic!(format!(
+                    "Failed to load build info for features: {:?}",
+                    features
+                ))
+            });
 
             assert_eq!(
                 expected_impl, step1_build_info.implementation,
@@ -580,10 +583,12 @@ mod tests {
                 ("OUT_DIR", out_dir.to_str().unwrap()),
             ]);
 
-            let step2_build_info = BuildInfo::load().expect(&format!(
-                "Failed to load build info for features: {:?}",
-                features
-            ));
+            let step2_build_info = BuildInfo::load().unwrap_or_else(|_| {
+                panic!(format!(
+                    "Failed to load build info for features: {:?}",
+                    features
+                ))
+            });
 
             assert_eq!(step1_build_info, step2_build_info, "context: {}", context);
             drop(guard);
@@ -637,10 +642,12 @@ mod tests {
                 build_info_path.to_str().unwrap(),
             )]);
 
-            let step3_build_info = BuildInfo::load().expect(&format!(
-                "Failed to load build info for features: {:?}",
-                features
-            ));
+            let step3_build_info = BuildInfo::load().unwrap_or_else(|_| {
+                panic!(format!(
+                    "Failed to load build info for features: {:?}",
+                    features
+                ))
+            });
 
             assert_eq!(step1_build_info, step3_build_info, "context: {}", context);
 

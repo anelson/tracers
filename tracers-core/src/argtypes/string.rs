@@ -116,7 +116,7 @@ mod tests {
         fn to_cstring(&self) -> Option<CString> {
             CString::new(*self).ok()
         }
-        fn assert_equals(&self, x: &str) -> () {
+        fn assert_equals(&self, x: &str) {
             assert_eq!(*self, x)
         }
     }
@@ -125,7 +125,7 @@ mod tests {
         fn to_cstring(&self) -> Option<CString> {
             CString::new(self.as_str()).ok()
         }
-        fn assert_equals(&self, x: &str) -> () {
+        fn assert_equals(&self, x: &str) {
             assert_eq!(self.as_str(), x)
         }
     }
@@ -136,7 +136,7 @@ mod tests {
             CString::new(Vec::from(self.as_bytes())).ok()
         }
 
-        fn assert_equals(&self, x: &str) -> () {
+        fn assert_equals(&self, x: &str) {
             assert_eq!(self.to_str().expect("should always be valid UTF-8"), x)
         }
     }
@@ -146,12 +146,12 @@ mod tests {
         fn to_cstring(&self) -> Option<CString> {
             CString::new(Vec::from(self.as_bytes())).ok()
         }
-        fn assert_equals(&self, x: &str) -> () {
+        fn assert_equals(&self, x: &str) {
             assert_eq!(self.to_str().expect("should always be valid UTF-8"), x)
         }
     }
 
-    fn test_with_string<'a, T: StringHelpers + ProbeArgType<T> + Debug>(x: T, pointer: *const i8) {
+    fn test_with_string<T: StringHelpers + ProbeArgType<T> + Debug>(x: T, pointer: *const i8) {
         if pointer.is_null() {
             //This may happen if the string x has embedded NUL bytes.  In that case the string
             //cannot be represented as a C-style null terminated string.  Quicktest definitely

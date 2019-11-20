@@ -293,7 +293,7 @@ mod tests {
             let temp_dir = tempfile::tempdir().unwrap();
             let out_dir = temp_dir.path().join("out");
 
-            for first_run in [true, false].into_iter() {
+            for first_run in [true, false].iter() {
                 //Generate code for all of the crates.
                 for case in TEST_CRATES.iter() {
                     let guard = testdata::with_env_vars(vec![

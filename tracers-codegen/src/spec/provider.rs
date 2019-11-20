@@ -475,7 +475,7 @@ mod test {
             };
 
             let probes = find_probes(&item_trait).unwrap();
-            assert_eq!(probes, test_trait.probes.unwrap_or(Vec::new()));
+            assert_eq!(probes, test_trait.probes.unwrap_or_default());
         }
     }
 

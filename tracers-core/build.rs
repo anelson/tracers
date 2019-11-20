@@ -439,6 +439,7 @@ fn generate_probe_tests() -> String {
             r##"
             #[quickcheck]
             #[cfg(unix)]
+            #[allow(clippy::too_many_arguments)]
             fn test_fire{arg_count}({args_declaration}) -> bool {{
                 let unsafe_impl = TestingProviderProbeImpl::new("{c_format_string}".to_string());
                 let probe_impl = ProviderProbe::new(&unsafe_impl);

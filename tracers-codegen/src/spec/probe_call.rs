@@ -165,10 +165,12 @@ mod test {
             match test_call.expected {
                 Ok(expected_call) => assert_eq!(
                     expected_call,
-                    ProbeCallSpecification::from_token_stream(test_call.call).expect(&format!(
-                        "Unexpected error parsing probe call: '{}'",
-                        call_str
-                    ))
+                    ProbeCallSpecification::from_token_stream(test_call.call).unwrap_or_else(
+                        |_| panic!(format!(
+                            "Unexpected error parsing probe call: '{}'",
+                            call_str
+                        ))
+                    )
                 ),
                 Err(error_msg) => match ProbeCallSpecification::from_token_stream(test_call.call) {
                     Ok(_) => panic!(

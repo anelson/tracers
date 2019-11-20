@@ -114,7 +114,7 @@ pub(crate) fn with_env_vars<'a, K: AsRef<str>, V: AsRef<str>>(
         env::set_var(key, value);
     }
 
-    EnvVarsSetterGuard { guard: guard }
+    EnvVarsSetterGuard { guard }
 }
 
 pub(crate) struct Target {
@@ -144,7 +144,7 @@ impl Target {
             name,
             entrypoint,
             additional_source_files,
-            expected_errors: expected_errors.unwrap_or(Vec::new()),
+            expected_errors: expected_errors.unwrap_or_default(),
         }
     }
 }
@@ -167,19 +167,19 @@ pub(crate) struct TestProviderTrait {
 
 impl fmt::Debug for TestProviderTrait {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
+        writeln!(
             f,
             "TestProviderTrait(
     desc='{}',
     provider_name='{}',
     expected_error='{:?}',
-    probes:\n",
+    probes:",
             self.description, self.provider_name, self.expected_error
         )?;
 
         if let Some(ref probes) = self.probes {
             for probe in probes.iter() {
-                write!(f, "        {:?},\n", probe)?;
+                writeln!(f, "        {:?},", probe)?;
             }
         }
 
@@ -632,7 +632,7 @@ pub(crate) fn get_test_probe_calls() -> Vec<TestProbeCall> {
     ]
 }
 
-pub(crate) static TEST_CRATE_NAME: &'static str = "test";
+pub(crate) static TEST_CRATE_NAME: &str = "test";
 lazy_static! {
     pub(crate) static ref TEST_CRATE_DIR: PathBuf = {
         //NB: this will be invoked sometimes as part of the `tracers-build` crate, such that
@@ -651,11 +651,11 @@ lazy_static! {
         //with the src file's relative path to get the absolute path, then canonicalize
         let workspace_dir = manifest_dir.parent().expect("Manifest dir has no parent that's not possible");
         let src_path = workspace_dir.join(src_file);
-        let mut src_dir = canonicalize(&src_path).expect(&format!("Failed to canonicalize source path: {}", &src_path.display()));
+        let mut src_dir = canonicalize(&src_path).unwrap_or_else(|_| panic!(format!("Failed to canonicalize source path: {}", &src_path.display())));
         src_dir.pop();
 
         let testdata_dir = src_dir.join("..").join("testdata");
-        let testdata_dir = canonicalize(&testdata_dir).expect(&format!("Failed to canonicalize test data path: {}", &testdata_dir.display()));
+        let testdata_dir = canonicalize(&testdata_dir).unwrap_or_else(|_| panic!(format!("Failed to canonicalize test data path: {}", &testdata_dir.display())));
 
         //At this point, `testdata_dir` is the fully qualified path on the filesystem to the
         //`testdata` directory in `tracers-codegen`.  The problem is that our test data include
@@ -668,7 +668,7 @@ lazy_static! {
 
         copy_items(&vec![testdata_dir.as_path()],
             temp_dir.as_path(),
-            &dir::CopyOptions::new()).expect(&format!("Failed to copy {} to {}", testdata_dir.display(), temp_dir.display()));
+            &dir::CopyOptions::new()).unwrap_or_else(|_| panic!(format!("Failed to copy {} to {}", testdata_dir.display(), temp_dir.display())));
 
         temp_dir.join("testdata").to_owned()
     };

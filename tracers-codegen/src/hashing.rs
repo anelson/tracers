@@ -72,7 +72,7 @@ mod test {
     #[test]
     fn file_name_generation() {
         let path = &Path::new("/foo/bar/baz/mylib.a");
-        let hash: HashCode = 0xcafebabedeadbeef;
+        let hash: HashCode = 0xcafe_babe_dead_beef;
 
         assert_eq!(
             Path::new("/foo/bar/baz/mylib-cafebabedeadbeef.a"),
