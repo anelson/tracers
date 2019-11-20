@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "libelf-sys",
-    "libstapsdt-sys",
+    "tracers-libelf-sys",
+    "tracers-libstapsdt-sys",
     "tracers-build",
     "tracers-codegen",
     "tracers-core",

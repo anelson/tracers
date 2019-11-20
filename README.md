@@ -32,8 +32,8 @@ at your option.
 However, the following `-sys` crates have the license
 corresponding to the third-party code which they wrap:
 
-* [`libelf-sys`](libelf-sys/) - Wraps `elfutils` libraries and thus is licensed LGPLv3
-* [`libstapsdt-sys`](libstapsdt-sys/) - Wraps `libstapsdt` and thus is licensed MIT
+* [`tracers-libelf-sys`](tracers-libelf-sys/) - Wraps `elfutils` libraries and thus is licensed LGPLv3
+* [`tracers-libstapsdt-sys`](tracers-libstapsdt-sys/) - Wraps `libstapsdt` and thus is licensed MIT
 
 ### Contribution
 
