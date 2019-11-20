@@ -39,12 +39,14 @@ verify() {
         exit 1
     fi
 
-    PATH_DEPS=$(grep -F "path = \"" Cargo.toml | sed -e 's/^/  /')
-    if [ -n "$PATH_DEPS" ]; then
-        err "crate \`$CRATE\` contained path dependencies:\n$PATH_DEPS"
-        echo "path dependencies must be removed prior to release"
-        exit 1
-    fi
+    # As of recent versions of Cargo this isn't true; path dependencies can be left in as long as there is also an
+    # explicit version dependency also.
+    #PATH_DEPS=$(grep -F "path = \"" Cargo.toml | sed -e 's/^/  /')
+    #if [ -n "$PATH_DEPS" ]; then
+    #    err "crate \`$CRATE\` contained path dependencies:\n$PATH_DEPS"
+    #    echo "path dependencies must be removed prior to release"
+    #    exit 1
+    #fi
 }
 
 release() {
@@ -53,10 +55,12 @@ release() {
     cargo publish $VERBOSE $DRY_RUN
 
     status "Tagging" "$TAG"
+    # NB: Do not push the tags here, because my SSH config requires manual interaction with the yubikey to auth
+    # to github which breaks this flow
     if [ -n "$DRY_RUN" ]; then
-        echo "# git tag $TAG && git push --tags"
+        echo "# git tag $TAG"
     else
-        git tag "$TAG" && git push --tags
+        git tag "$TAG"
     fi
 }
 

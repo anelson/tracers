@@ -41,4 +41,34 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in `tracers` by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
+# Releasing
 
+This section applies to maintainers only.
+
+To release a new version, dependent crates must be released first.  The `bin/publish.sh` script helps to automate the
+process but it's still quite manual.
+
+Release process:
+
+1. Update the `version` property of all crates and of all crates' dependencies on other `tracers` crates to the new
+   target version.
+
+1. Ensure all dependencies have both a path dependency for local development, and a version dependency for publishing.
+   These must be consistent with the new version being published.
+
+1. Update the `documentation` link to reflect the current version.
+
+1. 
+
+Crates must be published in this order:
+
+* `tracers-core`
+* `tracers-libelf-sys`
+* `tracers-libstapsdt-sys`
+* `tracers-codegen`
+* `tracers-macros-hack`
+* `tracers-macros`
+* `tracers-dyn-stap`
+* `tracers-dyn-noop`
+* `tracers-build`
+* `tracers`
