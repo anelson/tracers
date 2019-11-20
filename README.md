@@ -1,6 +1,6 @@
 # tracers - Rust instrumentation library
 
-[![Build Status](https://dev.azure.com/anelson-open-source/tracers/_apis/build/status/anelson.tracers?branchName=master)](https://dev.azure.com/anelson-open-source/tracers/_build/latest?definitionId=1&branchName=master)
+[![Build Status](https://dev.azure.com/anelson-open-source/tracers/_apis/build/status/anelson.tracers?branchName=master)](https://dev.azure.com/anelson-open-source/tracers/_build/latest?definitionId=4&branchName=master)
 
 # Summary
 
