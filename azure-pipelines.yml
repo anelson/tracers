@@ -151,5 +151,5 @@ jobs:
 
       - script: rustup component add clippy && cargo clippy --all-targets --all-features  -- -D warnings
         displayName: Run Clippy linter on Rust code (only on Rust stable)
-        condition:  and(eq( variables['Agent.OS'], 'Linux' ), eq( variables['rustup_toolchain'], 'stable' )
+        condition:  and(eq( variables['Agent.OS'], 'Linux' ), eq( variables['rustup_toolchain'], 'stable' ))
 
