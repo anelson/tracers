@@ -3,6 +3,7 @@
 //! name it will result in linker errors.  If this compiles and runs it means the customer provider
 //! name is being applied to the native code elements also
 #![deny(warnings)]
+#![allow(clippy::blacklisted_name)] //"foo"
 use tracers_macros::probe;
 
 mod foo {

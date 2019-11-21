@@ -1,4 +1,5 @@
 #![deny(warnings)]
+#![allow(clippy::blacklisted_name)] //"foo"
 use tracers_macros::{init_provider, probe, tracer};
 
 #[tracer]
